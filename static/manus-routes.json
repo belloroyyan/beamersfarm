@@ -1,0 +1,14 @@
+{
+  "routes": [
+    { "path": "/", "title": "Shop" },
+    { "path": "/product/:product_id", "title": "Product detail" },
+    { "path": "/cart", "title": "Shopping cart" },
+    { "path": "/checkout", "title": "Delivery details" },
+    { "path": "/order/:order_id/:token/success", "title": "Order confirmation" },
+    { "path": "/admin/login", "title": "Owner login" },
+    { "path": "/admin/", "title": "Order desk" },
+    { "path": "/admin/orders/:order_id", "title": "Order detail" },
+    { "path": "/admin/products", "title": "Product management" },
+    { "path": "/admin/products/:product_id/edit", "title": "Edit product" }
+  ]
+}

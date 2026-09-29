@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} · Beamers Farm{% endblock %}
+{% block content %}
+<div class="container success-shell"><div class="success-mark">{{ code }}</div><p class="eyebrow">Beamers Farm</p><h1>{{ message }}</h1><p class="success-lede">You can return to the shop and try again.</p><a class="button button-dark" href="{{ url_for('shop.index') }}">Back to shop</a></div>
+{% endblock %}

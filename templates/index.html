@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Fresh frozen chicken in Osogbo · Beamers Farm{% endblock %}
+{% block content %}
+<section class="hero container">
+  <div class="hero-copy">
+    <p class="eyebrow">Osogbo · Local delivery within the city</p>
+    <h1>Good food starts with <em>good chicken.</em></h1>
+    <p class="hero-lede">Your trusted local source for fresh, clean, and hygienically packaged frozen chicken, whole birds, and delicious parts. Conveniently delivered across Osogbo for families, restaurants, caterers, resellers, and students.</p>
+    <a class="button button-dark" href="#products">Shop Beamers Farm <span>↓</span></a>
+  </div>
+  <div class="hero-card">
+    <div class="hero-card-top"><span>PACKED WITH CARE</span><span class="status-dot"></span></div>
+    <div class="hero-glyph">BF</div>
+    <div class="hero-card-bottom"><strong>Clean portions. Fair prices.</strong><span>Prices in ₦</span></div>
+  </div>
+</section>
+
+<section class="trust-strip">
+  <div class="container trust-grid">
+    <div><span class="trust-number">01</span><strong>Choose your portions</strong><small>Whole birds and delicious parts</small></div>
+    <div><span class="trust-number">02</span><strong>Tell us where</strong><small>Delivery within Osogbo</small></div>
+    <div><span class="trust-number">03</span><strong>Pay by transfer</strong><small>We confirm every order</small></div>
+  </div>
+</section>
+
+<section class="container section" id="products">
+  <div class="section-heading"><div><p class="eyebrow">Beamers Farm selection</p><h2>Available today</h2></div><span class="section-note">{{ products|length }} products ready to go</span></div>
+  {% if products %}
+    <div class="product-grid">
+      {% for product in products %}
+        <article class="product-card">
+          <a class="product-art art-{{ product.image }}" href="{{ url_for('shop.product_detail', product_id=product.id) }}" aria-label="View {{ product.name }}">
+            <span class="art-label">{{ product.image|upper }}</span>
+            <span class="art-stamp">BF</span>
+          </a>
+          <div class="product-info">
+            <div class="product-heading"><h3>{{ product.name }}</h3><span class="stock-badge">{{ product.stock }} left</span></div>
+            <p>{{ product.description }}</p>
+            <div class="product-buy"><div><strong>{{ format_currency(product.price) }}</strong><small>{{ product.unit }}</small></div><form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post">
+<input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-lime" type="submit">Add to crate <span>+</span></button></form></div>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state"><h3>We are restocking soon.</h3><p>Message Beamers Farm on WhatsApp and we will let you know what is available.</p></div>
+  {% endif %}
+</section>
+
+<section class="container note-panel"><div><p class="eyebrow">Made for Osogbo kitchens</p><h2>Freshness, hygiene, affordability, and portions that fit your table.</h2></div><p>From everyday family meals to restaurant prep and catering orders, Beamers Farm keeps frozen chicken simple, clean, and convenient. Need help choosing? <a class="note-link" href="https://wa.me/2348062074302" target="_blank" rel="noopener">Chat with us on WhatsApp.</a></p></section>
+{% endblock %}
