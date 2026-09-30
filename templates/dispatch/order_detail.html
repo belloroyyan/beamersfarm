@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Delivery · Beamers Farm{% endblock %}
+{% block content %}
+<div class="admin-shell">
+  <div class="container">
+    <div class="admin-topbar compact-topbar">
+      <div>
+        <a class="back-link" href="{{ url_for('dispatch.dashboard') }}">← Back to dispatch queue</a>
+        <p class="eyebrow">Delivery #{{ order.public_id[:8] }}</p>
+        <h1>{{ order.customer_name }}’s delivery</h1>
+      </div>
+      <span class="status-pill status-{{ order.status|lower|replace(' ', '-') }}">{{ order.status }}</span>
+    </div>
+    <div class="detail-admin-grid dispatch-detail-grid">
+      <section class="admin-panel">
+        <div class="panel-heading"><div><p class="eyebrow">Order contents</p><h2>Items to deliver</h2></div></div>
+        {% for item in order.items %}
+          <div class="admin-line"><div><strong>{{ item.quantity }} × {{ item.product_name }}</strong></div></div>
+        {% endfor %}
+        <div class="dispatch-total"><span>Collection total</span><strong>{{ format_currency(order.total) }}</strong><small>Payment handling follows the owner’s instructions.</small></div>
+      </section>
+      <aside class="admin-side">
+        <section class="admin-panel contact-panel dispatch-contact">
+          <p class="eyebrow">Deliver to</p>
+          <h2>{{ order.customer_name }}</h2>
+          <a class="dispatch-phone" href="tel:{{ order.phone }}">Call {{ order.phone }}</a>
+          <p class="dispatch-address">{{ order.address }}</p>
+          <small>Order placed {{ order.created_at.strftime('%d %b %Y · %H:%M') }}</small>
+        </section>
+        <section class="admin-panel dispatch-complete">
+          <p class="eyebrow">Delivery progress</p>
+          <h2>Complete this delivery</h2>
+          <p>Once the customer has received the order, mark it as delivered.</p>
+          <form method="post">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="delivered">
+            <button class="button button-dark button-full" type="submit">Mark as delivered <span>✓</span></button>
+          </form>
+        </section>
+      </aside>
+    </div>
+  </div>
+</div>
+{% endblock %}

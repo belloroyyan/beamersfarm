@@ -72,6 +72,9 @@ class Config:
     ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", "")
     # Development-only compatibility for the original demo password.
     ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "frostadmin")
+    DISPATCH_RIDER_PASSWORD_HASH = os.environ.get("DISPATCH_RIDER_PASSWORD_HASH", "")
+    # Development-only convenience; production must use a password hash.
+    DISPATCH_RIDER_PASSWORD = os.environ.get("DISPATCH_RIDER_PASSWORD", "frostdispatch")
     AUTO_CREATE_SCHEMA = os.environ.get(
         "AUTO_CREATE_SCHEMA", "false" if IS_PRODUCTION else "true"
     ).lower() == "true"
@@ -89,6 +92,8 @@ class Config:
                 raise RuntimeError("SECRET_KEY must be set to a strong value in production.")
             if not cls.ADMIN_PASSWORD_HASH:
                 raise RuntimeError("ADMIN_PASSWORD_HASH must be set in production.")
+            if not cls.DISPATCH_RIDER_PASSWORD_HASH:
+                raise RuntimeError("DISPATCH_RIDER_PASSWORD_HASH must be set in production.")
             if cls.SQLALCHEMY_DATABASE_URI.startswith("sqlite:///"):
                 raise RuntimeError("Production requires DATABASE_URL for durable shared storage.")
             if cls.WHATSAPP_ENABLED:

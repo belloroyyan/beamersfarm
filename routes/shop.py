@@ -90,6 +90,11 @@ def updates():
     return mark_updates_seen(make_response(render_template("updates.html", updates=items)))
 
 
+@shop_bp.get("/help")
+def help_page():
+    return render_template("help.html")
+
+
 @shop_bp.get("/updates/dismiss")
 def dismiss_update():
     return mark_updates_seen(redirect(url_for("shop.index")))

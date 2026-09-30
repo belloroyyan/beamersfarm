@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Help · Beamers Farm{% endblock %}
+{% block content %}
+<section class="container page-shell help-shell">
+  <div class="page-heading help-heading">
+    <div><p class="eyebrow">Beamers Farm · Osogbo</p><h1>Help &amp; how to order</h1><p class="help-intro">Find your way around the shop, place an order, and know what happens next.</p></div>
+    <a class="button button-lime" href="https://wa.me/2348062074302?text={{ 'Hello Beamers Farm, I need help with the website or an order.'|urlencode }}" target="_blank" rel="noopener">Ask us on WhatsApp <span>↗</span></a>
+  </div>
+
+  <section class="help-card help-directions" aria-labelledby="farm-directions-title">
+    <div class="help-section-heading"><span class="help-number">01</span><div><p class="eyebrow">Visit us</p><h2 id="farm-directions-title">How to get to the farm</h2></div></div>
+    <p class="help-address"><strong>Address</strong><br>Elapop Estate, Coker Omu Community,<br>along UNIOSUN Main Campus Road,<br>Oke Baale, Osogbo, Osun State.</p>
+    <p><strong>Nearby landmark:</strong> Barracks, along Boredun–Egbeda Road, Osogbo.</p>
+    <ol class="help-list help-route-list">
+      <li>Use the Barracks on Boredun–Egbeda Road as a landmark when asking for directions to Oke Baale.</li>
+      <li>From Sasa Market, a local rickshaw to Oke Baale is approximately ₦400. Motorcycle (bike) riders are approximately ₦500–₦600.</li>
+      <li>At the entrance to Elapop Estate, look for the Beamers Farm banner. Once inside the estate, walk straight ahead; the path leads to the farm.</li>
+    </ol>
+    <p class="help-note">Transport fares are approximate and may vary. Please confirm the fare with your rider before setting off.</p>
+    <div class="help-hours"><span>Operating hours</span><strong>7:00 AM–7:00 PM</strong></div>
+    <p class="help-muted">Need help finding us? Call <a href="tel:+2348062074302">0806 207 4302</a>.</p>
+  </section>
+
+  <div class="help-grid">
+    <section class="help-card" aria-labelledby="browse-title">
+      <div class="help-section-heading"><span class="help-number">02</span><div><p class="eyebrow">Browse</p><h2 id="browse-title">Choose your chicken</h2></div></div>
+      <ol class="help-list">
+        <li>Open <strong>Products</strong> in the navigation or browse the popular picks on the home page.</li>
+        <li>Open a product to see its details, price, pack size, and availability.</li>
+        <li>Select a quantity and choose <strong>Add to crate</strong>. The crate count in the header updates as you shop.</li>
+      </ol>
+    </section>
+
+    <section class="help-card" aria-labelledby="crate-title">
+      <div class="help-section-heading"><span class="help-number">03</span><div><p class="eyebrow">Review</p><h2 id="crate-title">Check your crate</h2></div></div>
+      <ol class="help-list">
+        <li>Open <strong>Crate</strong> to review your chosen items, quantities, subtotal, and delivery fee.</li>
+        <li>Change a quantity and press <strong>Update crate</strong>, or use the × control to remove an item.</li>
+        <li>When your order looks right, choose <strong>Continue to delivery</strong>.</li>
+      </ol>
+      <a class="help-inline-link" href="{{ url_for('shop.cart') }}">Open your crate →</a>
+    </section>
+
+    <section class="help-card" aria-labelledby="order-title">
+      <div class="help-section-heading"><span class="help-number">04</span><div><p class="eyebrow">Place an order</p><h2 id="order-title">Enter delivery details</h2></div></div>
+      <ol class="help-list">
+        <li>Enter the name and phone number the farm should use to contact you.</li>
+        <li>Provide a complete delivery address in Osogbo, including house number, street, and area.</li>
+        <li>The WhatsApp order-update checkbox is optional. Submit the order when your details are ready.</li>
+      </ol>
+      <p class="help-note">Delivery is within Osogbo. If the shop is closed for orders, you can still browse the site and return when ordering reopens.</p>
+    </section>
+
+    <section class="help-card" aria-labelledby="after-order-title">
+      <div class="help-section-heading"><span class="help-number">05</span><div><p class="eyebrow">After checkout</p><h2 id="after-order-title">Keep your order reference</h2></div></div>
+      <ol class="help-list">
+        <li>After submitting, the confirmation page shows your order number, items, delivery address, and total.</li>
+        <li>Use the order number as the bank-transfer reference. Wait for Beamers Farm to confirm your order and provide payment instructions before transferring.</li>
+        <li>Save the confirmation page. If you contact the farm about your order, include the reference number so the team can find it quickly.</li>
+      </ol>
+      <a class="help-inline-link" href="{{ url_for('complaints.create_complaint') }}">Contact customer care →</a>
+    </section>
+  </div>
+
+  <section class="help-card help-contact">
+    <div><p class="eyebrow">Still need a hand?</p><h2>We’re happy to help.</h2><p>For help with the website, directions, or an existing order, contact Beamers Farm and include your order reference if you have one.</p></div>
+    <a class="button button-dark" href="https://wa.me/2348062074302?text={{ 'Hello Beamers Farm, I need help.'|urlencode }}" target="_blank" rel="noopener">Message 0806 207 4302 <span>↗</span></a>
+  </section>
+</section>
+{% endblock %}

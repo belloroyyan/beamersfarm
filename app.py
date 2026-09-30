@@ -13,6 +13,7 @@ from routes.admin import admin_bp
 from routes.shop import shop_bp
 from routes.whatsapp import whatsapp_bp
 from routes.complaints import complaints_bp
+from routes.dispatch import dispatch_bp
 from utils.helpers import cart_count, format_currency
 from utils.greetings import time_of_day_greeting
 from utils.updates import linkify, update_image_url
@@ -80,6 +81,7 @@ def create_app():
     app.register_blueprint(admin_bp)
     app.register_blueprint(whatsapp_bp)
     app.register_blueprint(complaints_bp)
+    app.register_blueprint(dispatch_bp)
 
     app.jinja_env.filters["linkify"] = linkify
 
@@ -102,7 +104,7 @@ def create_app():
 
     @app.before_request
     def protect_state_changes():
-        if app.config["IS_PRODUCTION"] and session.get("admin_logged_in"):
+        if app.config["IS_PRODUCTION"] and (session.get("staff_role") or session.get("admin_logged_in")):
             session.permanent = True
         if request.method in {"POST", "PUT", "PATCH", "DELETE"} and request.blueprint != "whatsapp":
             validate_csrf()

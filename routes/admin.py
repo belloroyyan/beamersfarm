@@ -21,7 +21,7 @@ COMPLAINT_CATEGORIES = ["Late delivery", "Missing item", "Incorrect item", "Prod
 def admin_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
-        if not session.get("admin_logged_in"):
+        if session.get("staff_role") != "owner" and not session.get("admin_logged_in"):
             return redirect(url_for("admin.login", next=request.path))
         return view(*args, **kwargs)
 
@@ -35,18 +35,43 @@ def valid_admin_password(password):
     return not current_app.config["IS_PRODUCTION"] and password == current_app.config["ADMIN_PASSWORD"]
 
 
+def valid_dispatch_rider_password(password):
+    password_hash = current_app.config.get("DISPATCH_RIDER_PASSWORD_HASH", "")
+    if password_hash:
+        return check_password_hash(password_hash, password)
+    return (
+        not current_app.config["IS_PRODUCTION"]
+        and password == current_app.config["DISPATCH_RIDER_PASSWORD"]
+    )
+
+
 @admin_bp.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        if valid_admin_password(request.form.get("password", "")):
+        role = request.form.get("role", "owner")
+        password = request.form.get("password", "")
+        authenticated = (
+            valid_admin_password(password) if role == "owner"
+            else valid_dispatch_rider_password(password) if role == "dispatch_rider"
+            else False
+        )
+        if authenticated:
             next_url = request.args.get("next")
             session.clear()
-            session["admin_logged_in"] = True
-            flash("Welcome back. Your order desk is ready.", "success")
-            if next_url and is_safe_redirect_url(next_url):
+            session["staff_role"] = role
+            if role == "owner":
+                session["admin_logged_in"] = True
+                flash("Welcome back. Your order desk is ready.", "success")
+                default_endpoint = "admin.dashboard"
+                allowed_next = next_url and not next_url.startswith("/dispatch")
+            else:
+                flash("Welcome. Your dispatch queue is ready.", "success")
+                default_endpoint = "dispatch.dashboard"
+                allowed_next = next_url and next_url.startswith("/dispatch")
+            if allowed_next and is_safe_redirect_url(next_url):
                 return redirect(next_url)
-            return redirect(url_for("admin.dashboard"))
-        flash("That admin password did not match.", "error")
+            return redirect(url_for(default_endpoint))
+        flash("Those sign-in details did not match.", "error")
     return render_template("admin/login.html")
 
 
@@ -307,19 +332,52 @@ def delete_update(update_id):
 @admin_bp.post("/clear-database")
 @admin_required
 def clear_database():
-    """Wipe customer activity (orders, complaints, messages, updates). Products and shop settings stay."""
+    """Clear explicitly selected customer/shop activity while keeping app-critical records."""
     if request.form.get("confirm", "").strip().upper() != "CLEAR":
         flash('Nothing was deleted. Type CLEAR in the box to confirm.', "error")
         return redirect(url_for("admin.dashboard"))
-    for item in ShopUpdate.query.all():
-        delete_update_image(item.image)
-    ShopUpdate.query.delete()
-    Complaint.query.delete()
-    OrderNotification.query.delete()
-    OrderItem.query.delete()
-    Order.query.delete()
-    if request.form.get("reset_pins") == "yes":
-        Product.query.update({Product.featured: False})
+
+    clear_orders = request.form.get("clear_orders") == "yes"
+    clear_complaints = request.form.get("clear_complaints") == "yes"
+    clear_messages = request.form.get("clear_messages") == "yes"
+    clear_updates = request.form.get("clear_updates") == "yes"
+    reset_pins = request.form.get("reset_pins") == "yes"
+    if not any((clear_orders, clear_complaints, clear_messages, clear_updates, reset_pins)):
+        flash("Choose at least one data category or homepage option to clear.", "error")
+        return redirect(url_for("admin.dashboard"))
+
+    cleared = []
+    if clear_orders:
+        # Preserve complaint records even when their related order is removed.
+        Complaint.query.filter(Complaint.order_id.isnot(None)).update(
+            {Complaint.order_id: None}, synchronize_session=False
+        )
+        OrderNotification.query.delete(synchronize_session=False)
+        OrderItem.query.delete(synchronize_session=False)
+        Order.query.delete(synchronize_session=False)
+        cleared.append("orders and delivery records (including their items and WhatsApp logs)")
+    elif clear_messages:
+        OrderNotification.query.delete(synchronize_session=False)
+        cleared.append("WhatsApp message logs")
+
+    if clear_complaints:
+        Complaint.query.delete(synchronize_session=False)
+        cleared.append("complaints")
+    elif clear_orders:
+        cleared.append("complaint records retained with order links removed")
+
+    if clear_updates:
+        for item in ShopUpdate.query.all():
+            delete_update_image(item.image)
+        ShopUpdate.query.delete(synchronize_session=False)
+        cleared.append("shop updates")
+
+    if reset_pins:
+        Product.query.update({Product.featured: False}, synchronize_session=False)
+        cleared.append("homepage product pins")
     db.session.commit()
-    flash("Database cleared. Orders, complaints, messages and updates were removed. Products and settings were kept.", "success")
+    flash(
+        "Cleared: " + "; ".join(cleared) + ". Products, stock, and shop settings were kept.",
+        "success",
+    )
     return redirect(url_for("admin.dashboard"))

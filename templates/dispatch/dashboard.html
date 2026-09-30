@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Dispatch queue · Beamers Farm{% endblock %}
+{% block content %}
+<div class="admin-shell">
+  <div class="container">
+    <div class="admin-topbar">
+      <div>
+        <p class="eyebrow">Dispatch desk / rider workspace</p>
+        <h1>Today’s delivery run.</h1>
+      </div>
+      <div class="admin-actions">
+        <form method="post" action="{{ url_for('admin.logout') }}">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+          <button class="text-button" type="submit">Sign out</button>
+        </form>
+      </div>
+    </div>
+    <div class="metric-grid dispatch-metrics">
+      <div class="metric-card"><span>Ready for delivery</span><strong>{{ queue_count }}</strong><small>Orders currently on the road</small></div>
+      <div class="metric-card"><span>Completed deliveries</span><strong>{{ completed_count }}</strong><small>All completed orders</small></div>
+    </div>
+    <section class="admin-panel">
+      <div class="panel-heading">
+        <div><p class="eyebrow">Delivery queue</p><h2>Orders out for delivery</h2></div>
+        <span class="section-note">Oldest orders first · {{ orders|length }} shown</span>
+      </div>
+      {% if orders %}
+        <div class="order-table-wrap">
+          <table class="order-table dispatch-table">
+            <thead><tr><th>Order</th><th>Customer</th><th>Placed</th><th>Items</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              {% for order in orders %}
+                <tr>
+                  <td><strong>#{{ order.public_id[:8] }}</strong></td>
+                  <td><strong>{{ order.customer_name }}</strong><small>{{ order.phone }}</small></td>
+                  <td>{{ order.created_at.strftime('%d %b %Y · %H:%M') }}</td>
+                  <td>{{ order.items|length }} item{{ '' if order.items|length == 1 else 's' }}</td>
+                  <td><span class="status-pill status-out-for-delivery">{{ order.status }}</span></td>
+                  <td><a class="table-link" href="{{ url_for('dispatch.order_detail', order_ref=order.public_id) }}">Open delivery →</a></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty-state compact"><h3>No deliveries waiting.</h3><p>Orders will appear here after the owner marks them “Out for delivery”.</p></div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}
