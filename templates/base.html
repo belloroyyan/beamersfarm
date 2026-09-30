@@ -16,9 +16,12 @@
         <img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="" class="brand-mark">
         <span><strong>BEAMERS FARM</strong><small>Fresh, clean, hygienically packaged.</small></span>
       </a>
+      <a class="header-crate" href="{{ url_for('shop.cart') }}" aria-label="Open your crate">Crate <span class="cart-count">{{ cart_count }}</span></a>
       <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-menu" aria-label="Open menu"><span></span><span></span><span></span></button>
       <nav class="main-nav" id="main-menu" aria-label="Main navigation">
         <a href="{{ url_for('shop.index') }}">Shop</a>
+        <a href="{{ url_for('shop.products') }}">Products</a>
+        <a href="{{ url_for('shop.updates') }}">Updates</a>
         <a href="{{ url_for('complaints.create_complaint') }}">Customer care</a>
         <span class="shop-status {{ 'shop-open' if shop_is_open else 'shop-closed' }}">{{ 'Open' if shop_is_open else 'Closed' }}</span>
         <a class="cart-link" href="{{ url_for('shop.cart') }}">Crate <span class="cart-count">{{ cart_count }}</span></a>

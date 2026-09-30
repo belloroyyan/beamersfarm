@@ -15,3 +15,18 @@
 
 /* Generated Beamers Farm product photography */
 .product-photo{background:#e8e5d9;isolation:isolate}.product-photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;z-index:0;transition:transform .35s ease}.product-card:hover .product-photo img{transform:scale(1.035)}.product-photo .photo-shade{position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(35,56,47,.02) 45%,rgba(35,56,47,.17) 100%);pointer-events:none}.product-photo.detail-art img{object-position:center}.mini-art.product-photo img{position:relative;width:100%;height:100%;object-fit:cover}.mini-art.product-photo .photo-shade{display:none}
+
+/* Homepage quick menu + owner pin control */
+.section-cta { margin-top: 2rem; display: flex; justify-content: center; }
+.feature-toggle { display: inline-flex; align-items: center; gap: .4rem; cursor: pointer; }
+.feature-toggle input[disabled] { cursor: not-allowed; opacity: .5; }
+.header-crate{display:none;align-items:center;gap:7px;margin-left:auto;background:var(--lime);color:var(--ink);font-weight:700;font-size:.8rem;padding:7px 11px;border-radius:20px}.header-crate .cart-count{background:var(--ink);color:var(--lime)}
+@media(max-width:700px){.header-crate{display:inline-flex}}
+.crate-bar{display:flex;align-items:center;gap:14px;background:var(--ink);color:#fff;border-radius:12px;padding:16px 20px;margin-bottom:30px;box-shadow:var(--shadow);transition:transform .15s}.crate-bar:hover{transform:translateY(-2px)}.crate-bar-icon{font-size:1.6rem}.crate-bar strong{display:block}.crate-bar small{display:block;color:#b9cacc;font-size:.78rem}.crate-bar-cta{margin-left:auto;display:inline-flex;align-items:center;gap:8px;background:var(--lime);color:var(--ink);font-weight:700;font-size:.82rem;padding:9px 14px;border-radius:8px;white-space:nowrap}.crate-bar-cta .cart-count{background:var(--ink);color:var(--lime)}
+.crate-float{position:fixed;right:18px;bottom:18px;z-index:20;display:inline-flex;align-items:center;gap:8px;background:var(--lime);color:var(--ink);font-weight:700;padding:12px 16px;border-radius:30px;box-shadow:0 12px 28px rgba(12,27,42,.25)}.crate-float .cart-count{background:var(--ink);color:var(--lime)}
+@media(max-width:560px){.crate-bar{flex-wrap:wrap}.crate-bar-cta{margin-left:0;width:100%;justify-content:center}}
+.update-popup{position:fixed;inset:0;z-index:50;background:rgba(12,27,42,.55);display:grid;place-items:center;padding:18px}.update-popup-card{position:relative;background:#fff;border-radius:16px;padding:28px;max-width:520px;width:100%;max-height:90vh;overflow:auto;box-shadow:var(--shadow)}.update-popup-close{position:absolute;top:10px;right:14px;font-size:1.7rem;color:#7a8d8f;line-height:1}.update-popup-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.update-list{display:grid;gap:18px}.update-card{background:#fff;border:1px solid #e0e9e2;border-radius:12px;padding:24px}.update-image{display:block;width:100%;max-height:360px;object-fit:cover;border-radius:10px;margin:6px 0 16px}.update-body{color:#44585c;font-size:.93rem;line-height:1.65;overflow-wrap:anywhere}.update-body a{color:#4f7a12;text-decoration:underline}.update-meta{color:#7a8d8f;font-size:.75rem;margin:14px 0 0}
+.update-form{display:grid;gap:14px}.update-form label{display:grid;gap:6px;font-size:.82rem}
+.danger-zone{margin-top:24px;border-color:#f0c9c0;display:grid;grid-template-columns:1fr 320px;gap:30px}.danger-zone p{color:#6b7a7b;font-size:.85rem}.danger-form{display:grid;gap:12px}.danger-form label{display:grid;gap:6px;font-size:.8rem}.button-danger{background:#b4412f;color:#fff}
+@media(max-width:800px){.danger-zone{grid-template-columns:1fr}}

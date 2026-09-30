@@ -24,6 +24,7 @@ class Product(db.Model):
     stock = db.Column(db.Integer, nullable=False, default=0)
     image = db.Column(db.String(80), nullable=False, default="chicken")
     active = db.Column(db.Boolean, nullable=False, default=True)
+    featured = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     order_items = db.relationship("OrderItem", back_populates="product")
@@ -137,3 +138,14 @@ class OrderItem(db.Model):
 
     order = db.relationship("Order", back_populates="items")
     product = db.relationship("Product", back_populates="order_items")
+
+
+class ShopUpdate(db.Model):
+    __tablename__ = "shop_updates"
+
+    id = db.Column(db.Integer, primary_key=True)
+    topic = db.Column(db.String(160), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    image = db.Column(db.String(160), nullable=True)
+    posted_by = db.Column(db.String(80), nullable=False, default="Admin")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)

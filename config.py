@@ -46,6 +46,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True, "connect_args": DATABASE_CONNECT_ARGS}
     PRODUCT_UPLOAD_FOLDER = str(BASE_DIR / "static" / "uploads" / "products")
+    UPDATE_UPLOAD_FOLDER = str(BASE_DIR / "static" / "uploads" / "updates")
     MAX_CONTENT_LENGTH = 8 * 1024 * 1024
     DELIVERY_FEE = 1500
     SHOP_OPEN_DEFAULT = os.environ.get("SHOP_OPEN_DEFAULT", "true").lower() == "true"

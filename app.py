@@ -15,6 +15,7 @@ from routes.whatsapp import whatsapp_bp
 from routes.complaints import complaints_bp
 from utils.helpers import cart_count, format_currency
 from utils.greetings import time_of_day_greeting
+from utils.updates import linkify, update_image_url
 from utils.product_images import product_image_url
 from utils.security import csrf_token, validate_csrf
 
@@ -80,12 +81,15 @@ def create_app():
     app.register_blueprint(whatsapp_bp)
     app.register_blueprint(complaints_bp)
 
+    app.jinja_env.filters["linkify"] = linkify
+
     @app.context_processor
     def inject_helpers():
         shop_settings = ShopSettings.query.get(1)
         return {
             "greeting": time_of_day_greeting(),
             "product_image_url": product_image_url,
+            "update_image_url": update_image_url,
             "format_currency": format_currency,
             "cart_count": cart_count(session.get("cart", {})),
             "csrf_token": csrf_token,

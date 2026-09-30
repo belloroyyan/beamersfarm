@@ -6,9 +6,10 @@ from datetime import datetime
 from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
-from models import Complaint, Order, OrderNotification, Product, ShopSettings, db
+from models import Complaint, Order, OrderItem, OrderNotification, Product, ShopSettings, ShopUpdate, db
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.product_images import save_product_image
+from utils.updates import delete_update_image, save_update_image
 from utils.security import is_safe_redirect_url
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -163,7 +164,13 @@ def products():
             flash("Product added to the catalog.", "success")
         return redirect(url_for("admin.products"))
     products = Product.query.order_by(Product.active.desc(), Product.name.asc()).all()
-    return render_template("admin/products.html", products=products)
+    featured_count = sum(1 for product in products if product.featured)
+    return render_template(
+        "admin/products.html",
+        products=products,
+        featured_count=featured_count,
+        featured_limit=FEATURED_LIMIT,
+    )
 
 
 @admin_bp.route("/products/<int:product_id>/edit", methods=["GET", "POST"])
@@ -202,8 +209,38 @@ def edit_product(product_id):
 def toggle_product(product_id):
     product = Product.query.get_or_404(product_id)
     product.active = not product.active
+    if not product.active:
+        product.featured = False
     db.session.commit()
     flash(f"{product.name} is now {'visible in the catalog' if product.active else 'archived from the catalog'}.", "success")
+    return redirect(url_for("admin.products"))
+
+
+FEATURED_LIMIT = 3
+
+
+@admin_bp.post("/products/<int:product_id>/feature")
+@admin_required
+def toggle_featured(product_id):
+    product = Product.query.get_or_404(product_id)
+    if product.featured:
+        product.featured = False
+        db.session.commit()
+        flash(f"{product.name} removed from the homepage quick menu.", "success")
+        return redirect(url_for("admin.products"))
+    if not product.active:
+        flash("Restore the product before showing it on the homepage.", "error")
+        return redirect(url_for("admin.products"))
+    featured_count = Product.query.filter_by(featured=True).count()
+    if featured_count >= FEATURED_LIMIT:
+        flash(
+            f"You can only pin {FEATURED_LIMIT} products to the homepage. Remove one first.",
+            "error",
+        )
+        return redirect(url_for("admin.products"))
+    product.featured = True
+    db.session.commit()
+    flash(f"{product.name} now shows on the homepage quick menu.", "success")
     return redirect(url_for("admin.products"))
 
 
@@ -233,3 +270,56 @@ def complaint_detail(complaint_id):
             flash("Complaint updated.", "success")
         return redirect(url_for("admin.complaint_detail", complaint_id=complaint.id))
     return render_template("admin/complaint_detail.html", complaint=complaint, statuses=COMPLAINT_STATUSES)
+
+
+@admin_bp.route("/updates", methods=["GET", "POST"])
+@admin_required
+def updates():
+    if request.method == "POST":
+        topic = request.form.get("topic", "").strip()
+        body = request.form.get("body", "").strip()
+        posted_by = request.form.get("posted_by", "").strip() or "Admin"
+        if not topic or not body:
+            flash("Please add a topic and a message.", "error")
+            return render_template("admin/updates.html", updates=ShopUpdate.query.order_by(ShopUpdate.created_at.desc()).all())
+        image, error = save_update_image(request.files.get("image"))
+        if error:
+            flash(error, "error")
+            return render_template("admin/updates.html", updates=ShopUpdate.query.order_by(ShopUpdate.created_at.desc()).all())
+        db.session.add(ShopUpdate(topic=topic[:160], body=body, image=image, posted_by=posted_by[:80]))
+        db.session.commit()
+        flash("Update posted. Visitors will see it on the homepage.", "success")
+        return redirect(url_for("admin.updates"))
+    return render_template("admin/updates.html", updates=ShopUpdate.query.order_by(ShopUpdate.created_at.desc()).all())
+
+
+@admin_bp.post("/updates/<int:update_id>/delete")
+@admin_required
+def delete_update(update_id):
+    item = ShopUpdate.query.get_or_404(update_id)
+    delete_update_image(item.image)
+    db.session.delete(item)
+    db.session.commit()
+    flash("Update deleted.", "success")
+    return redirect(url_for("admin.updates"))
+
+
+@admin_bp.post("/clear-database")
+@admin_required
+def clear_database():
+    """Wipe customer activity (orders, complaints, messages, updates). Products and shop settings stay."""
+    if request.form.get("confirm", "").strip().upper() != "CLEAR":
+        flash('Nothing was deleted. Type CLEAR in the box to confirm.', "error")
+        return redirect(url_for("admin.dashboard"))
+    for item in ShopUpdate.query.all():
+        delete_update_image(item.image)
+    ShopUpdate.query.delete()
+    Complaint.query.delete()
+    OrderNotification.query.delete()
+    OrderItem.query.delete()
+    Order.query.delete()
+    if request.form.get("reset_pins") == "yes":
+        Product.query.update({Product.featured: False})
+    db.session.commit()
+    flash("Database cleared. Orders, complaints, messages and updates were removed. Products and settings were kept.", "success")
+    return redirect(url_for("admin.dashboard"))

@@ -2,6 +2,19 @@
 {% block title %}Fresh frozen chicken in Osogbo · Beamers Farm{% endblock %}
 {% block content %}
 {% if not shop_is_open %}<div class="container shop-notice"><strong>Orders are currently closed.</strong><span>{{ shop_closed_message }}</span></div>{% endif %}
+{% if latest_update %}
+<div class="update-popup" role="dialog" aria-modal="true" aria-labelledby="update-popup-title">
+  <div class="update-popup-card">
+    <a class="update-popup-close" href="{{ url_for('shop.dismiss_update') }}" aria-label="Close update">×</a>
+    <p class="eyebrow">New update · {{ latest_update.created_at.strftime('%d %b %Y') }}</p>
+    {% set img = update_image_url(latest_update.image) %}{% if img %}<img class="update-image" src="{{ img }}" alt="">{% endif %}
+    <h2 id="update-popup-title">{{ latest_update.topic }}</h2>
+    <div class="update-body">{{ latest_update.body|linkify }}</div>
+    <p class="update-meta">Posted by {{ latest_update.posted_by }}</p>
+    <div class="update-popup-actions"><a class="button button-dark" href="{{ url_for('shop.updates') }}">See all updates <span>→</span></a><a class="button button-outline" href="{{ url_for('shop.dismiss_update') }}">Close</a></div>
+  </div>
+</div>
+{% endif %}
 <section class="hero container">
   <div class="hero-copy">
     <p class="eyebrow">{{ greeting }}, welcome to Beamers Farm · Osogbo delivery</p>
@@ -25,7 +38,7 @@
 </section>
 
 <section class="container section" id="products">
-  <div class="section-heading"><div><p class="eyebrow">Beamers Farm selection</p><h2>Available today</h2></div><span class="section-note">{{ products|length }} products ready to go</span></div>
+  <div class="section-heading"><div><p class="eyebrow">Beamers Farm quick menu</p><h2>Popular picks</h2></div><span class="section-note">Handpicked by the shop</span></div>
   {% if products %}
     <div class="product-grid">
       {% for product in products %}
@@ -43,6 +56,7 @@
         </article>
       {% endfor %}
     </div>
+    <div class="section-cta"><a class="button button-dark" href="{{ url_for('shop.products') }}">See the full menu ({{ total_products }} products) <span>→</span></a></div>
   {% else %}
     <div class="empty-state"><h3>We are restocking soon.</h3><p>Message Beamers Farm on WhatsApp and we will let you know what is available.</p></div>
   {% endif %}

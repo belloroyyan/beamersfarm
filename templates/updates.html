@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Updates · Beamers Farm{% endblock %}
+{% block content %}
+<section class="container page-shell">
+  <div class="page-heading"><div><p class="eyebrow">News from the farm</p><h1>Updates</h1></div><a class="back-link" href="{{ url_for('shop.index') }}">← Back to shop</a></div>
+  {% if updates %}
+    <div class="update-list">
+      {% for u in updates %}
+        <article class="update-card">
+          <p class="eyebrow">{{ u.created_at.strftime('%d %b %Y · %H:%M') }}</p>
+          <h2>{{ u.topic }}</h2>
+          {% set img = update_image_url(u.image) %}{% if img %}<img class="update-image" src="{{ img }}" alt="" loading="lazy">{% endif %}
+          <div class="update-body">{{ u.body|linkify }}</div>
+          <p class="update-meta">Posted by {{ u.posted_by }}</p>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state"><h2>No updates yet.</h2><p>Check back soon for news, offers and restock alerts.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

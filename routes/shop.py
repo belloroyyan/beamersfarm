@@ -1,9 +1,9 @@
 from datetime import datetime
 from decimal import Decimal
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, flash, make_response, redirect, render_template, request, session, url_for
 
-from models import Order, OrderItem, Product, ShopSettings, db
+from models import Order, OrderItem, Product, ShopSettings, ShopUpdate, db
 from utils.helpers import build_cart
 
 shop_bp = Blueprint("shop", __name__)
@@ -38,15 +38,67 @@ def shop_is_open():
     return settings.is_open if settings else current_app.config["SHOP_OPEN_DEFAULT"]
 
 
+FEATURED_LIMIT = 3
+
+
+def available_products_query():
+    return Product.query.filter_by(active=True).filter(Product.stock > 0)
+
+
 @shop_bp.get("/")
 def index():
-    products = (
-        Product.query.filter_by(active=True)
-        .filter(Product.stock > 0)
+    featured = (
+        available_products_query()
+        .filter(Product.featured.is_(True))
         .order_by(Product.created_at.asc())
+        .limit(FEATURED_LIMIT)
         .all()
     )
-    return render_template("index.html", products=products)
+    if not featured:
+        featured = (
+            available_products_query()
+            .order_by(Product.created_at.asc())
+            .limit(FEATURED_LIMIT)
+            .all()
+        )
+    total_products = available_products_query().count()
+    latest_update = ShopUpdate.query.order_by(ShopUpdate.id.desc()).first()
+    show_update = bool(latest_update and last_seen_update_id() < latest_update.id)
+    return render_template(
+        "index.html", products=featured, total_products=total_products,
+        latest_update=latest_update if show_update else None,
+    )
+
+
+SEEN_UPDATE_COOKIE = "bf_seen_update"
+
+
+def last_seen_update_id():
+    value = request.cookies.get(SEEN_UPDATE_COOKIE, "0")
+    return int(value) if value.isdigit() else 0
+
+
+def mark_updates_seen(response):
+    latest = db.session.query(db.func.max(ShopUpdate.id)).scalar() or 0
+    response.set_cookie(SEEN_UPDATE_COOKIE, str(latest), max_age=60 * 60 * 24 * 365, samesite="Lax", httponly=True)
+    return response
+
+
+@shop_bp.get("/updates")
+def updates():
+    items = ShopUpdate.query.order_by(ShopUpdate.created_at.desc()).all()
+    return mark_updates_seen(make_response(render_template("updates.html", updates=items)))
+
+
+@shop_bp.get("/updates/dismiss")
+def dismiss_update():
+    return mark_updates_seen(redirect(url_for("shop.index")))
+
+
+@shop_bp.get("/products")
+def products():
+    products = available_products_query().order_by(Product.created_at.asc()).all()
+    return render_template("products.html", products=products)
 
 
 @shop_bp.get("/product/<int:product_id>")

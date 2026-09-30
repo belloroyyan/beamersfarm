@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Updates · Owner desk{% endblock %}
+{% block content %}<div class="admin-shell"><div class="container">
+<div class="admin-topbar"><div><p class="eyebrow">Owner desk / updates</p><h1>Post an update</h1></div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to overview</a></div>
+<section class="admin-panel">
+  <form method="post" enctype="multipart/form-data" class="update-form">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <label>Topic<input type="text" name="topic" maxlength="160" required value="{{ request.form.get('topic', '') }}" placeholder="e.g. Fresh stock arriving Friday"></label>
+    <label>Message<textarea name="body" rows="6" required placeholder="Write your update. Links, emails and phone numbers become clickable automatically.">{{ request.form.get('body', '') }}</textarea></label>
+    <div class="field-grid">
+      <label>Image (optional)<input type="file" name="image" accept=".jpg,.jpeg,.png,.webp,.gif"></label>
+      <label>Posted by<input type="text" name="posted_by" maxlength="80" value="{{ request.form.get('posted_by', 'Admin') }}"></label>
+    </div>
+    <p class="form-note">The date is added automatically.</p>
+    <button class="button button-lime" type="submit">Post update <span>→</span></button>
+  </form>
+</section>
+<section class="admin-panel">
+  <div class="panel-heading"><div><p class="eyebrow">Published</p><h2>Previous updates</h2></div><a class="table-link" href="{{ url_for('shop.updates') }}">View public page →</a></div>
+  {% if updates %}
+    <div class="update-list">{% for u in updates %}
+      <article class="update-card">
+        <p class="eyebrow">{{ u.created_at.strftime('%d %b %Y · %H:%M') }} · {{ u.posted_by }}</p>
+        <h3>{{ u.topic }}</h3>
+        <div class="update-body">{{ u.body|linkify }}</div>
+        <form method="post" action="{{ url_for('admin.delete_update', update_id=u.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="text-button" type="submit">Delete</button></form>
+      </article>
+    {% endfor %}</div>
+  {% else %}<div class="empty-state compact"><h3>No updates yet.</h3></div>{% endif %}
+</section>
+</div></div>{% endblock %}

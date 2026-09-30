@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}All products · Beamers Farm{% endblock %}
+{% block content %}
+{% if not shop_is_open %}<div class="container shop-notice"><strong>Orders are currently closed.</strong><span>{{ shop_closed_message }}</span></div>{% endif %}
+<section class="container section" id="products">
+  <a class="crate-bar" href="{{ url_for('shop.cart') }}"><span class="crate-bar-icon">🧺</span><span><strong>Your crate</strong><small>{% if cart_count %}{{ cart_count }} item{{ 's' if cart_count != 1 }} ready for checkout{% else %}Empty for now — add items below{% endif %}</small></span><span class="crate-bar-cta">View crate <span class="cart-count">{{ cart_count }}</span> →</span></a>
+  <div class="section-heading"><div><p class="eyebrow">Beamers Farm selection</p><h2>All products</h2></div><span class="section-note">{{ products|length }} products ready to go</span></div>
+  {% if products %}
+    <div class="product-grid">
+      {% for product in products %}
+        <article class="product-card">
+          <a class="product-art product-photo art-{{ product.image }}" href="{{ url_for('shop.product_detail', product_id=product.id) }}" aria-label="View {{ product.name }}">
+            <img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy">
+            <span class="photo-shade"></span>
+          </a>
+          <div class="product-info">
+            <div class="product-heading"><h3>{{ product.name }}</h3><span class="stock-badge">{{ product.stock }} left</span></div>
+            <p>{{ product.description }}</p>
+            <div class="product-buy"><div><strong>{{ format_currency(product.price) }}</strong><small>{{ product.unit }}</small></div><form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post">
+<input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-lime" type="submit">Add to crate <span>+</span></button></form></div>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="empty-state"><h3>We are restocking soon.</h3><p>Message Beamers Farm on WhatsApp and we will let you know what is available.</p></div>
+  {% endif %}
+</section>
+{% if cart_count %}<a class="crate-float" href="{{ url_for('shop.cart') }}">View crate <span class="cart-count">{{ cart_count }}</span></a>{% endif %}
+{% endblock %}
