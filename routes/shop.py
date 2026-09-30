@@ -1,8 +1,9 @@
+from datetime import datetime
 from decimal import Decimal
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 
-from models import Order, OrderItem, Product, db
+from models import Order, OrderItem, Product, ShopSettings, db
 from utils.helpers import build_cart
 
 shop_bp = Blueprint("shop", __name__)
@@ -30,6 +31,11 @@ def locked_cart_summary():
         db.select(Product).where(Product.id.in_(ids)).with_for_update()
     ).scalars().all()
     return cart_summary(products)
+
+
+def shop_is_open():
+    settings = ShopSettings.query.get(1)
+    return settings.is_open if settings else current_app.config["SHOP_OPEN_DEFAULT"]
 
 
 @shop_bp.get("/")
@@ -101,6 +107,12 @@ def remove_from_cart(product_id):
 
 @shop_bp.route("/checkout", methods=["GET", "POST"])
 def checkout():
+    if not shop_is_open():
+        settings = ShopSettings.query.get(1)
+        return render_template(
+            "shop_closed.html",
+            message=settings.closed_message if settings else current_app.config["SHOP_CLOSED_MESSAGE"],
+        ), 403
     summary = cart_summary()
     if not summary["lines"]:
         flash("Add at least one product before checking out.", "error")
@@ -110,6 +122,7 @@ def checkout():
         customer_name = request.form.get("customer_name", "").strip()
         phone = request.form.get("phone", "").strip()
         address = request.form.get("address", "").strip()
+        whatsapp_opt_in = request.form.get("whatsapp_opt_in") == "yes"
         if not customer_name or len(customer_name) > 120 or not phone or len(phone) > 40 or not address or len(address) > 1000:
             flash("Please enter a valid name, phone number, and delivery address.", "error")
             return render_template("checkout.html", summary=summary)
@@ -130,6 +143,8 @@ def checkout():
                 customer_name=customer_name,
                 phone=phone,
                 address=address,
+                whatsapp_opt_in=whatsapp_opt_in,
+                whatsapp_opt_in_at=datetime.utcnow() if whatsapp_opt_in else None,
                 status="Received",
                 subtotal=summary["subtotal"],
                 delivery_fee=summary["delivery_fee"],
@@ -154,12 +169,17 @@ def checkout():
             db.session.rollback()
             raise
         session["cart"] = {}
-        return redirect(url_for("shop.order_success", order_id=order.id, token=order.public_token))
+        return redirect(url_for("shop.order_success", order_ref=order.public_id, token=order.public_token))
 
     return render_template("checkout.html", summary=summary)
 
 
-@shop_bp.get("/order/<int:order_id>/<string:token>/success")
-def order_success(order_id, token):
-    order = Order.query.filter_by(id=order_id, public_token=token).first_or_404()
+@shop_bp.get("/order/<string:order_ref>/<string:token>/success")
+def order_success(order_ref, token):
+    order = Order.query.filter_by(public_id=order_ref, public_token=token).first()
+    if order is None and order_ref.isdigit():
+        order = Order.query.filter_by(id=int(order_ref), public_token=token).first()
+    if order is None:
+        from flask import abort
+        abort(404)
     return render_template("order_success.html", order=order)

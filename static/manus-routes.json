@@ -9,6 +9,10 @@
     { "path": "/admin/", "title": "Order desk" },
     { "path": "/admin/orders/:order_id", "title": "Order detail" },
     { "path": "/admin/products", "title": "Product management" },
-    { "path": "/admin/products/:product_id/edit", "title": "Edit product" }
+    { "path": "/admin/products/:product_id/edit", "title": "Edit product" },
+    { "path": "/admin/complaints", "title": "Complaints" },
+    { "path": "/admin/complaints/:complaint_id", "title": "Complaint detail" },
+    { "path": "/complaint", "title": "Customer care" },
+    { "path": "/webhooks/whatsapp", "title": "WhatsApp webhook" }
   ]
 }

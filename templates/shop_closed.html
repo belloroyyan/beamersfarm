@@ -1,0 +1,3 @@
+{% extends "base.html" %}
+{% block title %}Shop closed · Beamers Farm{% endblock %}
+{% block content %}<div class="container success-shell"><div class="success-mark">—</div><p class="eyebrow">Orders are closed</p><h1>We’re taking a quiet pause.</h1><p class="success-lede">{{ message }}</p><div class="payment-card"><p class="eyebrow">Still need help?</p><p>You can browse the catalogue and send us a complaint or enquiry. For urgent questions, message us on <a class="text-link" href="https://wa.me/2348062074302" target="_blank" rel="noopener">WhatsApp</a>.</p></div><a class="button button-dark" href="{{ url_for('shop.index') }}">Browse products</a></div>{% endblock %}

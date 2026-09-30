@@ -45,10 +45,29 @@ class Config:
     SQLALCHEMY_DATABASE_URI = DATABASE_URI
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True, "connect_args": DATABASE_CONNECT_ARGS}
+    PRODUCT_UPLOAD_FOLDER = str(BASE_DIR / "static" / "uploads" / "products")
+    MAX_CONTENT_LENGTH = 8 * 1024 * 1024
     DELIVERY_FEE = 1500
+    SHOP_OPEN_DEFAULT = os.environ.get("SHOP_OPEN_DEFAULT", "true").lower() == "true"
+    SHOP_CLOSED_MESSAGE = os.environ.get(
+        "SHOP_CLOSED_MESSAGE",
+        "We are currently closed for orders. You can still browse our products.",
+    )
     PAYMENT_BANK = "Opay"
     PAYMENT_ACCOUNT_NUMBER = "8062074302"
     PAYMENT_ACCOUNT_NAME = "Dauda Akanni Bello"
+    MESSAGING_ENABLED = os.environ.get("MESSAGING_ENABLED", "false").lower() == "true"
+    MESSAGING_MODE = os.environ.get("MESSAGING_MODE", "mock").lower()
+    WHATSAPP_ENABLED = os.environ.get("WHATSAPP_ENABLED", "false").lower() == "true"
+    WHATSAPP_GRAPH_API_VERSION = os.environ.get("WHATSAPP_GRAPH_API_VERSION", "v26.0")
+    WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
+    WHATSAPP_BUSINESS_ACCOUNT_ID = os.environ.get("WHATSAPP_BUSINESS_ACCOUNT_ID", "")
+    WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN", "")
+    WHATSAPP_TEMPLATE_NAME = os.environ.get("WHATSAPP_TEMPLATE_NAME", "beamers_order_confirmed")
+    WHATSAPP_TEMPLATE_LANGUAGE = os.environ.get("WHATSAPP_TEMPLATE_LANGUAGE", "en")
+    WHATSAPP_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "")
+    META_APP_SECRET = os.environ.get("META_APP_SECRET", "")
+    WHATSAPP_MAX_ATTEMPTS = int(os.environ.get("WHATSAPP_MAX_ATTEMPTS", "5"))
     ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", "")
     # Development-only compatibility for the original demo password.
     ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "frostadmin")
@@ -71,3 +90,13 @@ class Config:
                 raise RuntimeError("ADMIN_PASSWORD_HASH must be set in production.")
             if cls.SQLALCHEMY_DATABASE_URI.startswith("sqlite:///"):
                 raise RuntimeError("Production requires DATABASE_URL for durable shared storage.")
+            if cls.WHATSAPP_ENABLED:
+                required = {
+                    "WHATSAPP_PHONE_NUMBER_ID": cls.WHATSAPP_PHONE_NUMBER_ID,
+                    "WHATSAPP_ACCESS_TOKEN": cls.WHATSAPP_ACCESS_TOKEN,
+                    "WHATSAPP_VERIFY_TOKEN": cls.WHATSAPP_VERIFY_TOKEN,
+                    "META_APP_SECRET": cls.META_APP_SECRET,
+                }
+                missing = [name for name, value in required.items() if not value]
+                if missing:
+                    raise RuntimeError("WhatsApp is enabled but required variables are missing: " + ", ".join(missing))

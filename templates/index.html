@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Fresh frozen chicken in Osogbo · Beamers Farm{% endblock %}
 {% block content %}
+{% if not shop_is_open %}<div class="container shop-notice"><strong>Orders are currently closed.</strong><span>{{ shop_closed_message }}</span></div>{% endif %}
 <section class="hero container">
   <div class="hero-copy">
-    <p class="eyebrow">Osogbo · Local delivery within the city</p>
+    <p class="eyebrow">{{ greeting }}, welcome to Beamers Farm · Osogbo delivery</p>
     <h1>Good food starts with <em>good chicken.</em></h1>
     <p class="hero-lede">Your trusted local source for fresh, clean, and hygienically packaged frozen chicken, whole birds, and delicious parts. Conveniently delivered across Osogbo for families, restaurants, caterers, resellers, and students.</p>
     <a class="button button-dark" href="#products">Shop Beamers Farm <span>↓</span></a>
@@ -29,9 +30,9 @@
     <div class="product-grid">
       {% for product in products %}
         <article class="product-card">
-          <a class="product-art art-{{ product.image }}" href="{{ url_for('shop.product_detail', product_id=product.id) }}" aria-label="View {{ product.name }}">
-            <span class="art-label">{{ product.image|upper }}</span>
-            <span class="art-stamp">BF</span>
+          <a class="product-art product-photo art-{{ product.image }}" href="{{ url_for('shop.product_detail', product_id=product.id) }}" aria-label="View {{ product.name }}">
+            <img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy">
+            <span class="photo-shade"></span>
           </a>
           <div class="product-info">
             <div class="product-heading"><h3>{{ product.name }}</h3><span class="stock-badge">{{ product.stock }} left</span></div>

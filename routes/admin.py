@@ -1,14 +1,20 @@
 from decimal import Decimal
 from functools import wraps
 
+from datetime import datetime
+
 from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
-from models import Order, Product, db
+from models import Complaint, Order, OrderNotification, Product, ShopSettings, db
+from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
+from utils.product_images import save_product_image
 from utils.security import is_safe_redirect_url
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 ORDER_STATUSES = ["Received", "Confirmed", "Preparing", "Out for delivery", "Delivered", "Cancelled"]
+COMPLAINT_STATUSES = ["New", "Under Review", "Resolved", "Closed"]
+COMPLAINT_CATEGORIES = ["Late delivery", "Missing item", "Incorrect item", "Product quality", "Payment issue", "Delivery experience", "Other"]
 
 
 def admin_required(view):
@@ -54,24 +60,45 @@ def logout():
 @admin_required
 def dashboard():
     orders = Order.query.order_by(Order.created_at.desc()).limit(100).all()
+    shop_settings = ShopSettings.query.get(1)
     stats = {
         "open": Order.query.filter(Order.status.notin_(["Delivered", "Cancelled"])).count(),
         "today": Order.query.filter(db.func.date(Order.created_at) == db.func.current_date()).count(),
         "products": Product.query.filter_by(active=True).count(),
         "low_stock": Product.query.filter(Product.active.is_(True), Product.stock <= 5).count(),
+        "complaints": Complaint.query.filter(Complaint.status.in_(["New", "Under Review"])).count(),
     }
-    return render_template("admin/dashboard.html", orders=orders, stats=stats, statuses=ORDER_STATUSES)
+    return render_template("admin/dashboard.html", orders=orders, stats=stats, statuses=ORDER_STATUSES, shop_settings=shop_settings)
 
 
-@admin_bp.route("/orders/<int:order_id>", methods=["GET", "POST"])
+@admin_bp.post("/shop/toggle")
 @admin_required
-def order_detail(order_id):
-    order = Order.query.get_or_404(order_id)
+def toggle_shop():
+    settings = ShopSettings.query.get(1)
+    if not settings:
+        settings = ShopSettings(id=1, is_open=current_app.config["SHOP_OPEN_DEFAULT"], closed_message=current_app.config["SHOP_CLOSED_MESSAGE"])
+        db.session.add(settings)
+    settings.is_open = not settings.is_open
+    db.session.commit()
+    flash(f"Shop is now {'open for orders' if settings.is_open else 'closed for new orders'}.", "success")
+    return redirect(url_for("admin.dashboard"))
+
+
+@admin_bp.route("/orders/<string:order_ref>", methods=["GET", "POST"])
+@admin_required
+def order_detail(order_ref):
+    order = Order.query.filter_by(public_id=order_ref).first()
+    if order is None and order_ref.isdigit():
+        order = db.session.get(Order, int(order_ref))
+    if order is None:
+        from flask import abort
+        abort(404)
     if request.method == "POST":
         new_status = request.form.get("status", "")
         if new_status not in ORDER_STATUSES:
             flash("Choose a valid order status.", "error")
         elif new_status != order.status:
+            previous_status = order.status
             if new_status == "Cancelled" and order.status != "Cancelled":
                 for item in order.items:
                     if item.product:
@@ -85,9 +112,29 @@ def order_detail(order_id):
                     if item.product:
                         item.product.stock -= item.quantity
             order.status = new_status
+            if previous_status != "Confirmed" and new_status == "Confirmed" and order.whatsapp_opt_in:
+                existing = OrderNotification.query.filter_by(
+                    order_id=order.id,
+                    channel="whatsapp",
+                    event="order_confirmed",
+                ).first()
+                if existing is None:
+                    db.session.add(
+                        OrderNotification(
+                            order=order,
+                            channel="whatsapp",
+                            event="order_confirmed",
+                            recipient=normalize_nigerian_phone(order.phone),
+                            message=build_order_confirmed_message(order),
+                            status="pending",
+                        )
+                    )
             db.session.commit()
-            flash("Order status updated.", "success")
-        return redirect(url_for("admin.order_detail", order_id=order.id))
+            if new_status == "Confirmed" and previous_status != "Confirmed" and order.whatsapp_opt_in:
+                flash("Order confirmed. WhatsApp notification queued for the scheduled sender.", "success")
+            else:
+                flash("Order status updated.", "success")
+        return redirect(url_for("admin.order_detail", order_ref=order.public_id))
     return render_template("admin/order_detail.html", order=order, statuses=ORDER_STATUSES)
 
 
@@ -107,7 +154,11 @@ def products():
         if not name or len(name) > 120 or price < 0 or price > Decimal("9999999999.99") or stock < 0:
             flash("Enter a valid product name, price, and stock amount.", "error")
         else:
-            db.session.add(Product(name=name, description=description[:2000], price=price, unit=unit[:80], stock=stock, image="chicken"))
+            image_path, image_error = save_product_image(request.files.get("image"))
+            if image_error:
+                flash(image_error, "error")
+                return redirect(url_for("admin.products"))
+            db.session.add(Product(name=name, description=description[:2000], price=price, unit=unit[:80], stock=stock, image=image_path or "chicken"))
             db.session.commit()
             flash("Product added to the catalog.", "success")
         return redirect(url_for("admin.products"))
@@ -134,6 +185,12 @@ def edit_product(product_id):
         product.name = request.form.get("name", "").strip()[:120] or product.name
         product.description = request.form.get("description", "").strip()[:2000]
         product.unit = request.form.get("unit", "per pack").strip()[:80] or "per pack"
+        image_path, image_error = save_product_image(request.files.get("image"))
+        if image_error:
+            flash(image_error, "error")
+            return render_template("admin/product_edit.html", product=product)
+        if image_path:
+            product.image = image_path
         db.session.commit()
         flash("Product details saved.", "success")
         return redirect(url_for("admin.products"))
@@ -148,3 +205,31 @@ def toggle_product(product_id):
     db.session.commit()
     flash(f"{product.name} is now {'visible in the catalog' if product.active else 'archived from the catalog'}.", "success")
     return redirect(url_for("admin.products"))
+
+
+@admin_bp.get("/complaints")
+@admin_required
+def complaints():
+    status = request.args.get("status", "").strip()
+    query = Complaint.query.order_by(Complaint.created_at.desc())
+    if status in COMPLAINT_STATUSES:
+        query = query.filter_by(status=status)
+    return render_template("admin/complaints.html", complaints=query.all(), statuses=COMPLAINT_STATUSES, selected_status=status)
+
+
+@admin_bp.route("/complaints/<int:complaint_id>", methods=["GET", "POST"])
+@admin_required
+def complaint_detail(complaint_id):
+    complaint = Complaint.query.get_or_404(complaint_id)
+    if request.method == "POST":
+        status = request.form.get("status", "")
+        if status not in COMPLAINT_STATUSES:
+            flash("Choose a valid complaint status.", "error")
+        else:
+            complaint.status = status
+            complaint.owner_notes = request.form.get("owner_notes", "").strip()[:5000]
+            complaint.resolved_at = datetime.utcnow() if status in {"Resolved", "Closed"} else None
+            db.session.commit()
+            flash("Complaint updated.", "success")
+        return redirect(url_for("admin.complaint_detail", complaint_id=complaint.id))
+    return render_template("admin/complaint_detail.html", complaint=complaint, statuses=COMPLAINT_STATUSES)

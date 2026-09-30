@@ -8,10 +8,14 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config, INSTANCE_DIR
-from models import Product, db
+from models import Product, ShopSettings, db
 from routes.admin import admin_bp
 from routes.shop import shop_bp
+from routes.whatsapp import whatsapp_bp
+from routes.complaints import complaints_bp
 from utils.helpers import cart_count, format_currency
+from utils.greetings import time_of_day_greeting
+from utils.product_images import product_image_url
 from utils.security import csrf_token, validate_csrf
 
 migrate = Migrate()
@@ -51,6 +55,18 @@ def seed_products():
     db.session.commit()
 
 
+def ensure_shop_settings():
+    if not ShopSettings.query.get(1):
+        db.session.add(
+            ShopSettings(
+                id=1,
+                is_open=Config.SHOP_OPEN_DEFAULT,
+                closed_message=Config.SHOP_CLOSED_MESSAGE,
+            )
+        )
+        db.session.commit()
+
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -61,23 +77,30 @@ def create_app():
     migrate.init_app(app, db)
     app.register_blueprint(shop_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(whatsapp_bp)
+    app.register_blueprint(complaints_bp)
 
     @app.context_processor
     def inject_helpers():
+        shop_settings = ShopSettings.query.get(1)
         return {
+            "greeting": time_of_day_greeting(),
+            "product_image_url": product_image_url,
             "format_currency": format_currency,
             "cart_count": cart_count(session.get("cart", {})),
             "csrf_token": csrf_token,
             "payment_bank": app.config["PAYMENT_BANK"],
             "payment_account_number": app.config["PAYMENT_ACCOUNT_NUMBER"],
             "payment_account_name": app.config["PAYMENT_ACCOUNT_NAME"],
+            "shop_is_open": shop_settings.is_open if shop_settings else app.config["SHOP_OPEN_DEFAULT"],
+            "shop_closed_message": shop_settings.closed_message if shop_settings else app.config["SHOP_CLOSED_MESSAGE"],
         }
 
     @app.before_request
     def protect_state_changes():
         if app.config["IS_PRODUCTION"] and session.get("admin_logged_in"):
             session.permanent = True
-        if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"} and request.blueprint != "whatsapp":
             validate_csrf()
 
     @app.after_request
@@ -131,6 +154,7 @@ def create_app():
         if app.config["AUTO_CREATE_SCHEMA"]:
             db.create_all()
             seed_products()
+            ensure_shop_settings()
     return app
 
 

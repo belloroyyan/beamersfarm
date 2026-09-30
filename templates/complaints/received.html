@@ -1,0 +1,3 @@
+{% extends "base.html" %}
+{% block title %}Complaint received · Beamers Farm{% endblock %}
+{% block content %}<div class="container success-shell"><div class="success-mark">✓</div><p class="eyebrow">Customer care</p><h1>We’ve received your message, {{ name }}.</h1><p class="success-lede">Thank you for telling us. The Beamers Farm team will review your complaint and contact you if more information is needed.</p><a class="button button-dark" href="{{ url_for('shop.index') }}">Back to Beamers Farm</a></div>{% endblock %}
