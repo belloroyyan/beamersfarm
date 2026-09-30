@@ -8,6 +8,12 @@ from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
 
+order_customer_push_subscriptions = db.Table(
+    "order_customer_push_subscriptions",
+    db.Column("order_id", db.Integer, db.ForeignKey("orders.id", ondelete="CASCADE"), primary_key=True),
+    db.Column("subscription_id", db.Integer, db.ForeignKey("customer_push_subscriptions.id", ondelete="CASCADE"), primary_key=True),
+)
+
 
 class Product(db.Model):
     __tablename__ = "products"
@@ -93,6 +99,11 @@ class Order(db.Model):
         "OrderNotification", back_populates="order", cascade="all, delete-orphan"
     )
     complaints = db.relationship("Complaint", back_populates="order")
+    customer_push_subscriptions = db.relationship(
+        "CustomerPushSubscription",
+        secondary=order_customer_push_subscriptions,
+        back_populates="orders",
+    )
 
 
 class OrderNotification(db.Model):
@@ -149,3 +160,39 @@ class ShopUpdate(db.Model):
     image = db.Column(db.String(160), nullable=True)
     posted_by = db.Column(db.String(80), nullable=False, default="Admin")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class StaffPushSubscription(db.Model):
+    __tablename__ = "staff_push_subscriptions"
+    __table_args__ = (
+        db.UniqueConstraint("staff_role", "endpoint_hash", name="uq_staff_push_subscriptions_role_endpoint_hash"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    staff_role = db.Column(db.String(32), nullable=False)
+    endpoint_hash = db.Column(db.String(64), nullable=False)
+    endpoint = db.Column(db.Text, nullable=False)
+    p256dh = db.Column(db.String(200), nullable=False)
+    auth = db.Column(db.String(200), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class CustomerPushSubscription(db.Model):
+    __tablename__ = "customer_push_subscriptions"
+    __table_args__ = (
+        db.UniqueConstraint("customer_key", "endpoint_hash", name="uq_customer_push_subscriptions_customer_endpoint"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    customer_key = db.Column(db.String(64), nullable=False)
+    endpoint_hash = db.Column(db.String(64), nullable=False)
+    endpoint = db.Column(db.Text, nullable=False)
+    p256dh = db.Column(db.String(200), nullable=False)
+    auth = db.Column(db.String(200), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    orders = db.relationship(
+        "Order",
+        secondary=order_customer_push_subscriptions,
+        back_populates="customer_push_subscriptions",
+    )

@@ -1,4 +1,4 @@
-const CACHE_NAME = "beamers-farm-pwa-v1";
+const CACHE_NAME = "beamers-farm-pwa-v5";
 const OFFLINE_URL = "/static/offline.html";
 const PRECACHE_URLS = [
   OFFLINE_URL,
@@ -7,6 +7,8 @@ const PRECACHE_URLS = [
   "/static/js/cart.js",
   "/static/js/copy-reference.js",
   "/static/js/pwa-register.js",
+  "/static/js/dispatch-push.js",
+  "/static/js/customer-push.js",
   "/static/images/brand-mark.png",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
@@ -64,4 +66,52 @@ self.addEventListener("fetch", (event) => {
     if (response.ok) await cache.put(url.pathname, response.clone());
     return response;
   })());
+});
+
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (_) {
+    payload = { body: event.data ? event.data.text() : "A new order is in the dispatch queue." };
+  }
+
+  const title = typeof payload.title === "string" ? payload.title : "New delivery assigned";
+  const body = typeof payload.body === "string"
+    ? payload.body
+    : "A new order is in the dispatch queue. Sign in to review the delivery.";
+  let targetUrl = "/dispatch/";
+  try {
+    const candidate = new URL(typeof payload.url === "string" ? payload.url : "/dispatch/", self.location.origin);
+    if (candidate.origin === self.location.origin) targetUrl = candidate.pathname + candidate.search;
+  } catch (_) {
+    targetUrl = "/dispatch/";
+  }
+
+  event.waitUntil(self.registration.showNotification(title, {
+    body,
+    icon: "/static/icons/icon-192.png",
+    badge: "/static/icons/icon-192.png",
+    data: { url: targetUrl },
+  }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  let targetUrl = "/dispatch/";
+  try {
+    const candidate = new URL(event.notification.data && event.notification.data.url || "/dispatch/", self.location.origin);
+    if (candidate.origin === self.location.origin) targetUrl = candidate.href;
+  } catch (_) {
+    targetUrl = new URL("/dispatch/", self.location.origin).href;
+  }
+
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (windowClients) => {
+    const existing = windowClients.find((client) => new URL(client.url).origin === self.location.origin);
+    if (existing) {
+      await existing.navigate(targetUrl);
+      return existing.focus();
+    }
+    return self.clients.openWindow(targetUrl);
+  }));
 });

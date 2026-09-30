@@ -1,12 +1,29 @@
+import hashlib
+import hmac
+import re
 from datetime import datetime
 from decimal import Decimal
 
-from flask import Blueprint, current_app, flash, make_response, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 
-from models import Order, OrderItem, Product, ShopSettings, ShopUpdate, db
+from models import CustomerPushSubscription, Order, OrderItem, Product, ShopSettings, ShopUpdate, db
 from utils.helpers import build_cart
+from utils.notifications import normalize_nigerian_phone
+from utils.push_subscriptions import valid_push_endpoint
+from utils.web_push import send_customer_order_confirmed_push, send_owner_new_order_push, web_push_is_configured
 
 shop_bp = Blueprint("shop", __name__)
+
+
+def customer_notification_key(phone):
+    normalized = normalize_nigerian_phone(phone)
+    if not normalized:
+        normalized = " ".join((phone or "").split()).casefold()
+    return hmac.new(
+        str(current_app.config["SECRET_KEY"]).encode("utf-8"),
+        normalized.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 def current_cart():
@@ -225,6 +242,7 @@ def checkout():
         except Exception:
             db.session.rollback()
             raise
+        send_owner_new_order_push()
         session["cart"] = {}
         return redirect(url_for("shop.order_success", order_ref=order.public_id, token=order.public_token))
 
@@ -239,4 +257,77 @@ def order_success(order_ref, token):
     if order is None:
         from flask import abort
         abort(404)
-    return render_template("order_success.html", order=order)
+    return render_template(
+        "order_success.html", order=order, push_configured=web_push_is_configured(),
+        vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""),
+    )
+
+
+@shop_bp.post("/order/<string:order_ref>/<string:token>/push-subscriptions")
+def customer_push_subscription(order_ref, token):
+    order = Order.query.filter_by(public_id=order_ref, public_token=token).first()
+    if order is None and order_ref.isdigit():
+        order = Order.query.filter_by(id=int(order_ref), public_token=token).first()
+    if order is None:
+        abort(404)
+    if not web_push_is_configured():
+        return jsonify(error="Push notifications are not configured by the site owner."), 503
+
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    endpoint = payload.get("endpoint")
+    if not valid_push_endpoint(endpoint):
+        return jsonify(error="The browser returned an invalid push subscription."), 400
+    endpoint_hash = hashlib.sha256(endpoint.encode("utf-8")).hexdigest()
+    customer_key = customer_notification_key(order.phone)
+    subscription = CustomerPushSubscription.query.filter_by(
+        customer_key=customer_key, endpoint_hash=endpoint_hash
+    ).first()
+    already_linked = bool(
+        subscription
+        and any(item.id == subscription.id for item in order.customer_push_subscriptions)
+    )
+
+    if payload.get("action") == "check":
+        if subscription is None:
+            return jsonify(enabled=False), 200
+        if not already_linked:
+            order.customer_push_subscriptions.append(subscription)
+            db.session.commit()
+            if order.status in {"Confirmed", "Preparing", "Out for delivery", "Delivered"}:
+                send_customer_order_confirmed_push(order, subscription_ids=[subscription.id])
+        return jsonify(enabled=True, message="Order notifications were already enabled on this device."), 200
+
+    if payload.get("action") != "subscribe":
+        return jsonify(error="Choose a valid notification action."), 400
+    keys = payload.get("keys")
+    p256dh = keys.get("p256dh") if isinstance(keys, dict) else None
+    auth = keys.get("auth") if isinstance(keys, dict) else None
+    if (
+        not isinstance(p256dh, str)
+        or not re.fullmatch(r"[A-Za-z0-9_-]{40,200}", p256dh)
+        or not isinstance(auth, str)
+        or not re.fullmatch(r"[A-Za-z0-9_-]{16,200}", auth)
+    ):
+        return jsonify(error="The browser returned an invalid push subscription."), 400
+
+    if subscription is None:
+        subscription = CustomerPushSubscription(
+            customer_key=customer_key, endpoint_hash=endpoint_hash,
+            endpoint=endpoint, p256dh=p256dh, auth=auth
+        )
+        db.session.add(subscription)
+    else:
+        subscription.endpoint = endpoint
+        subscription.p256dh = p256dh
+        subscription.auth = auth
+    if not already_linked:
+        order.customer_push_subscriptions.append(subscription)
+    db.session.commit()
+    if not already_linked and order.status in {"Confirmed", "Preparing", "Out for delivery", "Delivered"}:
+        send_customer_order_confirmed_push(order, subscription_ids=[subscription.id])
+    return jsonify(
+        enabled=True,
+        message="Order notifications are enabled for this customer on this device. Future orders for this customer will not need another prompt.",
+    ), 201

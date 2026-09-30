@@ -15,6 +15,21 @@
         </form>
       </div>
     </div>
+    <section class="admin-panel dispatch-notification-panel" data-staff-push data-subscription-url="{{ url_for('dispatch.save_push_subscription') }}" data-vapid-public-key="{{ vapid_public_key }}" data-csrf-token="{{ csrf_token() }}">
+      <div class="dispatch-notification-copy">
+        <p class="eyebrow">Stay informed</p>
+        <h2>Dispatch alerts</h2>
+        {% if push_configured %}
+          <p>Enable this device to get an alert when the owner assigns an order to the dispatch queue.</p>
+          <p class="dispatch-notification-status" data-push-status role="status" aria-live="polite">Notifications are optional and can be changed in your browser settings.</p>
+        {% else %}
+          <p>Push alerts are not configured yet. The owner can still add orders to this queue; refresh the page to check for new deliveries.</p>
+        {% endif %}
+      </div>
+      {% if push_configured %}
+        <button class="button button-dark" type="button" data-push-enable>Enable notifications on this device</button>
+      {% endif %}
+    </section>
     <div class="metric-grid dispatch-metrics">
       <div class="metric-card"><span>Ready for delivery</span><strong>{{ queue_count }}</strong><small>Orders currently on the road</small></div>
       <div class="metric-card"><span>Completed deliveries</span><strong>{{ completed_count }}</strong><small>All completed orders</small></div>
@@ -49,3 +64,4 @@
   </div>
 </div>
 {% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/dispatch-push.js') }}" defer></script>{% endblock %}

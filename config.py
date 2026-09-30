@@ -8,6 +8,43 @@ BASE_DIR = Path(__file__).resolve().parent
 INSTANCE_DIR = BASE_DIR / "instance"
 
 
+def normalize_vapid_private_key(value):
+    key = (value or "").strip()
+    if key.startswith("-----BEGIN "):
+        key = (
+            key.replace("\\r\\n", "\n")
+            .replace("\\n", "\n")
+            .replace("\\r", "\n")
+            .replace("\r\n", "\n")
+            .replace("\r", "\n")
+        )
+    return key
+
+
+def validate_vapid_private_key(value):
+    try:
+        if value.startswith("-----BEGIN "):
+            pem = value.encode("utf-8")
+        else:
+            path = Path(value)
+            if not path.is_file():
+                raise ValueError("not a PEM value or existing file")
+            pem = path.read_bytes()
+
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+
+        private_key = serialization.load_pem_private_key(pem, password=None)
+        if not isinstance(private_key, ec.EllipticCurvePrivateKey) or not isinstance(
+            private_key.curve, ec.SECP256R1
+        ):
+            raise ValueError("VAPID requires an unencrypted P-256 EC private key")
+    except Exception as exc:
+        raise RuntimeError(
+            "VAPID_PRIVATE_KEY must be valid unencrypted P-256 PEM text or a path to a PEM file."
+        ) from exc
+
+
 def database_config():
     # Managed Webdev supplies DATABASE_URL. CHICKEN_DATABASE_URL remains a
     # convenient explicit override for local development and tests.
@@ -75,6 +112,10 @@ class Config:
     DISPATCH_RIDER_PASSWORD_HASH = os.environ.get("DISPATCH_RIDER_PASSWORD_HASH", "")
     # Development-only convenience; production must use a password hash.
     DISPATCH_RIDER_PASSWORD = os.environ.get("DISPATCH_RIDER_PASSWORD", "frostdispatch")
+    VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
+    # Accept protected PEM text (including literal \\n sequences) or a mounted PEM file path.
+    VAPID_PRIVATE_KEY = normalize_vapid_private_key(os.environ.get("VAPID_PRIVATE_KEY", ""))
+    VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "").strip()
     AUTO_CREATE_SCHEMA = os.environ.get(
         "AUTO_CREATE_SCHEMA", "false" if IS_PRODUCTION else "true"
     ).lower() == "true"
@@ -94,8 +135,17 @@ class Config:
                 raise RuntimeError("ADMIN_PASSWORD_HASH must be set in production.")
             if not cls.DISPATCH_RIDER_PASSWORD_HASH:
                 raise RuntimeError("DISPATCH_RIDER_PASSWORD_HASH must be set in production.")
-            if cls.SQLALCHEMY_DATABASE_URI.startswith("sqlite:///"):
+            if cls.SQLALCHEMY_DATABASE_URI.startswith("sqlite:///" ):
                 raise RuntimeError("Production requires DATABASE_URL for durable shared storage.")
+            vapid_settings = (cls.VAPID_PUBLIC_KEY, cls.VAPID_PRIVATE_KEY, cls.VAPID_SUBJECT)
+            if any(vapid_settings) and not all(vapid_settings):
+                raise RuntimeError(
+                    "Dispatch push notifications require VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_SUBJECT together."
+                )
+            if cls.VAPID_SUBJECT and not cls.VAPID_SUBJECT.startswith(("mailto:", "https://")):
+                raise RuntimeError("VAPID_SUBJECT must be a mailto: or https:// contact URL.")
+            if all(vapid_settings):
+                validate_vapid_private_key(cls.VAPID_PRIVATE_KEY)
             if cls.WHATSAPP_ENABLED:
                 required = {
                     "WHATSAPP_PHONE_NUMBER_ID": cls.WHATSAPP_PHONE_NUMBER_ID,

@@ -4,6 +4,7 @@ __pycache__/
 venv/
 .env
 instance/database.db*
+instance/vapid_private.pem
 .pytest_cache/
 .DS_Store
 static/uploads/products/*

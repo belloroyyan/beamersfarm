@@ -4,13 +4,16 @@ from functools import wraps
 from datetime import datetime
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
+from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash
 
-from models import Complaint, Order, OrderItem, OrderNotification, Product, ShopSettings, ShopUpdate, db
+from models import Complaint, CustomerPushSubscription, Order, OrderItem, OrderNotification, Product, ShopSettings, ShopUpdate, StaffPushSubscription, db, order_customer_push_subscriptions
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.product_images import save_product_image
 from utils.updates import delete_update_image, save_update_image
 from utils.security import is_safe_redirect_url
+from utils.push_subscriptions import delete_staff_push_subscription, save_staff_push_subscription
+from utils.web_push import send_customer_order_confirmed_push, send_dispatch_assignment_push, web_push_is_configured
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 ORDER_STATUSES = ["Received", "Confirmed", "Preparing", "Out for delivery", "Delivered", "Cancelled"]
@@ -77,9 +80,34 @@ def login():
 
 @admin_bp.post("/logout")
 def logout():
+    staff_role = session.get("staff_role")
+    if staff_role == "dispatch_rider":
+        endpoint_hash = session.get("staff_push_subscription_hash") or session.get("dispatch_push_subscription_hash")
+        if endpoint_hash:
+            try:
+                subscription = StaffPushSubscription.query.filter_by(
+                    staff_role=staff_role, endpoint_hash=endpoint_hash
+                ).first()
+                if subscription is not None:
+                    db.session.delete(subscription)
+                    db.session.commit()
+            except SQLAlchemyError:
+                db.session.rollback()
     session.clear()
     flash("You have been signed out.", "success")
     return redirect(url_for("shop.index"))
+
+
+@admin_bp.post("/push-subscriptions")
+@admin_required
+def save_owner_push_subscription():
+    return save_staff_push_subscription("owner")
+
+
+@admin_bp.delete("/push-subscriptions")
+@admin_required
+def delete_owner_push_subscription():
+    return delete_staff_push_subscription("owner")
 
 
 @admin_bp.get("/")
@@ -94,7 +122,11 @@ def dashboard():
         "low_stock": Product.query.filter(Product.active.is_(True), Product.stock <= 5).count(),
         "complaints": Complaint.query.filter(Complaint.status.in_(["New", "Under Review"])).count(),
     }
-    return render_template("admin/dashboard.html", orders=orders, stats=stats, statuses=ORDER_STATUSES, shop_settings=shop_settings)
+    return render_template(
+        "admin/dashboard.html", orders=orders, stats=stats, statuses=ORDER_STATUSES,
+        shop_settings=shop_settings, push_configured=web_push_is_configured(),
+        vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""),
+    )
 
 
 @admin_bp.post("/shop/toggle")
@@ -156,7 +188,21 @@ def order_detail(order_ref):
                         )
                     )
             db.session.commit()
-            if new_status == "Confirmed" and previous_status != "Confirmed" and order.whatsapp_opt_in:
+            if new_status == "Confirmed" and previous_status != "Confirmed":
+                send_customer_order_confirmed_push(order)
+            if new_status == "Out for delivery" and previous_status != "Out for delivery":
+                push_result = send_dispatch_assignment_push()
+                if not push_result["configured"]:
+                    flash("Order assigned to dispatch. Push alerts are not configured yet; the rider can refresh the queue.", "success")
+                elif push_result["failed"] and not push_result["total"]:
+                    flash("Order assigned to dispatch, but push subscriptions could not be read. The rider can refresh the queue.", "success")
+                elif not push_result["total"]:
+                    flash("Order assigned to dispatch. No rider device has enabled push alerts yet.", "success")
+                elif push_result["sent"]:
+                    flash(f"Order assigned to dispatch. Push alert sent to {push_result['sent']} device(s).", "success")
+                else:
+                    flash("Order assigned to dispatch, but the push alert could not be delivered. The rider can refresh the queue.", "success")
+            elif new_status == "Confirmed" and previous_status != "Confirmed" and order.whatsapp_opt_in:
                 flash("Order confirmed. WhatsApp notification queued for the scheduled sender.", "success")
             else:
                 flash("Order status updated.", "success")
@@ -352,10 +398,13 @@ def clear_database():
         Complaint.query.filter(Complaint.order_id.isnot(None)).update(
             {Complaint.order_id: None}, synchronize_session=False
         )
+        # Keep device opt-in, but remove links to the deleted orders.
+        db.session.execute(order_customer_push_subscriptions.delete())
+        CustomerPushSubscription.query.delete(synchronize_session=False)
         OrderNotification.query.delete(synchronize_session=False)
         OrderItem.query.delete(synchronize_session=False)
         Order.query.delete(synchronize_session=False)
-        cleared.append("orders and delivery records (including their items and WhatsApp logs)")
+        cleared.append("orders and delivery records (including items, WhatsApp logs, and customer push subscriptions)")
     elif clear_messages:
         OrderNotification.query.delete(synchronize_session=False)
         cleared.append("WhatsApp message logs")

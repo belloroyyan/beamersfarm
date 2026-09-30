@@ -26,6 +26,7 @@
           <p class="eyebrow">Next action</p><h2>Update status</h2>
           <form method="post">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+            <p class="dispatch-assignment-hint">Choosing “Out for delivery” adds this order to the rider queue and alerts devices where the rider enabled notifications.</p>
             <label>Status<select name="status">{% for status in statuses %}<option value="{{ status }}" {% if status == order.status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label>
             <button class="button button-dark button-full" type="submit">Save status</button>
           </form>

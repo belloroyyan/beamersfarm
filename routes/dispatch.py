@@ -1,10 +1,10 @@
 from functools import wraps
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 
-from models import Order
-from models import db
-from utils.security import is_safe_redirect_url
+from models import Order, db
+from utils.push_subscriptions import delete_staff_push_subscription, save_staff_push_subscription
+from utils.web_push import web_push_is_configured
 
 
 dispatch_bp = Blueprint("dispatch", __name__, url_prefix="/dispatch")
@@ -27,6 +27,18 @@ def find_order(order_ref):
     return order
 
 
+@dispatch_bp.post("/push-subscriptions")
+@rider_required
+def save_push_subscription():
+    return save_staff_push_subscription("dispatch_rider")
+
+
+@dispatch_bp.delete("/push-subscriptions")
+@rider_required
+def delete_push_subscription():
+    return delete_staff_push_subscription("dispatch_rider")
+
+
 @dispatch_bp.get("/")
 @rider_required
 def dashboard():
@@ -42,6 +54,8 @@ def dashboard():
     return render_template(
         "dispatch/dashboard.html", orders=orders, queue_count=queue_count,
         completed_count=completed_count,
+        push_configured=web_push_is_configured(),
+        vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""),
     )
 
 
