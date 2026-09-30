@@ -143,6 +143,23 @@ def create_app():
     def route_manifest():
         return send_from_directory(app.static_folder, "manus-routes.json", mimetype="application/json")
 
+    @app.get("/manifest.webmanifest")
+    def pwa_manifest():
+        response = send_from_directory(
+            app.static_folder, "manifest.webmanifest", mimetype="application/manifest+json"
+        )
+        response.headers["Cache-Control"] = "public, max-age=3600"
+        return response
+
+    @app.get("/service-worker.js")
+    def pwa_service_worker():
+        response = send_from_directory(
+            app.static_folder, "service-worker.js", mimetype="application/javascript"
+        )
+        response.headers["Service-Worker-Allowed"] = "/"
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
     @app.errorhandler(400)
     def bad_request(error):
         return render_template("error.html", code=400, message=error.description or "Bad request."), 400

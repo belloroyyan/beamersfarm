@@ -17,7 +17,12 @@
   <meta name="twitter:description" content="Beamers Farm — fresh, clean, hygienically packaged frozen chicken in Osogbo, Nigeria.">
   <meta name="twitter:image" content="{{ url_for('static', filename='images/brand-mark.png', _external=True) }}">
   <meta name="twitter:image:alt" content="Beamers Farm brand mark">
+  <meta name="theme-color" content="#23382f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Beamers">
   <title>{% block title %}Beamers Farm{% endblock %}</title>
+  <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/brand-mark.png') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   {% block head %}{% endblock %}
@@ -70,6 +75,7 @@
     </div>
   </footer>
   <script src="{{ url_for('static', filename='js/cart.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/pwa-register.js') }}" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>
