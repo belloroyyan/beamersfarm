@@ -91,9 +91,9 @@ class Config:
         "SHOP_CLOSED_MESSAGE",
         "We are currently closed for orders. You can still browse our products.",
     )
-    PAYMENT_BANK = "Opay"
-    PAYMENT_ACCOUNT_NUMBER = "8062074302"
-    PAYMENT_ACCOUNT_NAME = "Dauda Akanni Bello"
+    PAYMENT_BANK = os.environ.get("PAYMENT_BANK", "Opay")
+    PAYMENT_ACCOUNT_NUMBER = os.environ.get("PAYMENT_ACCOUNT_NUMBER", "8062074302")
+    PAYMENT_ACCOUNT_NAME = os.environ.get("PAYMENT_ACCOUNT_NAME", "Dauda Akanni Bello")
     MESSAGING_ENABLED = os.environ.get("MESSAGING_ENABLED", "false").lower() == "true"
     MESSAGING_MODE = os.environ.get("MESSAGING_MODE", "mock").lower()
     WHATSAPP_ENABLED = os.environ.get("WHATSAPP_ENABLED", "false").lower() == "true"

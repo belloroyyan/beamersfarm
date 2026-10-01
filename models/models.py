@@ -26,6 +26,8 @@ class Product(db.Model):
     name = db.Column(db.String(120), nullable=False)
     description = db.Column(db.Text, nullable=False, default="")
     price = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    pricing_type = db.Column(db.String(30), nullable=False, default="fixed", server_default="fixed")
+    weight_price_per_kg = db.Column(db.Numeric(12, 2), nullable=True)
     unit = db.Column(db.String(80), nullable=False, default="per pack")
     stock = db.Column(db.Integer, nullable=False, default=0)
     image = db.Column(db.String(80), nullable=False, default="chicken")
@@ -38,6 +40,10 @@ class Product(db.Model):
     @property
     def is_available(self):
         return self.active and self.stock > 0
+
+    @property
+    def is_weight_priced(self):
+        return self.pricing_type == "weight_deposit"
 
 
 class ShopSettings(db.Model):
@@ -87,6 +93,8 @@ class Order(db.Model):
     whatsapp_opt_in = db.Column(db.Boolean, nullable=False, default=False)
     whatsapp_opt_in_at = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(40), nullable=False, default="Received")
+    payment_status = db.Column(db.String(30), nullable=False, default="Unverified", server_default="Unverified")
+    payment_verified_at = db.Column(db.DateTime, nullable=True)
     subtotal = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     delivery_fee = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     total = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
@@ -104,6 +112,10 @@ class Order(db.Model):
         secondary=order_customer_push_subscriptions,
         back_populates="orders",
     )
+
+    @property
+    def has_weight_priced_items(self):
+        return any(item.pricing_type == "weight_deposit" for item in self.items)
 
 
 class OrderNotification(db.Model):
@@ -145,6 +157,9 @@ class OrderItem(db.Model):
     product_name = db.Column(db.String(120), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     unit_price = db.Column(db.Numeric(12, 2), nullable=False)
+    unit = db.Column(db.String(80), nullable=False, default="per pack", server_default="per pack")
+    pricing_type = db.Column(db.String(30), nullable=False, default="fixed", server_default="fixed")
+    weight_price_per_kg = db.Column(db.Numeric(12, 2), nullable=True)
     subtotal = db.Column(db.Numeric(12, 2), nullable=False)
 
     order = db.relationship("Order", back_populates="items")

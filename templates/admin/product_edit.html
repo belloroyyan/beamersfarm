@@ -1,6 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Edit {{ product.name }} · Beamers Farm{% endblock %}
 {% block content %}
-<div class="admin-shell"><div class="container"><div class="page-heading admin-heading"><div><a class="back-link" href="{{ url_for('admin.products') }}">← Back to products</a><p class="eyebrow">Catalog edit</p><h1>{{ product.name }}</h1></div></div><form class="form-card edit-product-card" method="post" enctype="multipart/form-data">
-<input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><div class="field-grid"><label>Product name<input type="text" name="name" value="{{ product.name }}" required></label><label>Unit<input type="text" name="unit" value="{{ product.unit }}" required></label></div><label>Description<textarea name="description" rows="4">{{ product.description }}</textarea></label><label>Replace product image <small class="field-help">Optional · leave empty to keep the current image</small><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label><div class="field-grid"><label>Price (₦)<input type="number" name="price" min="0" step="0.01" value="{{ product.price }}" required></label><label>Available stock<input type="number" name="stock" min="0" step="1" value="{{ product.stock }}" required></label></div><div class="form-actions"><button class="button button-dark" type="submit">Save changes</button><a class="button button-outline" href="{{ url_for('admin.products') }}">Cancel</a></div></form></div></div>
+<div class="admin-shell"><div class="container">
+  <div class="page-heading admin-heading"><div><a class="back-link" href="{{ url_for('admin.products') }}">← Back to products</a><p class="eyebrow">Catalog edit</p><h1>{{ product.name }}</h1></div></div>
+  <form class="form-card edit-product-card" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <div class="field-grid"><label>Product name<input type="text" name="name" value="{{ product.name }}" required></label><label>Unit<input type="text" name="unit" value="{{ product.unit }}" required></label></div>
+    <label>Description<textarea name="description" rows="4">{{ product.description }}</textarea></label>
+    <label>Pricing type<select name="pricing_type"><option value="fixed" {% if not product.is_weight_priced %}selected{% endif %}>Fixed price</option><option value="weight_deposit" {% if product.is_weight_priced %}selected{% endif %}>Weight-priced · deposit plus balance</option></select><small class="field-help">Weight-priced items are charged a deposit now; the rest is calculated after weighing and paid on delivery.</small></label>
+    <label>Replace product image <small class="field-help">Optional · leave empty to keep the current image</small><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
+    <div class="field-grid"><label>Price or deposit per unit (₦)<input type="number" name="price" min="0" step="0.01" value="{{ product.price }}" required><small class="field-help">For weight-priced items, this is due now before confirmation.</small></label><label>Final rate per kilogram (₦)<input type="number" name="weight_price_per_kg" min="0.01" step="0.01" value="{{ product.weight_price_per_kg if product.weight_price_per_kg is not none else '' }}"><small class="field-help">Required only for weight-priced items.</small></label></div>
+    <label>Available stock<input type="number" name="stock" min="0" step="1" value="{{ product.stock }}" required></label>
+    <div class="form-actions"><button class="button button-dark" type="submit">Save changes</button><a class="button button-outline" href="{{ url_for('admin.products') }}">Cancel</a></div>
+  </form>
+</div></div>
 {% endblock %}

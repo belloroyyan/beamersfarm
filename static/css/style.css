@@ -57,3 +57,27 @@
 
 /* Customer order-status notification opt-in */
 .order-notification-card{display:flex;align-items:center;justify-content:space-between;gap:22px;margin:24px 0;padding:22px 24px;background:#f5f8f2;border:1px solid #dce7d6;border-left:4px solid var(--lime);border-radius:12px}.order-notification-card h2{margin:0 0 8px;font-size:1.2rem}.order-notification-card p:not(.eyebrow){margin:0 0 8px;color:#64756b;font-size:.88rem;line-height:1.55}.order-notification-card .eyebrow{margin:0 0 7px}.order-notification-card .order-notification-status{margin:0;color:#74837a;font-size:.78rem}.order-notification-card button{flex-shrink:0;min-height:50px}.order-notification-card [hidden]{display:none!important}@media(max-width:640px){.order-notification-card{display:block;padding:18px}.order-notification-card button{width:100%;margin-top:15px}}
+
+
+/* Weight-priced deposits and pay-before-confirmation workflow */
+.weight-pricing-disclaimer{margin:16px 0 22px;padding:14px 16px;border:1px solid #d7deca;border-left:4px solid var(--lime);border-radius:8px;background:#f4f6ea;color:#43594c;font-size:.84rem;line-height:1.55}
+.weight-pricing-disclaimer p{margin:6px 0 0;color:#52695c;font-size:.82rem}
+.weight-pricing-disclaimer p:last-child{margin-bottom:0}
+.weight-pricing-disclaimer strong{color:var(--ink)}
+.compact-disclaimer{font-size:.75rem;margin:12px 0 0;padding:10px 12px}
+.weight-card-note{min-height:0!important;margin:10px 0 0!important;padding:9px 11px;border-radius:7px;background:#f4f6ea;color:#566d5d!important;font-size:.72rem!important;line-height:1.45}
+.pricing-line-note{display:block!important;margin-top:5px;color:#6f827a;font-size:.72rem;line-height:1.4}
+.checkout-line>span{flex:1}
+.payment-before-confirmation{padding:12px 14px;border-left:3px solid var(--lime);border-radius:6px;background:#f4f6ea;color:#52665a;line-height:1.55}
+.payment-confirmed-note{margin-top:13px;padding:10px 12px;border-radius:6px;background:#e2f0ed;color:#36776c;font-size:.78rem}
+.payment-verification-panel{border-color:#d4dfd1;background:#fbfcf7}
+.payment-verification-panel h2{margin-bottom:12px}
+.payment-verification-panel>p:not(.eyebrow){font-size:.82rem;color:#61736b}
+.payment-verification-panel .weight-balance-note{margin-top:12px;padding:10px 12px;border-radius:6px;background:#f4f6ea;color:#52695c}
+.payment-verification-check{display:flex!important;align-items:flex-start;gap:10px;padding:12px;border:1px solid #d9e2d8;border-radius:7px;background:#f7f9f4;color:#4c6155!important;text-transform:none!important;letter-spacing:normal!important;font-size:.76rem!important;line-height:1.5}
+.payment-verification-check input{flex:0 0 auto;width:19px;height:19px;margin:2px 0 0;accent-color:#526f30}
+.payment-verification-check span{font-weight:500}
+.payment-verification-check strong{font-weight:700}
+.admin-weight-rate{display:block;margin-top:4px;color:#6e8378;font-size:.62rem;line-height:1.35}
+.payment-reference{align-items:center;flex-wrap:wrap}
+@media(max-width:700px){.weight-pricing-disclaimer{padding:12px 13px;font-size:.8rem}.payment-verification-check{font-size:.74rem!important}.payment-before-confirmation{font-size:.75rem}}

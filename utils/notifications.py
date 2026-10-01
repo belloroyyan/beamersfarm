@@ -22,9 +22,13 @@ def normalize_nigerian_phone(value):
 def build_order_confirmed_message(order):
     """Build the exact text that a future WhatsApp provider will send."""
     amount = f"₦{order.total:,.2f}"
+    balance_note = (
+        "Any remaining weight-based balance is due after weighing on delivery. "
+        if order.has_weight_priced_items else ""
+    )
     return (
-        f"Hello {order.customer_name}, your Beamers Farm order "
-        f"#{order.public_id} has been confirmed. Total: {amount}. "
-        "We are preparing your order for delivery within Osogbo. "
+        f"Hello {order.customer_name}, payment of {amount} for your Beamers Farm order "
+        f"#{order.public_id} has been verified and your order is confirmed. "
+        f"{balance_note}We are preparing your order for delivery within Osogbo. "
         "For questions, contact Beamers Farm on WhatsApp: 08062074302."
     )

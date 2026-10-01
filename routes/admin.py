@@ -20,6 +20,32 @@ ORDER_STATUSES = ["Received", "Confirmed", "Preparing", "Out for delivery", "Del
 COMPLAINT_STATUSES = ["New", "Under Review", "Resolved", "Closed"]
 COMPLAINT_CATEGORIES = ["Late delivery", "Missing item", "Incorrect item", "Product quality", "Payment issue", "Delivery experience", "Other"]
 
+MAX_PRODUCT_PRICE = Decimal("9999999999.99")
+
+
+def parse_product_pricing(form):
+    pricing_type = form.get("pricing_type", "fixed")
+    if pricing_type not in {"fixed", "weight_deposit"}:
+        raise ValueError("Choose a valid product pricing type.")
+    try:
+        price = Decimal(form.get("price", "0"))
+        stock = int(form.get("stock", "0"))
+        weight_price_per_kg = (
+            Decimal(form.get("weight_price_per_kg", "0"))
+            if pricing_type == "weight_deposit" else None
+        )
+        if price < 0 or price > MAX_PRODUCT_PRICE or stock < 0:
+            raise ValueError("Enter a valid non-negative price and stock amount.")
+        if pricing_type == "weight_deposit" and (
+            price <= 0 or weight_price_per_kg <= 0 or weight_price_per_kg > MAX_PRODUCT_PRICE
+        ):
+            raise ValueError("A weight-priced product needs a deposit and a positive price-per-kilogram rate.")
+    except (ArithmeticError, TypeError, ValueError) as error:
+        if isinstance(error, ValueError) and str(error):
+            raise
+        raise ValueError("Enter valid price, weight rate, and whole-number stock values.") from error
+    return price, stock, pricing_type, weight_price_per_kg
+
 
 def admin_required(view):
     @wraps(view)
@@ -155,22 +181,47 @@ def order_detail(order_ref):
         new_status = request.form.get("status", "")
         if new_status not in ORDER_STATUSES:
             flash("Choose a valid order status.", "error")
-        elif new_status != order.status:
+        else:
             previous_status = order.status
-            if new_status == "Cancelled" and order.status != "Cancelled":
-                for item in order.items:
-                    if item.product:
-                        item.product.stock += item.quantity
-            elif order.status == "Cancelled" and new_status != "Cancelled":
+            status_changed = new_status != previous_status
+            payment_verified_now = False
+            verify_requested = request.form.get("verify_payment") == "yes"
+            payment_required_statuses = {"Confirmed", "Preparing", "Out for delivery", "Delivered"}
+
+            if verify_requested and order.payment_status != "Verified" and new_status != "Confirmed":
+                flash("To verify payment, select Confirmed and tick the bank-account verification box.", "error")
+                return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+            if new_status in payment_required_statuses and order.payment_status != "Verified":
+                if new_status != "Confirmed" or not verify_requested:
+                    flash(
+                        "This order cannot be confirmed or progressed until the amount due now appears in the business bank account. Select Confirmed only after checking the account and tick the verification box.",
+                        "error",
+                    )
+                    return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+                payment_verified_now = True
+
+            if status_changed and order.status == "Cancelled" and new_status != "Cancelled":
                 for item in order.items:
                     if item.product and item.product.stock < item.quantity:
                         flash(f"Not enough stock to reopen {item.product_name}.", "error")
                         return render_template("admin/order_detail.html", order=order, statuses=ORDER_STATUSES)
+
+            if status_changed and new_status == "Cancelled" and order.status != "Cancelled":
+                for item in order.items:
+                    if item.product:
+                        item.product.stock += item.quantity
+            elif status_changed and order.status == "Cancelled" and new_status != "Cancelled":
                 for item in order.items:
                     if item.product:
                         item.product.stock -= item.quantity
-            order.status = new_status
-            if previous_status != "Confirmed" and new_status == "Confirmed" and order.whatsapp_opt_in:
+
+            if payment_verified_now:
+                order.payment_status = "Verified"
+                order.payment_verified_at = datetime.utcnow()
+
+            if status_changed:
+                order.status = new_status
+            if status_changed and previous_status != "Confirmed" and new_status == "Confirmed" and order.whatsapp_opt_in:
                 existing = OrderNotification.query.filter_by(
                     order_id=order.id,
                     channel="whatsapp",
@@ -187,10 +238,15 @@ def order_detail(order_ref):
                             status="pending",
                         )
                     )
-            db.session.commit()
-            if new_status == "Confirmed" and previous_status != "Confirmed":
+            if status_changed or payment_verified_now:
+                db.session.commit()
+            else:
+                flash("No order or payment changes were made.", "success")
+                return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+
+            if status_changed and new_status == "Confirmed" and previous_status != "Confirmed":
                 send_customer_order_confirmed_push(order)
-            if new_status == "Out for delivery" and previous_status != "Out for delivery":
+            if status_changed and new_status == "Out for delivery" and previous_status != "Out for delivery":
                 push_result = send_dispatch_assignment_push()
                 if not push_result["configured"]:
                     flash("Order assigned to dispatch. Push alerts are not configured yet; the rider can refresh the queue.", "success")
@@ -202,7 +258,13 @@ def order_detail(order_ref):
                     flash(f"Order assigned to dispatch. Push alert sent to {push_result['sent']} device(s).", "success")
                 else:
                     flash("Order assigned to dispatch, but the push alert could not be delivered. The rider can refresh the queue.", "success")
-            elif new_status == "Confirmed" and previous_status != "Confirmed" and order.whatsapp_opt_in:
+            elif payment_verified_now and new_status == "Confirmed" and order.whatsapp_opt_in:
+                flash("Payment verified in the business bank account and order confirmed. WhatsApp notification queued.", "success")
+            elif payment_verified_now and new_status == "Confirmed":
+                flash("Payment verified in the business bank account and order confirmed.", "success")
+            elif payment_verified_now:
+                flash("Payment verified. The order remains confirmed.", "success")
+            elif status_changed and new_status == "Confirmed" and order.whatsapp_opt_in:
                 flash("Order confirmed. WhatsApp notification queued for the scheduled sender.", "success")
             else:
                 flash("Order status updated.", "success")
@@ -218,19 +280,27 @@ def products():
         description = request.form.get("description", "").strip()
         unit = request.form.get("unit", "per pack").strip() or "per pack"
         try:
-            price = Decimal(request.form.get("price", "0"))
-            stock = int(request.form.get("stock", "0"))
-        except (ValueError, TypeError, ArithmeticError):
-            flash("Enter a valid price and whole-number stock amount.", "error")
+            price, stock, pricing_type, weight_price_per_kg = parse_product_pricing(request.form)
+        except ValueError as error:
+            flash(str(error), "error")
             return redirect(url_for("admin.products"))
-        if not name or len(name) > 120 or price < 0 or price > Decimal("9999999999.99") or stock < 0:
-            flash("Enter a valid product name, price, and stock amount.", "error")
+        if not name or len(name) > 120:
+            flash("Enter a valid product name.", "error")
         else:
             image_path, image_error = save_product_image(request.files.get("image"))
             if image_error:
                 flash(image_error, "error")
                 return redirect(url_for("admin.products"))
-            db.session.add(Product(name=name, description=description[:2000], price=price, unit=unit[:80], stock=stock, image=image_path or "chicken"))
+            db.session.add(Product(
+                name=name,
+                description=description[:2000],
+                price=price,
+                pricing_type=pricing_type,
+                weight_price_per_kg=weight_price_per_kg,
+                unit=unit[:80],
+                stock=stock,
+                image=image_path or "chicken",
+            ))
             db.session.commit()
             flash("Product added to the catalog.", "success")
         return redirect(url_for("admin.products"))
@@ -250,16 +320,14 @@ def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
     if request.method == "POST":
         try:
-            price = Decimal(request.form.get("price", "0"))
-            stock = int(request.form.get("stock", "0"))
-        except (ValueError, TypeError, ArithmeticError):
-            flash("Enter a valid price and whole-number stock amount.", "error")
-            return render_template("admin/product_edit.html", product=product)
-        if price < 0 or price > Decimal("9999999999.99") or stock < 0:
-            flash("Enter a valid non-negative price and stock amount.", "error")
+            price, stock, pricing_type, weight_price_per_kg = parse_product_pricing(request.form)
+        except ValueError as error:
+            flash(str(error), "error")
             return render_template("admin/product_edit.html", product=product)
         product.price = price
         product.stock = stock
+        product.pricing_type = pricing_type
+        product.weight_price_per_kg = weight_price_per_kg
         product.name = request.form.get("name", "").strip()[:120] or product.name
         product.description = request.form.get("description", "").strip()[:2000]
         product.unit = request.form.get("unit", "per pack").strip()[:80] or "per pack"

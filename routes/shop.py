@@ -36,7 +36,11 @@ def cart_summary(products=None):
         ids = [int(key) for key in cart if str(key).isdigit()]
         products = Product.query.filter(Product.id.in_(ids)).all() if ids else []
     product_map = {product.id: product for product in products}
-    return build_cart(cart, product_map, current_app.config["DELIVERY_FEE"])
+    summary = build_cart(cart, product_map, current_app.config["DELIVERY_FEE"])
+    summary["has_weight_priced_items"] = any(
+        line["product"].is_weight_priced for line in summary["lines"]
+    )
+    return summary
 
 
 def locked_cart_summary():
@@ -234,6 +238,9 @@ def checkout():
                         product_name=product.name,
                         quantity=line["quantity"],
                         unit_price=Decimal(str(product.price)),
+                        unit=product.unit,
+                        pricing_type=product.pricing_type,
+                        weight_price_per_kg=product.weight_price_per_kg,
                         subtotal=line["line_subtotal"],
                     )
                 )

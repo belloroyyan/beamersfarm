@@ -1,55 +1,47 @@
 {% extends "base.html" %}
 {% block title %}Order #{{ order.public_id }} · Beamers Farm{% endblock %}
 {% block content %}
-<div class="admin-shell">
-  <div class="container">
-    <div class="admin-topbar compact-topbar">
-      <div>
-        <a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a>
-        <p class="eyebrow">Order #{{ order.public_id }}</p>
-        <h1>{{ order.customer_name }}’s delivery</h1>
-      </div>
-      <span class="status-pill status-{{ order.status|lower|replace(' ', '-') }}">{{ order.status }}</span>
-    </div>
-    <div class="detail-admin-grid">
-      <section class="admin-panel">
-        <div class="panel-heading"><div><p class="eyebrow">Order contents</p><h2>What is going out</h2></div></div>
-        {% for item in order.items %}
-          <div class="admin-line"><div><strong>{{ item.quantity }} × {{ item.product_name }}</strong><small>{{ format_currency(item.unit_price) }} each</small></div><strong>{{ format_currency(item.subtotal) }}</strong></div>
-        {% endfor %}
-        <div class="summary-row"><span>Subtotal</span><strong>{{ format_currency(order.subtotal) }}</strong></div>
-        <div class="summary-row"><span>Delivery fee</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div>
-        <div class="summary-total"><span>Total</span><strong>{{ format_currency(order.total) }}</strong></div>
-      </section>
-      <aside class="admin-side">
-        <section class="admin-panel">
-          <p class="eyebrow">Next action</p><h2>Update status</h2>
-          <form method="post">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-            <p class="dispatch-assignment-hint">Choosing “Out for delivery” adds this order to the rider queue and alerts devices where the rider enabled notifications.</p>
-            <label>Status<select name="status">{% for status in statuses %}<option value="{{ status }}" {% if status == order.status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label>
-            <button class="button button-dark button-full" type="submit">Save status</button>
-          </form>
-        </section>
-        {% if order.notifications %}
-          <section class="admin-panel notification-panel">
-            <p class="eyebrow">Customer messaging</p><h2>WhatsApp updates</h2>
-            {% for notification in order.notifications %}
-              <div class="notification-row">
-                <strong>{{ notification.event|replace('_', ' ')|title }}</strong>
-                <span class="status-pill status-{{ notification.status }}">{{ notification.status }}</span>
-                <small>{{ notification.recipient }} · Delivery state is updated by the scheduled sender and Meta webhook.</small>
-              </div>
-            {% endfor %}
-          </section>
-        {% endif %}
-        <section class="admin-panel contact-panel">
-          <p class="eyebrow">Deliver to</p><h2>{{ order.customer_name }}</h2>
-          <a href="tel:{{ order.phone }}">{{ order.phone }}</a><p>{{ order.address }}</p>
-          <small>Placed {{ order.created_at.strftime('%d %b %Y · %H:%M') }}</small>
-        </section>
-      </aside>
-    </div>
+<div class="admin-shell"><div class="container">
+  <div class="admin-topbar compact-topbar">
+    <div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Order #{{ order.public_id }}</p><h1>{{ order.customer_name }}’s delivery</h1></div>
+    <span class="status-pill status-{{ order.status|lower|replace(' ', '-') }}">{{ order.status }}</span>
   </div>
-</div>
+  <div class="detail-admin-grid">
+    <section class="admin-panel">
+      <div class="panel-heading"><div><p class="eyebrow">Order contents</p><h2>What is going out</h2></div></div>
+      {% for item in order.items %}
+      <div class="admin-line"><div><strong>{{ item.quantity }} × {{ item.product_name }}</strong><small>{% if item.pricing_type == 'weight_deposit' %}Deposit {{ format_currency(item.unit_price) }} per {{ item.unit }} · final rate {{ format_currency(item.weight_price_per_kg) }}/kg{% else %}{{ format_currency(item.unit_price) }} per {{ item.unit }}{% endif %}</small></div><strong>{{ format_currency(item.subtotal) }}</strong></div>
+      {% endfor %}
+      <div class="summary-row"><span>Pay-now subtotal</span><strong>{{ format_currency(order.subtotal) }}</strong></div>
+      <div class="summary-row"><span>Delivery fee</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div>
+      <div class="summary-total"><span>Amount to verify now</span><strong>{{ format_currency(order.total) }}</strong></div>
+      {% if order.has_weight_priced_items %}<p class="weight-pricing-disclaimer">Weight-priced items: this amount includes their deposits. The remaining balance is calculated after weighing and paid on delivery.</p>{% endif %}
+    </section>
+    <aside class="admin-side">
+      <section class="admin-panel payment-verification-panel">
+        <p class="eyebrow">Bank transfer</p>
+        <h2>{% if order.payment_status == 'Verified' %}Payment verified{% else %}Awaiting payment verification{% endif %}</h2>
+        {% if order.payment_status == 'Verified' %}<span class="status-pill status-delivered">Verified{% if order.payment_verified_at %} · {{ order.payment_verified_at.strftime('%d %b %Y · %H:%M') }}{% endif %}</span>
+        {% else %}<p>Check that <strong>{{ format_currency(order.total) }}</strong> has actually appeared in Beamers Farm’s business bank account. An order is not confirmed until this payment is verified.</p><p class="form-note">Unpaid orders remain unconfirmed. Cancel an abandoned unpaid order to return its reserved stock to the catalog.</p>{% endif %}
+        {% if order.has_weight_priced_items %}<p class="weight-balance-note">The weight-based balance is not included in the amount due now; it is settled after weighing on delivery.</p>{% endif %}
+      </section>
+      <section class="admin-panel">
+        <p class="eyebrow">Next action</p><h2>Update status</h2>
+        <form method="post">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+          <p class="dispatch-assignment-hint">Confirm the payment first. Only paid and verified orders can move to preparation or dispatch. Choosing “Out for delivery” adds the order to the rider queue and alerts subscribed rider devices.</p>
+          <label>Status<select name="status">{% for status in statuses %}<option value="{{ status }}" {% if status == order.status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label>
+          {% if order.payment_status != 'Verified' %}<label class="payment-verification-check"><input type="checkbox" name="verify_payment" value="yes"><span>I checked the business bank account and verified that the amount due now has arrived. Selecting <strong>Confirmed</strong> will record this verification.</span></label>{% endif %}
+          <button class="button button-dark button-full" type="submit">Save status</button>
+        </form>
+      </section>
+      {% if order.notifications %}
+      <section class="admin-panel notification-panel"><p class="eyebrow">Customer messaging</p><h2>WhatsApp updates</h2>
+        {% for notification in order.notifications %}<div class="notification-row"><strong>{{ notification.event|replace('_', ' ')|title }}</strong><span class="status-pill status-{{ notification.status }}">{{ notification.status }}</span><small>{{ notification.recipient }} · Delivery state is updated by the scheduled sender and Meta webhook.</small></div>{% endfor %}
+      </section>
+      {% endif %}
+      <section class="admin-panel contact-panel"><p class="eyebrow">Deliver to</p><h2>{{ order.customer_name }}</h2><a href="tel:{{ order.phone }}">{{ order.phone }}</a><p>{{ order.address }}</p><small>Placed {{ order.created_at.strftime('%d %b %Y · %H:%M') }}</small></section>
+    </aside>
+  </div>
+</div></div>
 {% endblock %}

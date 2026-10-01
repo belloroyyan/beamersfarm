@@ -5,19 +5,19 @@
   <div class="success-mark">✓</div>
   <p class="eyebrow">Order received</p>
   <h1>Thank you, {{ order.customer_name }}.</h1>
-  <p class="success-lede">Beamers Farm has received your order. We will confirm your Osogbo delivery on <strong>{{ order.phone }}</strong>. For quick help, <a class="text-link" href="https://wa.me/2348062074302" target="_blank" rel="noopener">message us on WhatsApp</a>.</p>
+  <p class="success-lede">We have received order <strong>#{{ order.public_id }}</strong>. {% if order.payment_status == 'Verified' %}Your payment is verified and your order is {{ order.status|lower }}.{% else %}Your order is not confirmed yet. Transfer the amount due now below; Beamers Farm confirms only after funds appear in the business bank account.{% endif %} For help, <a class="text-link" href="https://wa.me/2348062074302" target="_blank" rel="noopener">message us on WhatsApp</a>.</p>
   {% if order.status == 'Out for delivery' %}<div class="delivery-alert"><strong>Your order is out for delivery.</strong><span>Our delivery team will contact you shortly.</span></div>{% endif %}
   {% if push_configured %}
   <section class="order-notification-card" data-customer-push data-subscription-url="{{ url_for('shop.customer_push_subscription', order_ref=order.public_id, token=order.public_token) }}" data-vapid-public-key="{{ vapid_public_key }}" data-csrf-token="{{ csrf_token() }}">
-    <div><p class="eyebrow">Order updates</p><h2>Know when we confirm your order</h2><p>Enable notifications on this device and we’ll let you know when your order is confirmed and being prepared.</p><p class="order-notification-status" data-customer-push-status role="status" aria-live="polite">Checking notification availability…</p></div>
+    <div><p class="eyebrow">Order updates</p><h2>Know when we confirm your order</h2><p>Enable notifications on this device and we’ll let you know after payment is verified and your order is confirmed.</p><p class="order-notification-status" data-customer-push-status role="status" aria-live="polite">Checking notification availability…</p></div>
     <button class="button button-dark" type="button" data-customer-push-enable hidden>Enable order notifications</button>
   </section>
   {% endif %}
 
   <div class="payment-card">
-    <p class="eyebrow">Pay by bank transfer</p>
-    <h2>Use your order number as the transfer reference.</h2>
-    <p>Transfer the order total only after Beamers Farm confirms your order. Your payment will be verified before delivery.</p>
+    <p class="eyebrow">{% if order.payment_status == 'Verified' %}Payment verified{% else %}Payment required before confirmation{% endif %}</p>
+    {% if order.payment_status == 'Verified' %}<h2>Payment verified: {{ format_currency(order.total) }}.</h2><p>Beamers Farm has verified the amount due now and confirmed your order. You do not need to transfer that amount again.</p>
+    {% else %}<h2>Transfer {{ format_currency(order.total) }} now.</h2><p>The amount below is due before the order can be confirmed. Use your order number as the transfer reference. We will confirm only after the payment appears in Beamers Farm’s business bank account.</p>{% endif %}
     <div class="payment-detail"><span>Bank</span><strong>{{ payment_bank }}</strong></div>
     <div class="payment-detail"><span>Account number</span><strong>{{ payment_account_number }}</strong></div>
     <div class="payment-detail"><span>Account name</span><strong>{{ payment_account_name }}</strong></div>
@@ -26,14 +26,18 @@
       <button class="copy-reference-button" type="button" data-copy-reference="{{ order.public_id }}" aria-label="Copy order reference {{ order.public_id }}">Copy reference</button>
       <span class="copy-reference-status" role="status" aria-live="polite"></span>
     </div>
+    {% if order.payment_status == 'Verified' %}<p class="payment-confirmed-note">Payment was verified in the business bank account on {{ order.payment_verified_at.strftime('%d %b %Y · %H:%M') if order.payment_verified_at else 'file' }}.</p>{% endif %}
   </div>
 
   <div class="receipt-card">
-    <div class="receipt-head"><span>ORDER #{{ order.public_id }}</span><span class="status-pill received">{{ order.status }}</span></div>
-    {% for item in order.items %}<div class="receipt-line"><span>{{ item.quantity }} × {{ item.product_name }}</span><strong>{{ format_currency(item.subtotal) }}</strong></div>{% endfor %}
-    <div class="summary-row"><span>Subtotal</span><strong>{{ format_currency(order.subtotal) }}</strong></div>
+    <div class="receipt-head"><span>ORDER #{{ order.public_id }}</span><span class="status-pill {% if order.payment_status == 'Verified' %}status-confirmed{% else %}status-received{% endif %}">{% if order.payment_status == 'Verified' %}Payment verified{% else %}Awaiting payment{% endif %}</span></div>
+    {% for item in order.items %}
+    <div class="receipt-line"><span>{{ item.quantity }} × {{ item.product_name }}{% if item.pricing_type == 'weight_deposit' %}<small class="pricing-line-note">Deposit · final price {{ format_currency(item.weight_price_per_kg) }}/kg after weighing</small>{% endif %}</span><strong>{{ format_currency(item.subtotal) }}</strong></div>
+    {% endfor %}
+    <div class="summary-row"><span>Pay-now subtotal</span><strong>{{ format_currency(order.subtotal) }}</strong></div>
     <div class="summary-row"><span>Delivery fee</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div>
-    <div class="summary-total"><span>Total to transfer</span><strong>{{ format_currency(order.total) }}</strong></div>
+    <div class="summary-total"><span>Amount due now</span><strong>{{ format_currency(order.total) }}</strong></div>
+    {% if order.has_weight_priced_items %}<p class="weight-pricing-disclaimer">Weight-priced item(s): the final price is based on actual weight at the rate shown above. The remaining balance, after subtracting the deposit paid, is due by cash or bank transfer on delivery after weighing.</p>{% endif %}
     <div class="receipt-address"><span>DELIVER TO</span><strong>{{ order.address }}</strong></div>
   </div>
   <a class="button button-dark" href="{{ url_for('shop.index') }}">Back to Beamers Farm</a>

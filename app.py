@@ -30,8 +30,10 @@ def seed_products():
         [
             Product(
                 name="Full Chicken",
-                description="A whole cleaned chicken, frozen fresh for family meals and Sunday roasts.",
-                price=Decimal("8500.00"),
+                description="A whole cleaned chicken, frozen fresh for family meals and Sunday roasts. Deposit is paid before confirmation; the final price is based on its weight.",
+                price=Decimal("4500.00"),
+                pricing_type="weight_deposit",
+                weight_price_per_kg=Decimal("4500.00"),
                 unit="per bird",
                 stock=24,
                 image="full",
