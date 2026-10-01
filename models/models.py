@@ -26,8 +26,6 @@ class Product(db.Model):
     name = db.Column(db.String(120), nullable=False)
     description = db.Column(db.Text, nullable=False, default="")
     price = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
-    pricing_type = db.Column(db.String(30), nullable=False, default="fixed", server_default="fixed")
-    weight_price_per_kg = db.Column(db.Numeric(12, 2), nullable=True)
     unit = db.Column(db.String(80), nullable=False, default="per pack")
     stock = db.Column(db.Integer, nullable=False, default=0)
     image = db.Column(db.String(80), nullable=False, default="chicken")
@@ -42,8 +40,11 @@ class Product(db.Model):
         return self.active and self.stock > 0
 
     @property
-    def is_weight_priced(self):
-        return self.pricing_type == "weight_deposit"
+    def is_sold_by_weight(self):
+        """Whether price/unit is kilogram-based; inventory still counts sale units."""
+        return (self.unit or "").strip().casefold() in {
+            "kg", "per kg", "kilogram", "kilograms", "per kilogram"
+        }
 
 
 class DeliveryZone(db.Model):
@@ -115,6 +116,7 @@ class Order(db.Model):
     fulfillment_type = db.Column(db.String(20), nullable=False, default="delivery", server_default="delivery")
     delivery_zone_name = db.Column(db.String(100), nullable=False, default="Pre-zone delivery", server_default="Pre-zone delivery")
     weighing_completed_at = db.Column(db.DateTime, nullable=True)
+    weighing_recorded_by = db.Column(db.String(120), nullable=True)
     subtotal = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     delivery_fee = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     total = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
@@ -274,6 +276,7 @@ class OrderItem(db.Model):
     pricing_type = db.Column(db.String(30), nullable=False, default="fixed", server_default="fixed")
     weight_price_per_kg = db.Column(db.Numeric(12, 2), nullable=True)
     actual_weight_kg = db.Column(db.Numeric(10, 3), nullable=True)
+    requested_weight_kg = db.Column(db.Numeric(10, 3), nullable=True)
     subtotal = db.Column(db.Numeric(12, 2), nullable=False)
 
     order = db.relationship("Order", back_populates="items")

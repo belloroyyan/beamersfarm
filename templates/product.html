@@ -10,20 +10,26 @@
       <h1>{{ product.name }}</h1>
       <p class="detail-description">{{ product.description }}</p>
       <div class="detail-price">
-        {% if product.is_weight_priced %}<strong>{{ format_currency(product.price) }} deposit</strong><span>{{ product.stock }} available · deposit per {{ product.unit }}</span>
+        {% if product.is_sold_by_weight %}<strong>{{ format_currency(product.price) }} / kg</strong><span>{{ product.stock }} whole bird{{ '' if product.stock == 1 else 's' }} available</span>
         {% else %}<strong>{{ format_currency(product.price) }}</strong><span>{{ product.stock }} available today</span>{% endif %}
       </div>
-      {% if product.is_weight_priced %}
-      <aside class="weight-pricing-disclaimer" aria-label="Weight-based price and payment terms">
-        <strong>Variable-weight pricing</strong>
-        <p>The final price is determined by the actual weight at <strong>{{ format_currency(product.weight_price_per_kg) }}/kg</strong>. The listed deposit is paid now and must be verified before order confirmation. After weighing, any remaining balance is settled separately. If the final price is lower than the deposit, the difference will be refunded within 48 hours after weighing.</p>
+      {% if product.is_sold_by_weight %}
+      <aside class="weight-pricing-disclaimer" aria-label="Requested weight information">
+        <strong>Choose your preferred size</strong>
+        <p>Select how many whole chickens you want, then enter <strong>one combined target weight in kilograms for all of them</strong> (not a separate weight for each bird). The amount due now is calculated at {{ format_currency(product.price) }} per kg using that requested total. The final packed weight may vary slightly; there is no later re-weighing charge or refund adjustment.</p>
       </aside>
       {% endif %}
       {% if product.is_available %}
       <form class="quantity-form" action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        {% if product.is_sold_by_weight %}
+        <label for="quantity">Number of whole chickens</label>
+        <div class="quantity-row"><input id="quantity" name="quantity" type="number" min="1" max="{{ product.stock }}" value="1" required><button class="button button-dark" type="submit">Add to crate <span>+</span></button></div>
+        <label class="requested-weight-control" for="requested-weight">Combined requested weight (kg)<input id="requested-weight" name="requested_weight_kg" type="number" min="0.001" max="500" step="0.001" placeholder="e.g. 2.500" required><small class="field-help">For multiple chickens, enter the total kg for all selected birds.</small></label>
+        {% else %}
         <label for="quantity">Quantity</label>
         <div class="quantity-row"><input id="quantity" name="quantity" type="number" min="1" max="{{ product.stock }}" value="1"><button class="button button-dark" type="submit">Add to crate <span>+</span></button></div>
+        {% endif %}
       </form>
       {% else %}<div class="out-of-stock">Currently unavailable</div>{% endif %}
     </div>

@@ -16,6 +16,7 @@ from utils.security import is_safe_redirect_url
 from utils.push_subscriptions import delete_staff_push_subscription, save_staff_push_subscription
 from utils.web_push import send_customer_order_confirmed_push, send_dispatch_assignment_push, web_push_is_configured
 from utils.order_workflow import ORDER_STATUSES, update_order_status
+from utils.order_settlement import save_order_weights
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 COMPLAINT_STATUSES = ["New", "Under Review", "Resolved", "Closed"]
@@ -25,28 +26,17 @@ MAX_PRODUCT_PRICE = Decimal("9999999999.99")
 MAX_DELIVERY_FEE = Decimal("1000000.00")
 
 
-def parse_product_pricing(form):
-    pricing_type = form.get("pricing_type", "fixed")
-    if pricing_type not in {"fixed", "weight_deposit"}:
-        raise ValueError("Choose a valid product pricing type.")
+def parse_product_price_stock(form):
     try:
         price = Decimal(form.get("price", "0"))
         stock = int(form.get("stock", "0"))
-        weight_price_per_kg = (
-            Decimal(form.get("weight_price_per_kg", "0"))
-            if pricing_type == "weight_deposit" else None
-        )
         if price < 0 or price > MAX_PRODUCT_PRICE or stock < 0:
             raise ValueError("Enter a valid non-negative price and stock amount.")
-        if pricing_type == "weight_deposit" and (
-            price <= 0 or weight_price_per_kg <= 0 or weight_price_per_kg > MAX_PRODUCT_PRICE
-        ):
-            raise ValueError("A weight-priced product needs a deposit and a positive price-per-kilogram rate.")
     except (ArithmeticError, TypeError, ValueError) as error:
         if isinstance(error, ValueError) and str(error):
             raise
-        raise ValueError("Enter valid price, weight rate, and whole-number stock values.") from error
-    return price, stock, pricing_type, weight_price_per_kg
+        raise ValueError("Enter a valid price and whole-number stock amount.") from error
+    return price, stock
 
 
 def admin_required(view):
@@ -296,44 +286,8 @@ def record_order_weights(order_ref):
     if order is None:
         from flask import abort
         abort(404)
-    if order.status == "Cancelled" or order.payment_status != "Verified":
-        flash("Record final weights only for active orders with verified payment.", "error")
-        return redirect(url_for("admin.order_detail", order_ref=order.public_id))
-    weighted_items = [item for item in order.items if item.pricing_type == "weight_deposit"]
-    if not weighted_items:
-        flash("This order has no weight-priced items to weigh.", "error")
-        return redirect(url_for("admin.order_detail", order_ref=order.public_id))
-    if any(record.event_type in {"balance_payment", "refund"} and record.status == "settled" for record in order.financial_records):
-        flash("Weights are locked after a balance payment or refund has been recorded. Use the financial history for any further adjustment.", "error")
-        return redirect(url_for("admin.order_detail", order_ref=order.public_id))
-
-    try:
-        for item in weighted_items:
-            raw = request.form.get(f"weight_{item.id}", "").strip()
-            if not raw:
-                item.actual_weight_kg = None
-                continue
-            weight = Decimal(raw)
-            if not weight.is_finite() or weight <= 0 or weight > Decimal("500.000"):
-                raise ValueError("Each combined measured weight must be greater than 0 and no more than 500 kg.")
-            rounded_weight = weight.quantize(Decimal("0.001"))
-            if rounded_weight != weight:
-                raise ValueError("Enter weights to no more than three decimal places (for example, 4.250 kg).")
-            item.actual_weight_kg = rounded_weight
-    except (ArithmeticError, TypeError, ValueError) as error:
-        db.session.rollback()
-        message = str(error) if isinstance(error, ValueError) and str(error) else "Enter valid weights in kilograms, up to three decimal places."
-        flash(message, "error")
-        return redirect(url_for("admin.order_detail", order_ref=order.public_id))
-
-    if order.weights_complete:
-        if order.weighing_completed_at is None:
-            order.weighing_completed_at = datetime.utcnow()
-        flash("All weight entries are saved. The owner receipt now shows the final total and any balance or refund due within 48 hours.", "success")
-    else:
-        order.weighing_completed_at = None
-        flash("Weight entries saved. Add the remaining measurements to calculate the final total.", "success")
-    db.session.commit()
+    ok, message = save_order_weights(order, request.form, recorded_by="Owner")
+    flash(message, "success" if ok else "error")
     return redirect(url_for("admin.order_detail", order_ref=order.public_id))
 
 
@@ -463,7 +417,7 @@ def products():
         description = request.form.get("description", "").strip()
         unit = request.form.get("unit", "per pack").strip() or "per pack"
         try:
-            price, stock, pricing_type, weight_price_per_kg = parse_product_pricing(request.form)
+            price, stock = parse_product_price_stock(request.form)
         except ValueError as error:
             flash(str(error), "error")
             return redirect(url_for("admin.products"))
@@ -478,8 +432,6 @@ def products():
                 name=name,
                 description=description[:2000],
                 price=price,
-                pricing_type=pricing_type,
-                weight_price_per_kg=weight_price_per_kg,
                 unit=unit[:80],
                 stock=stock,
                 image=image_path or "chicken",
@@ -503,14 +455,12 @@ def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
     if request.method == "POST":
         try:
-            price, stock, pricing_type, weight_price_per_kg = parse_product_pricing(request.form)
+            price, stock = parse_product_price_stock(request.form)
         except ValueError as error:
             flash(str(error), "error")
             return render_template("admin/product_edit.html", product=product)
         product.price = price
         product.stock = stock
-        product.pricing_type = pricing_type
-        product.weight_price_per_kg = weight_price_per_kg
         product.name = request.form.get("name", "").strip()[:120] or product.name
         product.description = request.form.get("description", "").strip()[:2000]
         product.unit = request.form.get("unit", "per pack").strip()[:80] or "per pack"

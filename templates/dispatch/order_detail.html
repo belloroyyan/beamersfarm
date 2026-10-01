@@ -4,39 +4,28 @@
 <div class="admin-shell">
   <div class="container">
     <div class="admin-topbar compact-topbar">
-      <div>
-        <a class="back-link" href="{{ url_for('dispatch.dashboard') }}">← Back to dispatch queue</a>
-        <p class="eyebrow">Delivery #{{ order.public_id[:8] }}</p>
-        <h1>{{ order.customer_name }}’s delivery</h1>
-      </div>
+      <div><a class="back-link" href="{{ url_for('dispatch.dashboard') }}">← Back to dispatch queue</a><p class="eyebrow">Delivery #{{ order.public_id[:8] }}</p><h1>{{ order.customer_name }}’s delivery</h1></div>
       <span class="status-pill status-{{ order.status|lower|replace(' ', '-') }}">{{ order.status }}</span>
     </div>
-    <div class="detail-admin-grid dispatch-detail-grid">
+    <div class="detail-admin-grid">
       <section class="admin-panel">
         <div class="panel-heading"><div><p class="eyebrow">Order contents</p><h2>Items to deliver</h2></div></div>
-        {% for item in order.items %}
-          <div class="admin-line"><div><strong>{{ item.quantity }} × {{ item.product_name }}</strong></div></div>
-        {% endfor %}
-        <div class="dispatch-total"><span>Collection total</span><strong>{{ format_currency(order.total) }}</strong><small>Payment handling follows the owner’s instructions.</small></div>
+        {% for item in order.items %}<div class="admin-line"><div><strong>{{ item.quantity }} × {{ item.product_name }}</strong>{% if item.requested_weight_kg is not none %}<small>Customer requested {{ '%.3f'|format(item.requested_weight_kg) }} kg total across this line.</small>{% endif %}</div><strong>{{ format_currency(item.subtotal) }}</strong></div>{% endfor %}
+        <div class="dispatch-total"><span>Full order total</span><strong>{{ format_currency(order.total) }}</strong><small>{% if order.payment_status == 'Verified' %}Payment was verified before this order entered dispatch.{% else %}Check with the Sales desk before handover; payment has not yet been verified.{% endif %}</small></div>
+        {% if order.has_weight_priced_items %}
+          {% if order.payment_status == 'Verified' and order.weights_complete and order.weighing_completed_at %}
+          <div class="dispatch-total dispatch-balance-total"><span>Legacy final total after weighing</span><strong>{{ format_currency(order.final_total) }}</strong>
+            {% if order.balance_due and order.balance_due > 0 %}<small><strong>Collect on delivery: {{ format_currency(order.balance_due) }}</strong></small>
+            {% elif order.refund_due and order.refund_due > 0 %}<small>No balance to collect. The receipt states the outstanding legacy refund and deadline; contact the outlet/Owner for handling.</small>
+            {% else %}<small>No additional balance is due.</small>{% endif %}
+          </div>
+          {% else %}<div class="dispatch-total"><span>Legacy weigh-in</span><strong>Pending</strong><small>Do not collect any weight-based balance until outlet staff complete the legacy order weigh-in.</small></div>{% endif %}
+        {% endif %}
+        <a class="button button-outline customer-receipt-link" href="{{ url_for('shop.customer_receipt', order_ref=order.public_id, token=order.public_token) }}" target="_blank" rel="noopener">Open customer receipt to hand over</a>
       </section>
       <aside class="admin-side">
-        <section class="admin-panel contact-panel dispatch-contact">
-          <p class="eyebrow">Deliver to</p>
-          <h2>{{ order.customer_name }}</h2>
-          <a class="dispatch-phone" href="tel:{{ order.phone }}">Call {{ order.phone }}</a>
-          <p class="dispatch-address">{{ order.address }}</p>
-          <small>Order placed {{ order.created_at.strftime('%d %b %Y · %H:%M') }}</small>
-        </section>
-        <section class="admin-panel dispatch-complete">
-          <p class="eyebrow">Delivery progress</p>
-          <h2>Complete this delivery</h2>
-          <p>Once the customer has received the order, mark it as delivered.</p>
-          <form method="post">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="action" value="delivered">
-            <button class="button button-dark button-full" type="submit">Mark as delivered <span>✓</span></button>
-          </form>
-        </section>
+        <section class="admin-panel contact-panel dispatch-contact"><p class="eyebrow">Deliver to</p><h2>{{ order.customer_name }}</h2><a class="dispatch-phone" href="tel:{{ order.phone }}">Call {{ order.phone }}</a><p class="dispatch-address">{{ order.address }}</p><small>Order placed {{ order.created_at.strftime('%d %b %Y · %H:%M') }}</small></section>
+        <section class="admin-panel dispatch-complete"><p class="eyebrow">Delivery progress</p><h2>Complete this delivery</h2><p>Hand over the customer receipt. For new orders, do not collect an extra amount beyond any amount stated on the receipt. Once the customer has received the order, mark it as delivered.</p><form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="delivered"><button class="button button-dark button-full" type="submit">Mark as delivered <span>✓</span></button></form></section>
       </aside>
     </div>
   </div>

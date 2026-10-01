@@ -1,4 +1,4 @@
-const CACHE_NAME = "beamers-farm-pwa-v8";
+const CACHE_NAME = "beamers-farm-pwa-v11";
 const OFFLINE_URL = "/static/offline.html";
 const PRECACHE_URLS = [
   OFFLINE_URL,
@@ -13,6 +13,7 @@ const PRECACHE_URLS = [
   "/static/js/checkout-zones.js",
   "/static/js/receipt-print.js",
   "/static/images/brand-mark.png",
+  "/static/images/receipt-watermark.svg",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
   "/static/icons/apple-touch-icon.png"

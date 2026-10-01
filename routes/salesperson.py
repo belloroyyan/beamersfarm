@@ -4,6 +4,7 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, s
 
 from models import Order, SalespersonAccount, db
 from utils.order_workflow import SALESPERSON_STATUSES, update_order_status
+from utils.order_settlement import save_order_weights
 
 salesperson_bp = Blueprint("salesperson", __name__, url_prefix="/sales")
 
@@ -64,11 +65,29 @@ def dashboard(account):
 def order_detail(account, order_ref):
     order = find_order(order_ref)
     if request.method == "POST":
+        if request.form.get("save_weights") == "yes":
+            ok, message = save_order_weights(
+                order,
+                request.form,
+                recorded_by=account.display_name,
+                allowed_statuses={"Confirmed", "Preparing"},
+            )
+            flash(message, "success" if ok else "error")
+            return redirect(url_for("salesperson.order_detail", order_ref=order.public_id))
+
+        verify_only = request.form.get("verify_payment_only") == "yes"
+        verify_and_confirm = request.form.get("verify_and_confirm") == "yes"
+        verify_payment = verify_only or verify_and_confirm
+        if verify_payment and request.form.get("payment_received") != "yes":
+            flash("Confirm that the transfer is visible in the business POS/bank account before verifying it.", "error")
+            return redirect(url_for("salesperson.order_detail", order_ref=order.public_id))
         ok, message = update_order_status(
             order,
-            request.form.get("status", ""),
-            verify_payment=False,
+            order.status if verify_only else "Confirmed" if verify_and_confirm else request.form.get("status", ""),
+            verify_payment=verify_payment,
             actor="salesperson",
+            actor_name=account.display_name,
+            verification_reference=request.form.get("verification_reference", ""),
         )
         flash(message, "success" if ok else "error")
         return redirect(url_for("salesperson.order_detail", order_ref=order.public_id))
@@ -77,4 +96,23 @@ def order_detail(account, order_ref):
         account=account,
         order=order,
         available_statuses=available_statuses(order),
+    )
+
+
+@salesperson_bp.get("/orders/<string:order_ref>/settlement-receipt")
+@salesperson_required
+def settlement_receipt(account, order_ref):
+    order = find_order(order_ref)
+    if (
+        order.status == "Cancelled"
+        or order.payment_status != "Verified"
+        or not order.has_weight_priced_items
+        or not order.weights_complete
+        or order.weighing_completed_at is None
+    ):
+        abort(404)
+    return render_template(
+        "salesperson/settlement_receipt.html",
+        account=account,
+        order=order,
     )

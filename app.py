@@ -31,11 +31,9 @@ def seed_products():
         [
             Product(
                 name="Full Chicken",
-                description="A whole cleaned chicken, frozen fresh for family meals and Sunday roasts. Deposit is paid before confirmation; the final price is based on its weight.",
+                description="A whole cleaned chicken, frozen fresh for family meals and Sunday roasts. Choose the number of birds and enter one combined target weight for the whole line; the order is charged at the listed price per kilogram.",
                 price=Decimal("4500.00"),
-                pricing_type="weight_deposit",
-                weight_price_per_kg=Decimal("4500.00"),
-                unit="per bird",
+                unit="kg",
                 stock=24,
                 image="full",
             ),

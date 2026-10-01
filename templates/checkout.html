@@ -36,21 +36,20 @@
       </div>
       <label class="consent-row"><input type="checkbox" name="whatsapp_opt_in" value="yes" {% if request.form.get('whatsapp_opt_in') == 'yes' %}checked{% endif %}><span>I agree to receive WhatsApp updates about this order from Beamers Farm. We will only use your number for order-related communication.</span></label>
       <button class="button button-dark button-full" type="submit">Place order <span>→</span></button>
-      <p class="form-note payment-before-confirmation"><strong>Payment is required before confirmation.</strong> Placing an order does not confirm it. After submitting, pay the amount due now shown on your receipt using the order reference. Beamers Farm confirms only after funds appear in its business bank account.{% if summary.has_weight_priced_items %} The amount due now includes deposits; any weight-based balance is calculated after weighing. If the final price is lower than the deposit, the difference will be refunded within 48 hours after weighing.{% endif %}</p>
+      <p class="form-note payment-before-confirmation"><strong>Full payment is required before confirmation.</strong> Placing an order does not confirm it. After submitting, pay the complete amount shown on your receipt using the order reference. Beamers Farm confirms only after funds appear in its business bank account. Any per-kilogram item is charged using the combined target kg you entered.</p>
     </form>
     <aside class="summary-card checkout-zone-summary">
       <div class="summary-label">YOUR CRATE</div>
       {% for line in summary.lines %}
       <div class="checkout-line">
-        <span>{{ line.quantity }} × {{ line.product.name }}{% if line.product.is_weight_priced %}<small class="pricing-line-note">Deposit · {{ format_currency(line.product.weight_price_per_kg) }}/kg final rate</small>{% endif %}</span>
+        <span>{{ line.quantity }} × {{ line.product.name }}{% if line.requested_weight_kg is not none %}<small class="pricing-line-note">{{ '%.3f'|format(line.requested_weight_kg) }} kg total requested · {{ format_currency(line.product.price) }}/kg</small>{% endif %}</span>
         <strong>{{ format_currency(line.line_subtotal) }}</strong>
       </div>
       {% endfor %}
-      <div class="summary-row"><span>Items subtotal due now</span><strong>{{ format_currency(summary.subtotal) }}</strong></div>
+      <div class="summary-row"><span>Items subtotal</span><strong>{{ format_currency(summary.subtotal) }}</strong></div>
       <div class="summary-row"><span>Delivery / pickup</span><strong data-delivery-fee-output>{% if summary.delivery_fee_selected %}{{ format_currency(summary.delivery_fee) }}{% else %}Choose an option{% endif %}</strong></div>
-      <div class="summary-total"><span>Amount due now</span><strong data-total-output>{% if summary.delivery_fee_selected %}{{ format_currency(summary.total) }}{% else %}Choose an option{% endif %}</strong></div>
-      {% if summary.has_weight_priced_items %}<p class="weight-pricing-disclaimer compact-disclaimer">Weight-priced deposits are credited to the final price. Any refund from a lower measured weight is due within 48 hours after weighing.</p>{% endif %}
-      <small data-zone-fee-note>Choose a delivery area or free pickup option to calculate the amount due now.</small>
+      <div class="summary-total"><span>Full amount due now</span><strong data-total-output>{% if summary.delivery_fee_selected %}{{ format_currency(summary.total) }}{% else %}Choose an option{% endif %}</strong></div>
+      <small data-zone-fee-note>Choose a delivery area or free pickup option to calculate the full amount due.</small>
     </aside>
   </div>
 </div>

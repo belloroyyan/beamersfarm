@@ -96,3 +96,21 @@
 @media print{@page{size:auto;margin:14mm}html,body{background:#fff!important}body *{visibility:hidden!important}.print-receipt,.print-receipt *{visibility:visible!important}.print-receipt{position:absolute!important;left:0!important;top:0!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important}.print-receipt-header{break-inside:avoid}.print-receipt-section,.print-receipt-notice,.print-receipt-meta,.print-receipt-footer{break-inside:avoid}.print-receipt-ledger{font-size:9pt}.status-pill{border:1px solid #aaa!important;color:#111!important;background:#fff!important}}
 
 .selected-zone-description{margin:8px 0 12px;padding:9px 11px;border-radius:7px;background:#f2f5ee;color:#64746a;font-size:.75rem;line-height:1.5}.selected-zone-description[hidden]{display:none!important}
+
+/* Subtle vector watermark shared by customer, owner, and Salesperson receipts. */
+.print-receipt{background-image:url('../images/receipt-watermark.svg');background-repeat:repeat;background-size:180px 180px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+@media print{.print-receipt{background-image:url('../images/receipt-watermark.svg')!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}}
+
+.pickup-address-card{display:grid;gap:5px;margin-top:2px;padding:13px 15px;border:1px solid #dce6d8;border-left:3px solid var(--lime);border-radius:8px;background:#f4f7ef;color:var(--ink);font-size:.8rem;line-height:1.5}
+.pickup-address-card strong{font-size:.8rem}
+.pickup-address-card span{color:#4c6257}
+.pickup-address-card small{color:#718078;font-size:.72rem}
+.pickup-address-card small br:first-child{display:none}
+.pickup-address-card .text-link{color:#637f2a}
+.pickup-address-card[hidden]{display:none!important}
+
+.print-receipt-total.refund-total{color:#803c34;border-top-color:#ead0cb}
+.refund-deadline{margin:10px 0;padding:10px 12px;border-left:3px solid #bc6b5e;border-radius:5px;background:#fff5f2;color:#71443e;font-size:.82rem;line-height:1.45}
+
+/* Customer-entered combined target weight for standard per-kilogram products. */
+.requested-weight-control{display:grid!important;gap:6px!important;margin-top:12px;color:#637577;font-size:.72rem;font-weight:700}.requested-weight-control input{display:block;width:100%;min-width:0}.requested-weight-control .field-help{line-height:1.45}.cart-line-weight{grid-template-columns:68px minmax(120px,1fr) 76px minmax(145px,180px) 100px 20px}.cart-weight-control{min-width:0}.cart-line-weight .line-price{white-space:nowrap}@media(max-width:900px){.cart-line-weight{grid-template-columns:58px minmax(120px,1fr) 70px minmax(120px,150px) 86px 20px;gap:9px}}@media(max-width:700px){.cart-line-weight{grid-template-columns:48px minmax(0,1fr) 64px 20px;gap:8px}.cart-line-weight .cart-line-main{grid-column:2/3}.cart-line-weight .quantity-control{grid-column:3;grid-row:1}.cart-line-weight .cart-weight-control{grid-column:2/4}.cart-line-weight .line-price{grid-column:2/4;text-align:left}.cart-line-weight .remove-button{grid-column:4;grid-row:1}.requested-weight-control{font-size:.68rem}}

@@ -7,7 +7,7 @@ from decimal import Decimal
 from flask import Blueprint, abort, current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 
 from models import CustomerPushSubscription, DeliveryZone, Order, OrderFinancialRecord, OrderItem, Product, ShopSettings, ShopUpdate, db
-from utils.helpers import build_cart
+from utils.helpers import build_cart, parse_requested_weight
 from utils.notifications import normalize_nigerian_phone
 from utils.push_subscriptions import valid_push_endpoint
 from utils.web_push import send_customer_order_confirmed_push, send_owner_new_order_push, web_push_is_configured
@@ -43,9 +43,6 @@ def cart_summary(products=None, delivery_fee=None):
     fee = Decimal("0.00") if delivery_fee is None else Decimal(str(delivery_fee))
     summary = build_cart(cart, product_map, fee)
     summary["delivery_fee_selected"] = delivery_fee is not None
-    summary["has_weight_priced_items"] = any(
-        line["product"].is_weight_priced for line in summary["lines"]
-    )
     return summary
 
 
@@ -53,7 +50,7 @@ def locked_cart_summary(delivery_fee=None):
     cart = current_cart()
     ids = [int(key) for key in cart if str(key).isdigit()]
     if not ids:
-        return {"lines": [], "subtotal": Decimal("0.00"), "delivery_fee": Decimal("0.00"), "total": Decimal("0.00")}
+        return {"lines": [], "subtotal": Decimal("0.00"), "delivery_fee": Decimal("0.00"), "total": Decimal("0.00"), "has_invalid_weight": False}
     products = db.session.execute(
         db.select(Product).where(Product.id.in_(ids)).with_for_update()
     ).scalars().all()
@@ -154,10 +151,39 @@ def add_to_cart(product_id):
         quantity = int(request.form.get("quantity", 1))
     except (TypeError, ValueError):
         quantity = 1
-    quantity = max(1, min(quantity, product.stock))
+    quantity = max(1, quantity)
+    if quantity > product.stock:
+        flash(f"Only {product.stock} {product.name} unit(s) are available.", "error")
+        return redirect(request.referrer or url_for("shop.product_detail", product_id=product.id))
     cart = current_cart()
-    new_quantity = int(cart.get(str(product.id), 0)) + quantity
-    cart[str(product.id)] = min(new_quantity, product.stock)
+    key = str(product.id)
+    existing = cart.get(key, 0)
+    if isinstance(existing, dict):
+        existing_quantity = int(existing.get("quantity", 0) or 0)
+        existing_weight = parse_requested_weight(existing.get("requested_weight_kg"))
+    else:
+        existing_quantity = int(existing or 0)
+        existing_weight = None
+    new_quantity = existing_quantity + quantity
+    if new_quantity > product.stock:
+        flash(f"Your crate would exceed the available stock of {product.name}.", "error")
+        return redirect(request.referrer or url_for("shop.product_detail", product_id=product.id))
+    if product.is_sold_by_weight:
+        if existing_quantity and existing_weight is None:
+            flash("Update the existing crate line with one combined requested weight in kg before adding more birds.", "error")
+            return redirect(url_for("shop.cart"))
+        requested_weight = parse_requested_weight(request.form.get("requested_weight_kg"))
+        if requested_weight is None:
+            flash("Enter the combined requested weight in kilograms for this line.", "error")
+            return redirect(url_for("shop.product_detail", product_id=product.id))
+        if existing_weight is not None:
+            requested_weight += existing_weight
+        cart[key] = {
+            "quantity": new_quantity,
+            "requested_weight_kg": str(requested_weight),
+        }
+    else:
+        cart[key] = new_quantity
     session.modified = True
     flash(f"{product.name} added to your crate.", "success")
     return redirect(request.referrer or url_for("shop.index"))
@@ -166,6 +192,7 @@ def add_to_cart(product_id):
 @shop_bp.post("/cart/update")
 def update_cart():
     cart = current_cart()
+    invalid_weight = False
     for key in list(cart):
         try:
             quantity = int(request.form.get(f"quantity_{key}", 0))
@@ -174,10 +201,21 @@ def update_cart():
         product = db.session.get(Product, int(key)) if str(key).isdigit() else None
         if not product or quantity <= 0:
             cart.pop(key, None)
+        elif product.is_sold_by_weight:
+            requested_weight = parse_requested_weight(request.form.get(f"requested_weight_kg_{key}"))
+            cart[key] = {
+                "quantity": min(quantity, product.stock),
+                "requested_weight_kg": str(requested_weight) if requested_weight is not None else "",
+            }
+            invalid_weight = invalid_weight or requested_weight is None
         else:
             cart[key] = min(quantity, product.stock)
     session.modified = True
-    flash("Your crate has been updated.", "success")
+    flash(
+        "Your crate has been updated. Enter a valid total requested weight in kg for each kg-priced item."
+        if invalid_weight else "Your crate has been updated.",
+        "error" if invalid_weight else "success",
+    )
     return redirect(url_for("shop.cart"))
 
 
@@ -213,6 +251,9 @@ def checkout():
     if not summary["lines"]:
         flash("Add at least one product before checking out.", "error")
         return redirect(url_for("shop.index"))
+    if summary.get("has_invalid_weight"):
+        flash("Enter the combined requested weight in kg for each kg-priced item before checkout.", "error")
+        return redirect(url_for("shop.cart"))
 
     if request.method == "POST":
         customer_name = request.form.get("customer_name", "").strip()
@@ -237,6 +278,9 @@ def checkout():
             if not summary["lines"]:
                 flash("Your crate is empty. Please add a product first.", "error")
                 return redirect(url_for("shop.index"))
+            if summary.get("has_invalid_weight"):
+                flash("Enter the combined requested weight in kg for each kg-priced item before checkout.", "error")
+                return redirect(url_for("shop.cart"))
             for line in summary["lines"]:
                 if not line["product"].is_available or line["quantity"] > line["product"].stock:
                     flash(f"Not enough stock for {line['product'].name}. Please update your crate.", "error")
@@ -266,7 +310,7 @@ def checkout():
                         amount=summary["total"],
                         status="pending",
                         payment_method="bank transfer",
-                        notes="Pay-now amount includes item prices or deposits and the selected delivery fee.",
+                        notes="Full order amount due before confirmation, including the selected delivery fee.",
                     )
                 )
             for line in summary["lines"]:
@@ -279,8 +323,8 @@ def checkout():
                         quantity=line["quantity"],
                         unit_price=Decimal(str(product.price)),
                         unit=product.unit,
-                        pricing_type=product.pricing_type,
-                        weight_price_per_kg=product.weight_price_per_kg,
+                        pricing_type="unit_price",  # Neutral legacy snapshot marker; products no longer have pricing types.
+                        requested_weight_kg=line["requested_weight_kg"],
                         subtotal=line["line_subtotal"],
                     )
                 )

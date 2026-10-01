@@ -25,17 +25,19 @@ SALESPERSON_STATUSES = {
 }
 
 
-def update_order_status(order, new_status, *, verify_payment=False, actor="owner"):
+def update_order_status(
+    order, new_status, *, verify_payment=False, actor="owner", actor_name=None,
+    verification_reference="",
+):
     """Return (ok, message); commit a valid status/payment transition and send alerts."""
     if new_status not in ORDER_STATUSES:
         return False, "Choose a valid order status."
     if actor == "salesperson":
-        if new_status not in SALESPERSON_STATUSES.get(order.status, set()):
+        is_payment_only = verify_payment and order.status == "Received" and new_status == order.status
+        if new_status not in SALESPERSON_STATUSES.get(order.status, set()) and not is_payment_only:
             return False, "Salesperson access can only move verified orders through the allowed fulfillment steps."
-        if verify_payment:
-            return False, "Only the owner can verify payment in the business bank account."
-    if verify_payment and actor != "owner":
-        return False, "Only the owner can verify payment in the business bank account."
+    if verify_payment and actor not in {"owner", "salesperson"}:
+        return False, "Only the Owner or an authorized Salesperson can verify payment in the business bank account."
     if order.fulfillment_type == "pickup" and new_status in DELIVERY_ONLY_STATUSES:
         return False, "Farm-pickup orders cannot be assigned to delivery."
     if order.fulfillment_type != "pickup" and new_status in PICKUP_ONLY_STATUSES:
@@ -51,10 +53,10 @@ def update_order_status(order, new_status, *, verify_payment=False, actor="owner
     if verify_payment and order.payment_status != "Verified":
         payment_verified_now = True
     if new_status in PAYMENT_REQUIRED_STATUSES and order.payment_status != "Verified":
-        if actor != "owner" or new_status != "Confirmed" or not verify_payment:
+        if actor not in {"owner", "salesperson"} or new_status != "Confirmed" or not verify_payment:
             return False, (
                 "This order cannot be confirmed or progressed until the amount due now appears in the "
-                "business bank account. The owner must verify payment first."
+                "business bank account. The Owner or an authorized Salesperson must verify payment first."
             )
         payment_verified_now = True
 
@@ -92,7 +94,9 @@ def update_order_status(order, new_status, *, verify_payment=False, actor="owner
         if initial_record is not None:
             initial_record.status = "settled"
             initial_record.settled_at = order.payment_verified_at
-            initial_record.recorded_by = "Owner"
+            initial_record.recorded_by = (actor_name or ("Owner" if actor == "owner" else "Salesperson"))[:120]
+            if verification_reference:
+                initial_record.reference = verification_reference.strip()[:160]
 
     if status_changed:
         order.status = new_status

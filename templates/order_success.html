@@ -33,12 +33,12 @@
   <div class="receipt-card">
     <div class="receipt-head"><span>ORDER #{{ order.public_id }}</span><span class="status-pill {% if order.payment_status == 'Verified' %}status-confirmed{% else %}status-received{% endif %}">{% if order.payment_status == 'Verified' %}Payment verified{% else %}Awaiting payment{% endif %}</span></div>
     {% for item in order.items %}
-    <div class="receipt-line"><span>{{ item.quantity }} × {{ item.product_name }}{% if item.pricing_type == 'weight_deposit' %}<small class="pricing-line-note">Deposit · final price {{ format_currency(item.weight_price_per_kg) }}/kg after weighing</small>{% endif %}</span><strong>{{ format_currency(item.subtotal) }}</strong></div>
+    <div class="receipt-line"><span>{{ item.quantity }} × {{ item.product_name }}{% if item.requested_weight_kg is not none %}<small class="pricing-line-note">{{ '%.3f'|format(item.requested_weight_kg) }} kg requested in total · {{ format_currency(item.unit_price) }}/kg</small>{% elif item.pricing_type == 'weight_deposit' %}<small class="pricing-line-note">Legacy order · deposit-based price snapshot</small>{% endif %}</span><strong>{{ format_currency(item.subtotal) }}</strong></div>
     {% endfor %}
-    <div class="summary-row"><span>Pay-now subtotal</span><strong>{{ format_currency(order.subtotal) }}</strong></div>
+    <div class="summary-row"><span>Items subtotal</span><strong>{{ format_currency(order.subtotal) }}</strong></div>
     <div class="summary-row"><span>{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}Delivery · {{ order.delivery_zone_name }}{% endif %}</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div>
-    <div class="summary-total"><span>Amount due now</span><strong>{{ format_currency(order.total) }}</strong></div>
-    {% if order.has_weight_priced_items %}<p class="weight-pricing-disclaimer">Weight-priced item(s): the final price is based on actual weight. Any remaining balance is settled separately after weighing. If the final price is lower than the deposit, the difference will be refunded within 48 hours after weighing.</p>{% endif %}
+    <div class="summary-total"><span>Full amount due now</span><strong>{{ format_currency(order.total) }}</strong></div>
+    {% if order.has_weight_priced_items %}<p class="weight-pricing-disclaimer">This is a legacy order placed under the retired deposit-and-final-weighing workflow. See the customer receipt for its recorded settlement.</p>{% endif %}
     <div class="receipt-address"><span>{% if order.fulfillment_type == 'pickup' %}PICKUP LOCATION{% else %}DELIVER TO · {{ order.delivery_zone_name }}{% endif %}</span><strong>{{ order.address }}</strong></div>
   </div>
   <a class="button button-lime" href="{{ url_for('shop.customer_receipt', order_ref=order.public_id, token=order.public_token) }}">View / print customer receipt</a>
