@@ -17,9 +17,9 @@
 {% endif %}
 <section class="hero container">
   <div class="hero-copy">
-    <p class="eyebrow">{{ greeting }}, welcome to Beamers Farm · Osogbo delivery</p>
+    <p class="eyebrow">{{ greeting }}, welcome to Beamers Farm · Osogbo delivery or farm pickup</p>
     <h1>Good food starts with <em>good chicken.</em></h1>
-    <p class="hero-lede">Your trusted local source for fresh, clean, and hygienically packaged frozen chicken, whole birds, and delicious parts. Conveniently delivered across Osogbo for families, restaurants, caterers, resellers, and students.</p>
+    <p class="hero-lede">Your trusted local source for fresh, clean, and hygienically packaged frozen chicken, whole birds, and delicious parts. Choose a delivery zone across Osogbo or collect your order from our farm.</p>
     <a class="button button-dark" href="#products">Shop Beamers Farm <span>↓</span></a>
   </div>
   <div class="hero-card">
@@ -32,7 +32,7 @@
 <section class="trust-strip">
   <div class="container trust-grid">
     <div><span class="trust-number">01</span><strong>Choose your portions</strong><small>Whole birds and delicious parts</small></div>
-    <div><span class="trust-number">02</span><strong>Tell us where</strong><small>Delivery within Osogbo</small></div>
+    <div><span class="trust-number">02</span><strong>Choose fulfillment</strong><small>Delivery zone or free farm pickup</small></div>
     <div><span class="trust-number">03</span><strong>Pay by transfer</strong><small>We confirm every order</small></div>
   </div>
 </section>
@@ -52,7 +52,7 @@
             <p>{{ product.description }}</p>
             <div class="product-buy"><div><strong>{{ format_currency(product.price) }}{% if product.is_weight_priced %} deposit{% endif %}</strong><small>{{ product.unit }}</small></div><form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post">
 <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-lime" type="submit">Add to crate <span>+</span></button></form></div>
-            {% if product.is_weight_priced %}<p class="weight-card-note">Final price {{ format_currency(product.weight_price_per_kg) }}/kg after weighing. Balance due on delivery.</p>{% endif %}
+            {% if product.is_weight_priced %}<p class="weight-card-note">Final price {{ format_currency(product.weight_price_per_kg) }}/kg after weighing. Any refund from a lower weight is due within 48 hours.</p>{% endif %}
           </div>
         </article>
       {% endfor %}

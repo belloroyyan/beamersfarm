@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Owner receipt · Order #{{ order.public_id }}{% endblock %}
+{% block content %}
+<div class="container page-shell printable-page">
+  <div class="receipt-toolbar"><a class="back-link" href="{{ url_for('admin.order_detail', order_ref=order.public_id) }}">← Back to order desk</a><button class="button button-dark" type="button" data-print>Print owner receipt</button></div>
+  <article class="print-receipt owner-print-receipt">
+    <header class="print-receipt-header"><img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farm"><div><p class="eyebrow">Private · Owner copy</p><h1>Financial order receipt</h1><p>Order #{{ order.public_id }}</p></div><span class="status-pill {% if order.payment_status == 'Verified' %}status-confirmed{% else %}status-received{% endif %}">{{ order.payment_status }}</span></header>
+    <div class="print-receipt-meta"><div><span>Customer</span><strong>{{ order.customer_name }}</strong></div><div><span>Phone</span><strong>{{ order.phone }}</strong></div><div><span>Placed</span><strong>{{ order.created_at.strftime('%d %b %Y · %H:%M') }}</strong></div><div><span>Fulfillment</span><strong>{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}Delivery · {{ order.delivery_zone_name }}{% endif %}</strong></div></div>
+    <section class="print-receipt-section"><h2>Item and weigh-in details</h2>
+      {% for item in order.items %}<div class="print-receipt-row owner-receipt-item"><span><strong>{{ item.quantity }} × {{ item.product_name }}</strong><small>{% if item.pricing_type == 'weight_deposit' %}Deposit {{ format_currency(item.unit_price) }} per {{ item.unit }} · rate {{ format_currency(item.weight_price_per_kg) }}/kg{% else %}Fixed price {{ format_currency(item.unit_price) }} per {{ item.unit }}{% endif %}</small>{% if item.pricing_type == 'weight_deposit' %}<small>Measured total weight: {% if item.actual_weight_kg is not none %}{{ '%.3f'|format(item.actual_weight_kg) }} kg{% else %}Not recorded{% endif %}</small>{% endif %}</span><strong>{% if item.pricing_type == 'weight_deposit' and item.actual_weight_kg is not none %}{{ format_currency(item.final_subtotal) }} final{% else %}{{ format_currency(item.subtotal) }}{% endif %}</strong></div>{% endfor %}
+    </section>
+    <section class="print-receipt-section"><h2>Order totals</h2>
+      <div class="print-receipt-row"><span>Amount paid/required before confirmation</span><strong>{{ format_currency(order.total) }}</strong></div>
+      <div class="print-receipt-row"><span>{% if order.fulfillment_type == 'pickup' %}Farm pickup fee{% else %}{{ order.delivery_zone_name }} fee{% endif %}</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div>
+      {% if order.final_total is none %}<div class="settlement-status-card"><strong>Final total not ready</strong><span>Record the measured weight for every weight-priced line to calculate the final total and settlement.</span></div>
+      {% else %}<div class="print-receipt-row"><span>Final total after weighing</span><strong>{{ format_currency(order.final_total) }}</strong></div>
+        {% if order.payment_status != 'Verified' %}<div class="settlement-status-card"><strong>Initial payment is not verified</strong><span>Check the business bank account before confirming collection or refund of any final difference.</span></div>
+        {% elif order.balance_due and order.balance_due > 0 %}<div class="print-receipt-total"><span>Remaining balance due</span><strong>{{ format_currency(order.balance_due) }}</strong></div>
+        {% elif order.refund_due and order.refund_due > 0 %}<div class="print-receipt-total refund-total"><span>Refund still due</span><strong>{{ format_currency(order.refund_due) }}</strong></div><p class="refund-deadline">Refund deadline: {{ order.refund_deadline.strftime('%d %b %Y · %H:%M') if order.refund_deadline else 'Within 48 hours after weighing' }}.</p>
+        {% else %}<div class="settlement-status-card"><strong>Final difference settled</strong><span>No further balance or refund is outstanding.</span></div>{% endif %}
+      {% endif %}
+    </section>
+    <section class="print-receipt-section"><h2>Payment and refund history</h2>
+      {% if order.financial_records %}{% for record in order.financial_records %}<div class="print-receipt-row"><span><strong>{{ {'initial_payment':'Pay-now payment','balance_payment':'Balance payment','refund':'Refund'}[record.event_type] }}</strong><small>{{ record.created_at.strftime('%d %b %Y · %H:%M') }} · {{ record.payment_method|title }} · {{ record.status|title }}{% if record.reference %} · Ref {{ record.reference }}{% endif %}{% if record.recorded_by %} · Recorded by {{ record.recorded_by }}{% endif %}</small>{% if record.notes %}<small>{{ record.notes }}</small>{% endif %}</span><strong>{{ format_currency(record.amount) }}</strong></div>{% endfor %}
+      {% else %}<p>No financial records are available for this order.</p>{% endif %}
+    </section>
+    <section class="print-receipt-section"><h2>{% if order.fulfillment_type == 'pickup' %}Pickup location{% else %}Delivery address{% endif %}</h2><p>{{ order.address }}</p></section>
+    <footer class="print-receipt-footer"><span>Internal financial record · Order status: {{ order.status }}</span><span>Order placed {{ order.created_at.strftime('%d %b %Y · %H:%M') }}</span></footer>
+  </article>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/receipt-print.js') }}" defer></script>{% endblock %}

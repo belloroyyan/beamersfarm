@@ -8,12 +8,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config, INSTANCE_DIR
-from models import Product, ShopSettings, db
+from models import DeliveryZone, Product, ShopSettings, db
 from routes.admin import admin_bp
 from routes.shop import shop_bp
 from routes.whatsapp import whatsapp_bp
 from routes.complaints import complaints_bp
 from routes.dispatch import dispatch_bp
+from routes.salesperson import salesperson_bp
 from utils.helpers import cart_count, format_currency
 from utils.greetings import time_of_day_greeting
 from utils.updates import linkify, update_image_url
@@ -71,6 +72,29 @@ def ensure_shop_settings():
         db.session.commit()
 
 
+def ensure_delivery_zones():
+    if DeliveryZone.query.count() > 0:
+        return
+    db.session.add_all(
+        [
+            DeliveryZone(
+                name="Osogbo — Standard delivery",
+                description="Standard Osogbo delivery tier. Please confirm with us if you are unsure whether your neighborhood is included.",
+                fee=Decimal("1500.00"),
+                sort_order=10,
+            ),
+            DeliveryZone(
+                name="Farm pickup (Elapop Estate)",
+                description="Collect your order from Beamers Farm; no delivery fee.",
+                fee=Decimal("0.00"),
+                is_pickup=True,
+                sort_order=0,
+            ),
+        ]
+    )
+    db.session.commit()
+
+
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
@@ -84,6 +108,7 @@ def create_app():
     app.register_blueprint(whatsapp_bp)
     app.register_blueprint(complaints_bp)
     app.register_blueprint(dispatch_bp)
+    app.register_blueprint(salesperson_bp)
 
     app.jinja_env.filters["linkify"] = linkify
 
@@ -180,6 +205,7 @@ def create_app():
             db.create_all()
             seed_products()
             ensure_shop_settings()
+            ensure_delivery_zones()
     return app
 
 

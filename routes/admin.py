@@ -2,25 +2,27 @@ from decimal import Decimal
 from functools import wraps
 
 from datetime import datetime
+import re
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 from sqlalchemy.exc import SQLAlchemyError
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import Complaint, CustomerPushSubscription, Order, OrderItem, OrderNotification, Product, ShopSettings, ShopUpdate, StaffPushSubscription, db, order_customer_push_subscriptions
+from models import Complaint, CustomerPushSubscription, DeliveryZone, Order, OrderFinancialRecord, OrderItem, OrderNotification, Product, SalespersonAccount, ShopSettings, ShopUpdate, StaffPushSubscription, db, order_customer_push_subscriptions
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.product_images import save_product_image
 from utils.updates import delete_update_image, save_update_image
 from utils.security import is_safe_redirect_url
 from utils.push_subscriptions import delete_staff_push_subscription, save_staff_push_subscription
 from utils.web_push import send_customer_order_confirmed_push, send_dispatch_assignment_push, web_push_is_configured
+from utils.order_workflow import ORDER_STATUSES, update_order_status
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
-ORDER_STATUSES = ["Received", "Confirmed", "Preparing", "Out for delivery", "Delivered", "Cancelled"]
 COMPLAINT_STATUSES = ["New", "Under Review", "Resolved", "Closed"]
 COMPLAINT_CATEGORIES = ["Late delivery", "Missing item", "Incorrect item", "Product quality", "Payment issue", "Delivery experience", "Other"]
 
 MAX_PRODUCT_PRICE = Decimal("9999999999.99")
+MAX_DELIVERY_FEE = Decimal("1000000.00")
 
 
 def parse_product_pricing(form):
@@ -74,16 +76,31 @@ def valid_dispatch_rider_password(password):
     )
 
 
+def authenticate_salesperson(username, password):
+    normalized = (username or "").strip().casefold()
+    if not normalized:
+        return None
+    account = SalespersonAccount.query.filter_by(username=normalized, active=True).first()
+    if account and check_password_hash(account.password_hash, password):
+        return account
+    return None
+
+
 @admin_bp.route("/login", methods=["GET", "POST"])
 def login():
+    salesperson_account = None
     if request.method == "POST":
         role = request.form.get("role", "owner")
         password = request.form.get("password", "")
-        authenticated = (
-            valid_admin_password(password) if role == "owner"
-            else valid_dispatch_rider_password(password) if role == "dispatch_rider"
-            else False
-        )
+        if role == "owner":
+            authenticated = valid_admin_password(password)
+        elif role == "dispatch_rider":
+            authenticated = valid_dispatch_rider_password(password)
+        elif role == "salesperson":
+            salesperson_account = authenticate_salesperson(request.form.get("username"), password)
+            authenticated = salesperson_account is not None
+        else:
+            authenticated = False
         if authenticated:
             next_url = request.args.get("next")
             session.clear()
@@ -92,16 +109,84 @@ def login():
                 session["admin_logged_in"] = True
                 flash("Welcome back. Your order desk is ready.", "success")
                 default_endpoint = "admin.dashboard"
-                allowed_next = next_url and not next_url.startswith("/dispatch")
-            else:
+                allowed_next = next_url and not next_url.startswith(("/dispatch", "/sales"))
+            elif role == "dispatch_rider":
                 flash("Welcome. Your dispatch queue is ready.", "success")
                 default_endpoint = "dispatch.dashboard"
                 allowed_next = next_url and next_url.startswith("/dispatch")
+            else:
+                session["salesperson_id"] = salesperson_account.id
+                session["salesperson_name"] = salesperson_account.display_name
+                flash(f"Welcome, {salesperson_account.display_name}. Your sales desk is ready.", "success")
+                default_endpoint = "salesperson.dashboard"
+                allowed_next = next_url and next_url.startswith("/sales")
             if allowed_next and is_safe_redirect_url(next_url):
                 return redirect(next_url)
             return redirect(url_for(default_endpoint))
         flash("Those sign-in details did not match.", "error")
-    return render_template("admin/login.html")
+    return render_template(
+        "admin/login.html",
+        salesperson_enabled=SalespersonAccount.query.filter_by(active=True).count() > 0,
+    )
+
+
+@admin_bp.route("/staff", methods=["GET", "POST"])
+@admin_required
+def staff_accounts():
+    if request.method == "POST":
+        action = request.form.get("action", "")
+        account_id = request.form.get("account_id", "")
+        account = db.session.get(SalespersonAccount, int(account_id)) if account_id.isdigit() else None
+        if action == "add":
+            display_name = request.form.get("display_name", "").strip()
+            username = request.form.get("username", "").strip().casefold()
+            password = request.form.get("password", "")
+            confirm = request.form.get("confirm_password", "")
+            if not display_name or len(display_name) > 120:
+                flash("Enter a salesperson name up to 120 characters.", "error")
+            elif not re.fullmatch(r"[a-z0-9][a-z0-9._-]{2,39}", username):
+                flash("Usernames must be 3–40 characters using lowercase letters, numbers, dots, underscores, or hyphens.", "error")
+            elif SalespersonAccount.query.filter_by(username=username).first():
+                flash("That username is already in use. Re-activate the existing account or choose another username.", "error")
+            elif len(password) < 12 or len(password) > 256 or password != confirm:
+                flash("Use a password of at least 12 characters and make sure both password fields match.", "error")
+            else:
+                db.session.add(
+                    SalespersonAccount(
+                        display_name=display_name,
+                        username=username,
+                        password_hash=generate_password_hash(password),
+                        active=True,
+                    )
+                )
+                db.session.commit()
+                flash("Salesperson account created. Share the username and password securely with that employee.", "success")
+                return redirect(url_for("admin.staff_accounts"))
+        elif action == "reset_password" and account:
+            password = request.form.get("password", "")
+            confirm = request.form.get("confirm_password", "")
+            if len(password) < 12 or len(password) > 256 or password != confirm:
+                flash("Use a password of at least 12 characters and make sure both password fields match.", "error")
+            else:
+                account.password_hash = generate_password_hash(password)
+                db.session.commit()
+                flash(f"Password reset for {account.display_name}.", "success")
+                return redirect(url_for("admin.staff_accounts"))
+        elif action in {"activate", "deactivate"} and account:
+            account.active = action == "activate"
+            account.disabled_at = None if account.active else datetime.utcnow()
+            db.session.commit()
+            flash(
+                f"{account.display_name} can now sign in." if account.active
+                else f"{account.display_name} access revoked. Active sessions will be rejected on their next request.",
+                "success",
+            )
+            return redirect(url_for("admin.staff_accounts"))
+        else:
+            flash("Choose a valid salesperson account action.", "error")
+        return redirect(url_for("admin.staff_accounts"))
+    accounts = SalespersonAccount.query.order_by(SalespersonAccount.active.desc(), SalespersonAccount.display_name.asc()).all()
+    return render_template("admin/staff_accounts.html", accounts=accounts)
 
 
 @admin_bp.post("/logout")
@@ -142,7 +227,7 @@ def dashboard():
     orders = Order.query.order_by(Order.created_at.desc()).limit(100).all()
     shop_settings = ShopSettings.query.get(1)
     stats = {
-        "open": Order.query.filter(Order.status.notin_(["Delivered", "Cancelled"])).count(),
+        "open": Order.query.filter(Order.status.notin_(["Delivered", "Picked up", "Cancelled"])).count(),
         "today": Order.query.filter(db.func.date(Order.created_at) == db.func.current_date()).count(),
         "products": Product.query.filter_by(active=True).count(),
         "low_stock": Product.query.filter(Product.active.is_(True), Product.stock <= 5).count(),
@@ -178,98 +263,196 @@ def order_detail(order_ref):
         from flask import abort
         abort(404)
     if request.method == "POST":
-        new_status = request.form.get("status", "")
-        if new_status not in ORDER_STATUSES:
-            flash("Choose a valid order status.", "error")
-        else:
-            previous_status = order.status
-            status_changed = new_status != previous_status
-            payment_verified_now = False
-            verify_requested = request.form.get("verify_payment") == "yes"
-            payment_required_statuses = {"Confirmed", "Preparing", "Out for delivery", "Delivered"}
-
-            if verify_requested and order.payment_status != "Verified" and new_status != "Confirmed":
-                flash("To verify payment, select Confirmed and tick the bank-account verification box.", "error")
-                return redirect(url_for("admin.order_detail", order_ref=order.public_id))
-            if new_status in payment_required_statuses and order.payment_status != "Verified":
-                if new_status != "Confirmed" or not verify_requested:
-                    flash(
-                        "This order cannot be confirmed or progressed until the amount due now appears in the business bank account. Select Confirmed only after checking the account and tick the verification box.",
-                        "error",
-                    )
-                    return redirect(url_for("admin.order_detail", order_ref=order.public_id))
-                payment_verified_now = True
-
-            if status_changed and order.status == "Cancelled" and new_status != "Cancelled":
-                for item in order.items:
-                    if item.product and item.product.stock < item.quantity:
-                        flash(f"Not enough stock to reopen {item.product_name}.", "error")
-                        return render_template("admin/order_detail.html", order=order, statuses=ORDER_STATUSES)
-
-            if status_changed and new_status == "Cancelled" and order.status != "Cancelled":
-                for item in order.items:
-                    if item.product:
-                        item.product.stock += item.quantity
-            elif status_changed and order.status == "Cancelled" and new_status != "Cancelled":
-                for item in order.items:
-                    if item.product:
-                        item.product.stock -= item.quantity
-
-            if payment_verified_now:
-                order.payment_status = "Verified"
-                order.payment_verified_at = datetime.utcnow()
-
-            if status_changed:
-                order.status = new_status
-            if status_changed and previous_status != "Confirmed" and new_status == "Confirmed" and order.whatsapp_opt_in:
-                existing = OrderNotification.query.filter_by(
-                    order_id=order.id,
-                    channel="whatsapp",
-                    event="order_confirmed",
-                ).first()
-                if existing is None:
-                    db.session.add(
-                        OrderNotification(
-                            order=order,
-                            channel="whatsapp",
-                            event="order_confirmed",
-                            recipient=normalize_nigerian_phone(order.phone),
-                            message=build_order_confirmed_message(order),
-                            status="pending",
-                        )
-                    )
-            if status_changed or payment_verified_now:
-                db.session.commit()
-            else:
-                flash("No order or payment changes were made.", "success")
-                return redirect(url_for("admin.order_detail", order_ref=order.public_id))
-
-            if status_changed and new_status == "Confirmed" and previous_status != "Confirmed":
-                send_customer_order_confirmed_push(order)
-            if status_changed and new_status == "Out for delivery" and previous_status != "Out for delivery":
-                push_result = send_dispatch_assignment_push()
-                if not push_result["configured"]:
-                    flash("Order assigned to dispatch. Push alerts are not configured yet; the rider can refresh the queue.", "success")
-                elif push_result["failed"] and not push_result["total"]:
-                    flash("Order assigned to dispatch, but push subscriptions could not be read. The rider can refresh the queue.", "success")
-                elif not push_result["total"]:
-                    flash("Order assigned to dispatch. No rider device has enabled push alerts yet.", "success")
-                elif push_result["sent"]:
-                    flash(f"Order assigned to dispatch. Push alert sent to {push_result['sent']} device(s).", "success")
-                else:
-                    flash("Order assigned to dispatch, but the push alert could not be delivered. The rider can refresh the queue.", "success")
-            elif payment_verified_now and new_status == "Confirmed" and order.whatsapp_opt_in:
-                flash("Payment verified in the business bank account and order confirmed. WhatsApp notification queued.", "success")
-            elif payment_verified_now and new_status == "Confirmed":
-                flash("Payment verified in the business bank account and order confirmed.", "success")
-            elif payment_verified_now:
-                flash("Payment verified. The order remains confirmed.", "success")
-            elif status_changed and new_status == "Confirmed" and order.whatsapp_opt_in:
-                flash("Order confirmed. WhatsApp notification queued for the scheduled sender.", "success")
-            else:
-                flash("Order status updated.", "success")
+        verify_only = request.form.get("verify_payment_only") == "yes"
+        ok, message = update_order_status(
+            order,
+            order.status if verify_only else request.form.get("status", ""),
+            verify_payment=verify_only or request.form.get("verify_payment") == "yes",
+            actor="owner",
+        )
+        flash(message, "success" if ok else "error")
         return redirect(url_for("admin.order_detail", order_ref=order.public_id))
     return render_template("admin/order_detail.html", order=order, statuses=ORDER_STATUSES)
+
+
+@admin_bp.get("/orders/<string:order_ref>/receipt")
+@admin_required
+def owner_order_receipt(order_ref):
+    order = Order.query.filter_by(public_id=order_ref).first()
+    if order is None and order_ref.isdigit():
+        order = db.session.get(Order, int(order_ref))
+    if order is None:
+        from flask import abort
+        abort(404)
+    return render_template("admin/owner_receipt.html", order=order)
+
+
+@admin_bp.post("/orders/<string:order_ref>/weights")
+@admin_required
+def record_order_weights(order_ref):
+    order = Order.query.filter_by(public_id=order_ref).first()
+    if order is None and order_ref.isdigit():
+        order = db.session.get(Order, int(order_ref))
+    if order is None:
+        from flask import abort
+        abort(404)
+    if order.status == "Cancelled" or order.payment_status != "Verified":
+        flash("Record final weights only for active orders with verified payment.", "error")
+        return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+    weighted_items = [item for item in order.items if item.pricing_type == "weight_deposit"]
+    if not weighted_items:
+        flash("This order has no weight-priced items to weigh.", "error")
+        return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+    if any(record.event_type in {"balance_payment", "refund"} and record.status == "settled" for record in order.financial_records):
+        flash("Weights are locked after a balance payment or refund has been recorded. Use the financial history for any further adjustment.", "error")
+        return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+
+    try:
+        for item in weighted_items:
+            raw = request.form.get(f"weight_{item.id}", "").strip()
+            if not raw:
+                item.actual_weight_kg = None
+                continue
+            weight = Decimal(raw)
+            if not weight.is_finite() or weight <= 0 or weight > Decimal("500.000"):
+                raise ValueError("Each combined measured weight must be greater than 0 and no more than 500 kg.")
+            rounded_weight = weight.quantize(Decimal("0.001"))
+            if rounded_weight != weight:
+                raise ValueError("Enter weights to no more than three decimal places (for example, 4.250 kg).")
+            item.actual_weight_kg = rounded_weight
+    except (ArithmeticError, TypeError, ValueError) as error:
+        db.session.rollback()
+        message = str(error) if isinstance(error, ValueError) and str(error) else "Enter valid weights in kilograms, up to three decimal places."
+        flash(message, "error")
+        return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+
+    if order.weights_complete:
+        if order.weighing_completed_at is None:
+            order.weighing_completed_at = datetime.utcnow()
+        flash("All weight entries are saved. The owner receipt now shows the final total and any balance or refund due within 48 hours.", "success")
+    else:
+        order.weighing_completed_at = None
+        flash("Weight entries saved. Add the remaining measurements to calculate the final total.", "success")
+    db.session.commit()
+    return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+
+
+@admin_bp.post("/orders/<string:order_ref>/settlements")
+@admin_required
+def record_order_settlement(order_ref):
+    order = Order.query.filter_by(public_id=order_ref).first()
+    if order is None and order_ref.isdigit():
+        order = db.session.get(Order, int(order_ref))
+    if order is None:
+        from flask import abort
+        abort(404)
+    event_type = request.form.get("event_type", "")
+    method = request.form.get("payment_method", "")
+    reference = request.form.get("reference", "").strip()
+    notes = request.form.get("notes", "").strip()
+    if event_type not in {"balance_payment", "refund"} or method not in {"cash", "bank transfer"}:
+        flash("Choose a valid settlement type and method.", "error")
+        return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+    if order.payment_status != "Verified" or order.final_total is None:
+        flash("Verify the initial payment and record every measured weight before settling a balance or refund.", "error")
+        return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+    try:
+        amount = Decimal(request.form.get("amount", "0"))
+        if not amount.is_finite() or amount <= 0 or amount > Decimal("9999999999.99"):
+            raise ValueError
+        amount = amount.quantize(Decimal("0.01"))
+    except (ArithmeticError, TypeError, ValueError):
+        flash("Enter a valid settlement amount greater than zero.", "error")
+        return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+    remaining = order.balance_due if event_type == "balance_payment" else order.refund_due
+    if remaining is None or remaining <= 0 or amount > remaining:
+        flash("That amount is greater than the currently outstanding balance or refund.", "error")
+        return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+    now = datetime.utcnow()
+    db.session.add(
+        OrderFinancialRecord(
+            order=order,
+            event_type=event_type,
+            amount=amount,
+            status="settled",
+            payment_method=method,
+            reference=reference[:160],
+            notes=notes[:500],
+            recorded_by="Owner",
+            created_at=now,
+            settled_at=now,
+        )
+    )
+    db.session.commit()
+    flash("Financial settlement recorded in the order history.", "success")
+    return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+
+
+@admin_bp.route("/delivery-zones", methods=["GET", "POST"])
+@admin_required
+def delivery_zones():
+    if request.method == "POST":
+        action = request.form.get("action", "add")
+        zone_id = request.form.get("zone_id", "")
+        zone = db.session.get(DeliveryZone, int(zone_id)) if zone_id.isdigit() else None
+        name = request.form.get("name", "").strip()
+        description = request.form.get("description", "").strip()
+        if not name or len(name) > 100 or len(description) > 240:
+            flash("Enter a zone name up to 100 characters and an optional description up to 240 characters.", "error")
+            return redirect(url_for("admin.delivery_zones"))
+        duplicate = DeliveryZone.query.filter(DeliveryZone.name == name)
+        if zone:
+            duplicate = duplicate.filter(DeliveryZone.id != zone.id)
+        if duplicate.first():
+            flash("A delivery option with that name already exists.", "error")
+            return redirect(url_for("admin.delivery_zones"))
+        try:
+            fee = Decimal("0.00") if zone and zone.is_pickup else Decimal(request.form.get("fee", "0"))
+            if not fee.is_finite() or fee < 0 or fee > MAX_DELIVERY_FEE:
+                raise ValueError
+        except (ArithmeticError, TypeError, ValueError):
+            flash("Enter a valid non-negative fee up to ₦1,000,000.", "error")
+            return redirect(url_for("admin.delivery_zones"))
+        if action == "update" and zone:
+            zone.name = name
+            zone.description = description
+            zone.fee = fee
+            flash("Delivery option updated. Existing orders keep their saved zone and fee.", "success")
+        elif action == "add":
+            db.session.add(
+                DeliveryZone(
+                    name=name,
+                    description=description,
+                    fee=fee,
+                    is_pickup=False,
+                    active=True,
+                    sort_order=(db.session.query(db.func.max(DeliveryZone.sort_order)).scalar() or 0) + 10,
+                )
+            )
+            flash("Delivery zone added and available at checkout.", "success")
+        else:
+            flash("Choose an existing delivery option to update.", "error")
+            return redirect(url_for("admin.delivery_zones"))
+        db.session.commit()
+        return redirect(url_for("admin.delivery_zones"))
+    zones = DeliveryZone.query.order_by(DeliveryZone.sort_order.asc(), DeliveryZone.id.asc()).all()
+    return render_template("admin/delivery_zones.html", zones=zones)
+
+
+@admin_bp.post("/delivery-zones/<int:zone_id>/toggle")
+@admin_required
+def toggle_delivery_zone(zone_id):
+    zone = db.session.get(DeliveryZone, zone_id)
+    if zone is None:
+        from flask import abort
+        abort(404)
+    if zone.is_pickup:
+        flash("The free farm-pickup option must remain available.", "error")
+    else:
+        zone.active = not zone.active
+        db.session.commit()
+        flash(f"{zone.name} is now {'available' if zone.active else 'hidden'} at checkout. Existing orders are unchanged.", "success")
+    return redirect(url_for("admin.delivery_zones"))
 
 
 @admin_bp.route("/products", methods=["GET", "POST"])
@@ -470,9 +653,10 @@ def clear_database():
         db.session.execute(order_customer_push_subscriptions.delete())
         CustomerPushSubscription.query.delete(synchronize_session=False)
         OrderNotification.query.delete(synchronize_session=False)
+        OrderFinancialRecord.query.delete(synchronize_session=False)
         OrderItem.query.delete(synchronize_session=False)
         Order.query.delete(synchronize_session=False)
-        cleared.append("orders and delivery records (including items, WhatsApp logs, and customer push subscriptions)")
+        cleared.append("orders and delivery records (including items, payment/refund history, WhatsApp logs, and customer push subscriptions)")
     elif clear_messages:
         OrderNotification.query.delete(synchronize_session=False)
         cleared.append("WhatsApp message logs")

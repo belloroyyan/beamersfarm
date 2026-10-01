@@ -6,13 +6,17 @@ from decimal import Decimal
 
 from flask import Blueprint, abort, current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 
-from models import CustomerPushSubscription, Order, OrderItem, Product, ShopSettings, ShopUpdate, db
+from models import CustomerPushSubscription, DeliveryZone, Order, OrderFinancialRecord, OrderItem, Product, ShopSettings, ShopUpdate, db
 from utils.helpers import build_cart
 from utils.notifications import normalize_nigerian_phone
 from utils.push_subscriptions import valid_push_endpoint
 from utils.web_push import send_customer_order_confirmed_push, send_owner_new_order_push, web_push_is_configured
 
 shop_bp = Blueprint("shop", __name__)
+PICKUP_ADDRESS = (
+    "Beamers Farm, Elapop Estate, Coker Omu Community, along UNIOSUN Main Campus Road, "
+    "Oke Baale, Osogbo, Osun State"
+)
 
 
 def customer_notification_key(phone):
@@ -30,20 +34,22 @@ def current_cart():
     return session.setdefault("cart", {})
 
 
-def cart_summary(products=None):
+def cart_summary(products=None, delivery_fee=None):
     cart = current_cart()
     if products is None:
         ids = [int(key) for key in cart if str(key).isdigit()]
         products = Product.query.filter(Product.id.in_(ids)).all() if ids else []
     product_map = {product.id: product for product in products}
-    summary = build_cart(cart, product_map, current_app.config["DELIVERY_FEE"])
+    fee = Decimal("0.00") if delivery_fee is None else Decimal(str(delivery_fee))
+    summary = build_cart(cart, product_map, fee)
+    summary["delivery_fee_selected"] = delivery_fee is not None
     summary["has_weight_priced_items"] = any(
         line["product"].is_weight_priced for line in summary["lines"]
     )
     return summary
 
 
-def locked_cart_summary():
+def locked_cart_summary(delivery_fee=None):
     cart = current_cart()
     ids = [int(key) for key in cart if str(key).isdigit()]
     if not ids:
@@ -51,7 +57,7 @@ def locked_cart_summary():
     products = db.session.execute(
         db.select(Product).where(Product.id.in_(ids)).with_for_update()
     ).scalars().all()
-    return cart_summary(products)
+    return cart_summary(products, delivery_fee=delivery_fee)
 
 
 def shop_is_open():
@@ -191,7 +197,19 @@ def checkout():
             "shop_closed.html",
             message=settings.closed_message if settings else current_app.config["SHOP_CLOSED_MESSAGE"],
         ), 403
-    summary = cart_summary()
+    zones = DeliveryZone.query.filter_by(active=True).order_by(
+        DeliveryZone.sort_order.asc(), DeliveryZone.id.asc()
+    ).all()
+    selected_zone_id = request.values.get("delivery_zone_id", "")
+    selected_zone = next((zone for zone in zones if str(zone.id) == selected_zone_id), None)
+    summary = cart_summary(delivery_fee=selected_zone.fee if selected_zone else None)
+
+    def render_checkout():
+        return render_template(
+            "checkout.html", summary=summary, delivery_zones=zones,
+            selected_zone_id=selected_zone_id, selected_zone=selected_zone,
+        )
+
     if not summary["lines"]:
         flash("Add at least one product before checking out.", "error")
         return redirect(url_for("shop.index"))
@@ -201,14 +219,21 @@ def checkout():
         phone = request.form.get("phone", "").strip()
         address = request.form.get("address", "").strip()
         whatsapp_opt_in = request.form.get("whatsapp_opt_in") == "yes"
-        if not customer_name or len(customer_name) > 120 or not phone or len(phone) > 40 or not address or len(address) > 1000:
-            flash("Please enter a valid name, phone number, and delivery address.", "error")
-            return render_template("checkout.html", summary=summary)
+        if not selected_zone:
+            flash("Choose a delivery zone or free farm pickup to see the amount due.", "error")
+            return render_checkout()
+        if (
+            not customer_name or len(customer_name) > 120
+            or not phone or len(phone) > 40
+            or (not selected_zone.is_pickup and (not address or len(address) > 1000))
+        ):
+            flash("Please enter a valid name, phone number, and delivery address when delivery is selected.", "error")
+            return render_checkout()
 
         # A fresh transaction plus row locks prevents two workers selling the same stock.
         db.session.rollback()
         try:
-            summary = locked_cart_summary()
+            summary = locked_cart_summary(delivery_fee=selected_zone.fee)
             if not summary["lines"]:
                 flash("Your crate is empty. Please add a product first.", "error")
                 return redirect(url_for("shop.index"))
@@ -220,15 +245,30 @@ def checkout():
             order = Order(
                 customer_name=customer_name,
                 phone=phone,
-                address=address,
+                address=PICKUP_ADDRESS if selected_zone.is_pickup else address,
                 whatsapp_opt_in=whatsapp_opt_in,
                 whatsapp_opt_in_at=datetime.utcnow() if whatsapp_opt_in else None,
                 status="Received",
+                payment_status="Verified" if summary["total"] <= 0 else "Unverified",
+                payment_verified_at=datetime.utcnow() if summary["total"] <= 0 else None,
+                fulfillment_type="pickup" if selected_zone.is_pickup else "delivery",
+                delivery_zone_name=selected_zone.name,
                 subtotal=summary["subtotal"],
                 delivery_fee=summary["delivery_fee"],
                 total=summary["total"],
             )
             db.session.add(order)
+            if summary["total"] > 0:
+                db.session.add(
+                    OrderFinancialRecord(
+                        order=order,
+                        event_type="initial_payment",
+                        amount=summary["total"],
+                        status="pending",
+                        payment_method="bank transfer",
+                        notes="Pay-now amount includes item prices or deposits and the selected delivery fee.",
+                    )
+                )
             for line in summary["lines"]:
                 product = line["product"]
                 db.session.add(
@@ -253,7 +293,7 @@ def checkout():
         session["cart"] = {}
         return redirect(url_for("shop.order_success", order_ref=order.public_id, token=order.public_token))
 
-    return render_template("checkout.html", summary=summary)
+    return render_checkout()
 
 
 @shop_bp.get("/order/<string:order_ref>/<string:token>/success")
@@ -268,6 +308,16 @@ def order_success(order_ref, token):
         "order_success.html", order=order, push_configured=web_push_is_configured(),
         vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""),
     )
+
+
+@shop_bp.get("/order/<string:order_ref>/<string:token>/receipt")
+def customer_receipt(order_ref, token):
+    order = Order.query.filter_by(public_id=order_ref, public_token=token).first()
+    if order is None and order_ref.isdigit():
+        order = Order.query.filter_by(id=int(order_ref), public_token=token).first()
+    if order is None:
+        abort(404)
+    return render_template("customer_receipt.html", order=order)
 
 
 @shop_bp.post("/order/<string:order_ref>/<string:token>/push-subscriptions")
@@ -302,7 +352,7 @@ def customer_push_subscription(order_ref, token):
         if not already_linked:
             order.customer_push_subscriptions.append(subscription)
             db.session.commit()
-            if order.status in {"Confirmed", "Preparing", "Out for delivery", "Delivered"}:
+            if order.status in {"Confirmed", "Preparing", "Out for delivery", "Delivered", "Ready for pickup", "Picked up"}:
                 send_customer_order_confirmed_push(order, subscription_ids=[subscription.id])
         return jsonify(enabled=True, message="Order notifications were already enabled on this device."), 200
 

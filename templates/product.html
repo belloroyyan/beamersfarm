@@ -16,7 +16,7 @@
       {% if product.is_weight_priced %}
       <aside class="weight-pricing-disclaimer" aria-label="Weight-based price and payment terms">
         <strong>Variable-weight pricing</strong>
-        <p>The final price is determined by the actual weight at <strong>{{ format_currency(product.weight_price_per_kg) }}/kg</strong>. The listed deposit is paid now and must be verified before order confirmation. After weighing, the remaining balance (final price minus deposit paid) is due by cash or transfer on delivery.</p>
+        <p>The final price is determined by the actual weight at <strong>{{ format_currency(product.weight_price_per_kg) }}/kg</strong>. The listed deposit is paid now and must be verified before order confirmation. After weighing, any remaining balance is settled separately. If the final price is lower than the deposit, the difference will be refunded within 48 hours after weighing.</p>
       </aside>
       {% endif %}
       {% if product.is_available %}

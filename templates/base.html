@@ -48,6 +48,8 @@
           <a href="{{ url_for('admin.dashboard') }}">Owner desk</a>
         {% elif session.get('staff_role') == 'dispatch_rider' %}
           <a href="{{ url_for('dispatch.dashboard') }}">Dispatch desk</a>
+        {% elif session.get('staff_role') == 'salesperson' %}
+          <a href="{{ url_for('salesperson.dashboard') }}">Sales desk</a>
         {% else %}
           <a class="nav-muted" href="{{ url_for('admin.login') }}">Staff login</a>
         {% endif %}

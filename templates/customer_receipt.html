@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Customer receipt · Order #{{ order.public_id }} · Beamers Farm{% endblock %}
+{% block content %}
+<div class="container page-shell printable-page">
+  <div class="receipt-toolbar"><a class="back-link" href="{{ url_for('shop.order_success', order_ref=order.public_id, token=order.public_token) }}">← Back to order</a><button class="button button-dark" type="button" data-print>Print receipt</button></div>
+  <article class="print-receipt customer-print-receipt">
+    <header class="print-receipt-header"><img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farm"><div><p class="eyebrow">Beamers Farm</p><h1>Customer order receipt</h1><p>Order #{{ order.public_id }}</p></div><span class="status-pill {% if order.payment_status == 'Verified' %}status-confirmed{% else %}status-received{% endif %}">{% if order.payment_status == 'Verified' %}Payment verified{% else %}Awaiting payment{% endif %}</span></header>
+    <div class="print-receipt-meta"><div><span>Customer</span><strong>{{ order.customer_name }}</strong></div><div><span>Order date</span><strong>{{ order.created_at.strftime('%d %b %Y · %H:%M') }}</strong></div><div><span>Fulfillment</span><strong>{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}Delivery · {{ order.delivery_zone_name }}{% endif %}</strong></div><div><span>Order status</span><strong>{{ order.status }}</strong></div></div>
+    <section class="print-receipt-section"><h2>Items</h2>
+      {% for item in order.items %}<div class="print-receipt-row"><span>{{ item.quantity }} × {{ item.product_name }}{% if item.pricing_type == 'weight_deposit' %}<small>Weight-priced item · deposit included in amount due now</small>{% endif %}</span><strong>{{ format_currency(item.subtotal) }}</strong></div>{% endfor %}
+      <div class="print-receipt-row"><span>Items subtotal due now</span><strong>{{ format_currency(order.subtotal) }}</strong></div>
+      <div class="print-receipt-row"><span>{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}Delivery fee{% endif %}</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div>
+      <div class="print-receipt-total"><span>Amount due now</span><strong>{{ format_currency(order.total) }}</strong></div>
+    </section>
+    <section class="print-receipt-section"><h2>{% if order.fulfillment_type == 'pickup' %}Pickup location{% else %}Delivery address{% endif %}</h2><p>{{ order.address }}</p>{% if order.fulfillment_type == 'delivery' %}<p class="receipt-zone-note">Please ensure the selected zone matches the entered address. Beamers Farm may contact you to verify the delivery area.</p>{% endif %}</section>
+    {% if order.has_weight_priced_items %}<aside class="print-receipt-notice"><strong>Weight-priced items</strong><p>The final amount depends on actual weight. The deposit shown above is credited toward the final price. Any amount due or refund is settled separately after weighing. If the final price is lower than the deposit, the difference will be refunded within 48 hours after weighing.</p></aside>{% endif %}
+    <footer class="print-receipt-footer"><span>Keep this receipt and quote the order reference if you contact us.</span><span>Order placed {{ order.created_at.strftime('%d %b %Y · %H:%M') }}</span></footer>
+  </article>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/receipt-print.js') }}" defer></script>{% endblock %}

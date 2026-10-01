@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Staff sign in · Beamers Farm{% endblock %}
 {% block content %}
-<div class="container auth-shell"><div class="auth-card"><div class="auth-icon">BF</div><p class="eyebrow">Staff access</p><h1>Sign in to the cold room.</h1><p>Choose your role to open the right workspace.</p><form method="post">
-<input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><label>Sign in as<select name="role" required><option value="owner">Owner</option><option value="dispatch_rider">Dispatch rider</option></select></label><label>Password<input type="password" name="password" placeholder="Enter password" autocomplete="current-password" autofocus required></label><button class="button button-dark button-full" type="submit">Open workspace <span>→</span></button></form>{% if not config.IS_PRODUCTION %}<small class="form-note">Local demo passwords: Owner <code>frostadmin</code> · Dispatch rider <code>frostdispatch</code></small>{% endif %}</div></div>
+<div class="container auth-shell"><div class="auth-card"><div class="auth-icon">BF</div><p class="eyebrow">Staff access</p><h1>Sign in to your workspace.</h1><p>Choose your role to open the right desk.</p><form method="post">
+<input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><label>Sign in as<select name="role" data-staff-role required><option value="owner">Owner</option><option value="dispatch_rider">Dispatch rider</option>{% if salesperson_enabled %}<option value="salesperson">Salesperson</option>{% endif %}</select></label>
+<label data-salesperson-username hidden>Username<input type="text" name="username" placeholder="Your staff username" autocomplete="username" maxlength="40"></label>
+<label>Password<input type="password" name="password" placeholder="Enter password" autocomplete="current-password" autofocus required></label><button class="button button-dark button-full" type="submit">Open workspace <span>→</span></button></form>{% if not config.IS_PRODUCTION %}<small class="form-note">Local demo passwords: Owner <code>frostadmin</code> · Dispatch rider <code>frostdispatch</code></small>{% endif %}</div></div>
 {% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/staff-login.js') }}" defer></script>{% endblock %}

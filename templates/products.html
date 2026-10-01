@@ -18,7 +18,7 @@
             <p>{{ product.description }}</p>
             <div class="product-buy"><div><strong>{{ format_currency(product.price) }}{% if product.is_weight_priced %} deposit{% endif %}</strong><small>{{ product.unit }}</small></div><form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post">
 <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-lime" type="submit">Add to crate <span>+</span></button></form></div>
-            {% if product.is_weight_priced %}<p class="weight-card-note">Final price {{ format_currency(product.weight_price_per_kg) }}/kg after weighing. Balance due on delivery.</p>{% endif %}
+            {% if product.is_weight_priced %}<p class="weight-card-note">Final price {{ format_currency(product.weight_price_per_kg) }}/kg after weighing. Any refund from a lower weight is due within 48 hours.</p>{% endif %}
           </div>
         </article>
       {% endfor %}

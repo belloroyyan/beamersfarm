@@ -34,9 +34,9 @@
     <section class="help-card" aria-labelledby="crate-title">
       <div class="help-section-heading"><span class="help-number">03</span><div><p class="eyebrow">Review</p><h2 id="crate-title">Check your crate</h2></div></div>
       <ol class="help-list">
-        <li>Open <strong>Crate</strong> to review your chosen items, quantities, subtotal, and delivery fee.</li>
+        <li>Open <strong>Crate</strong> to review your items, quantities, and subtotal. The delivery fee is calculated after you select a zone at checkout.</li>
         <li>Change a quantity and press <strong>Update crate</strong>, or use the × control to remove an item.</li>
-        <li>When your order looks right, choose <strong>Continue to delivery</strong>.</li>
+        <li>When your order looks right, continue to checkout to choose delivery or free farm pickup.</li>
       </ol>
       <a class="help-inline-link" href="{{ url_for('shop.cart') }}">Open your crate →</a>
     </section>
@@ -45,18 +45,18 @@
       <div class="help-section-heading"><span class="help-number">04</span><div><p class="eyebrow">Place an order</p><h2 id="order-title">Enter delivery details</h2></div></div>
       <ol class="help-list">
         <li>Enter the name and phone number the farm should use to contact you.</li>
-        <li>Provide a complete delivery address in Osogbo, including house number, street, and area.</li>
+        <li>Choose a delivery zone and enter a complete address in that area, including house number, street, and neighborhood. Or choose free pickup from Beamers Farm.</li>
         <li>The WhatsApp order-update checkbox is optional. Submit the order when your details are ready.</li>
       </ol>
-      <p class="help-note">Delivery is within Osogbo. If the shop is closed for orders, you can still browse the site and return when ordering reopens.</p>
+      <p class="help-note">Available delivery zones and their current fees are shown at checkout. Please ensure your selected dropdown zone matches your typed address to avoid order cancellation or extra cash-on-delivery charges. Farm pickup is free from Elapop Estate, 7:00 AM–7:00 PM. If the shop is closed for orders, you can still browse the site and return when ordering reopens.</p>
     </section>
 
     <section class="help-card" aria-labelledby="after-order-title">
       <div class="help-section-heading"><span class="help-number">05</span><div><p class="eyebrow">After checkout</p><h2 id="after-order-title">Keep your order reference</h2></div></div>
       <ol class="help-list">
-        <li>After submitting, the confirmation page shows your order number, items, delivery address, amount due now, and bank-transfer details.</li>
+        <li>After submitting, the order page shows your order number, items, fulfillment choice, amount due now, and bank-transfer details. You can open and print a customer receipt from there.</li>
         <li>Transfer the amount due now before your order is confirmed. Use the order number as the bank-transfer reference. Beamers Farm checks its business bank account and confirms only after the payment appears.</li>
-        <li>If your crate includes a weight-priced item, the amount due now includes its deposit. The remaining balance (final weight-based price minus the deposit) is paid by cash or transfer on delivery after weighing.</li>
+        <li>If your crate includes a weight-priced item, the amount due now includes its deposit. After weighing, any remaining balance is settled separately. If the final price is lower than the deposit, the difference will be refunded within 48 hours after weighing.</li>
         <li>Keep the order reference so the farm can find your order quickly. You can optionally enable browser notifications on the receipt page to hear when payment is verified and your order is confirmed.</li>
       </ol>
       <a class="help-inline-link" href="{{ url_for('complaints.create_complaint') }}">Contact customer care →</a>

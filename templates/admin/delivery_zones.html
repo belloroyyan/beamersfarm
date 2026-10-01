@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Delivery zones · Beamers Farm{% endblock %}
+{% block content %}
+<div class="admin-shell"><div class="container">
+  <div class="admin-topbar compact-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner settings</p><h1>Delivery zones.</h1><p class="form-note">Set grouped areas and fees here; no redeployment is needed. Existing orders retain their original zone and fee.</p></div></div>
+  <div class="zone-management-grid">
+    <section class="admin-panel"><div class="panel-heading"><div><p class="eyebrow">Active and archived options</p><h2>Checkout options</h2></div><span class="section-note">{{ zones|length }} configured</span></div>
+      {% if zones %}<div class="zone-list">
+        {% for zone in zones %}<article class="zone-row {% if not zone.active %}zone-inactive{% endif %}">
+          <form method="post" action="{{ url_for('admin.delivery_zones') }}" class="zone-edit-form">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="update"><input type="hidden" name="zone_id" value="{{ zone.id }}">
+            <label>Option name<input name="name" value="{{ zone.name }}" maxlength="100" required></label>
+            <label>Areas / customer guidance<input name="description" value="{{ zone.description }}" maxlength="240" placeholder="Neighborhoods included"></label>
+            <label>Fee (₦)<input name="fee" type="number" min="0" max="1000000" step="0.01" value="{{ '%.2f'|format(zone.fee) }}" {% if zone.is_pickup %}readonly{% else %}required{% endif %}></label>
+            <div class="zone-row-actions"><span class="status-pill {% if zone.active %}status-confirmed{% else %}status-cancelled{% endif %}">{% if zone.is_pickup %}Free pickup{% elif zone.active %}Active{% else %}Inactive{% endif %}</span><button class="button button-outline" type="submit">Save changes</button></div>
+          </form>
+          {% if not zone.is_pickup %}<form method="post" action="{{ url_for('admin.toggle_delivery_zone', zone_id=zone.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="text-button zone-toggle-button" type="submit">{{ 'Hide at checkout' if zone.active else 'Restore at checkout' }}</button></form>{% endif %}
+        </article>{% endfor %}
+      </div>{% else %}<div class="empty-state compact"><h3>No delivery options are configured.</h3><p>Add a delivery zone or run the new database migration.</p></div>{% endif %}
+    </section>
+    <aside class="admin-panel add-zone-panel"><p class="eyebrow">Add a tier</p><h2>New delivery zone</h2><p class="form-note">Use broad pricing tiers, such as a near-zone and a farther-zone, rather than a separate price for every street. Free farm pickup is provided separately.</p>
+      <form method="post" action="{{ url_for('admin.delivery_zones') }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="add">
+        <label>Zone name<input name="name" maxlength="100" placeholder="e.g. Osogbo outer zone" required></label>
+        <label>Included areas / customer guidance<input name="description" maxlength="240" placeholder="Neighborhoods covered by this price"></label>
+        <label>Delivery fee (₦)<input name="fee" type="number" min="0" max="1000000" step="0.01" value="1500.00" required></label>
+        <button class="button button-dark button-full" type="submit">Add delivery zone</button>
+      </form>
+      <p class="zone-address-disclaimer">At checkout, customers must select a zone and enter an address. Manually verify that the selected tier matches the address; if it does not, contact the customer before fulfillment.</p>
+      <p class="form-note">Delivery zones can be hidden and restored; they are not deleted so past receipts remain accurate. Farm pickup remains free and available.</p>
+    </aside>
+  </div>
+</div></div>
+{% endblock %}

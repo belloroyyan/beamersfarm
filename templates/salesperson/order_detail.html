@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Sales order #{{ order.public_id }} · Beamers Farm{% endblock %}
+{% block content %}
+<div class="admin-shell"><div class="container">
+  <div class="admin-topbar compact-topbar"><div><a class="back-link" href="{{ url_for('salesperson.dashboard') }}">← Back to sales desk</a><p class="eyebrow">Salesperson · {{ account.display_name }}</p><h1>Order #{{ order.public_id }}</h1></div><span class="status-pill status-{{ order.status|lower|replace(' ', '-') }}">{{ order.status }}</span></div>
+  <div class="detail-admin-grid">
+    <section class="admin-panel"><div class="panel-heading"><div><p class="eyebrow">Customer order</p><h2>{{ order.customer_name }}</h2></div></div>
+      {% for item in order.items %}<div class="admin-line"><div><strong>{{ item.quantity }} × {{ item.product_name }}</strong><small>{% if item.pricing_type == 'weight_deposit' %}Deposit {{ format_currency(item.unit_price) }} per {{ item.unit }} · final amount handled by the owner after weighing{% else %}{{ format_currency(item.unit_price) }} per {{ item.unit }}{% endif %}</small></div><strong>{{ format_currency(item.subtotal) }}</strong></div>{% endfor %}
+      <div class="summary-row"><span>Items subtotal due now</span><strong>{{ format_currency(order.subtotal) }}</strong></div><div class="summary-row"><span>{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}{{ order.delivery_zone_name }}{% endif %}</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div><div class="summary-total"><span>Pay-now amount</span><strong>{{ format_currency(order.total) }}</strong></div>
+      <a class="button button-outline customer-receipt-link" href="{{ url_for('shop.customer_receipt', order_ref=order.public_id, token=order.public_token) }}" target="_blank" rel="noopener">Open customer receipt</a>
+    </section>
+    <aside class="admin-side">
+      <section class="admin-panel payment-verification-panel"><p class="eyebrow">Payment</p><h2>{% if order.payment_status == 'Verified' %}Verified by owner{% else %}Waiting for owner{% endif %}</h2>{% if order.payment_status == 'Verified' %}<p>The owner has checked the business bank account. You may move the order through its permitted fulfillment steps.</p>{% else %}<p><strong>Do not confirm this order yet.</strong> Payment is only verified by the owner after funds appear in the business bank account. You cannot mark payment as verified.</p>{% endif %}</section>
+      <section class="admin-panel"><p class="eyebrow">Fulfillment</p><h2>Update operational status</h2>
+        {% if order.payment_status != 'Verified' %}<p class="form-note">This order remains read-only until payment is verified by the owner.</p>{% endif %}
+        {% if available_statuses|length > 1 %}<form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><label>Status<select name="status">{% for status in available_statuses %}<option value="{{ status }}" {% if status == order.status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label><p class="form-note">You may confirm a verified order, prepare it, assign delivery or mark a ready pickup as collected. Only the owner can verify payments, cancel orders, record weights, or settle balances and refunds.</p><button class="button button-dark button-full" type="submit">Save status</button></form>{% endif %}
+      </section>
+      <section class="admin-panel contact-panel"><p class="eyebrow">{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}Delivery · {{ order.delivery_zone_name }}{% endif %}</p><h2>{{ order.customer_name }}</h2><a href="tel:{{ order.phone }}">{{ order.phone }}</a><p>{{ order.address }}</p><small>Placed {{ order.created_at.strftime('%d %b %Y · %H:%M') }}</small></section>
+    </aside>
+  </div>
+</div></div>
+{% endblock %}
