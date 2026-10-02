@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/update_sharing.html" import update_share_buttons %}
 {% block title %}Updates · Owner desk{% endblock %}
 {% block content %}<div class="admin-shell"><div class="container">
 <div class="admin-topbar"><div><p class="eyebrow">Owner desk / updates</p><h1>Post an update</h1></div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to overview</a></div>
@@ -11,7 +12,7 @@
       <label>Image (optional)<input type="file" name="image" accept=".jpg,.jpeg,.png,.webp,.gif"></label>
       <label>Posted by<input type="text" name="posted_by" maxlength="80" value="{{ request.form.get('posted_by', 'Admin') }}"></label>
     </div>
-    <p class="form-note">The date is added automatically.</p>
+    <p class="form-note">The date is added automatically. Published updates can be shared with a branded image preview or downloaded as a PNG.</p>
     <button class="button button-lime" type="submit">Post update <span>→</span></button>
   </form>
 </section>
@@ -23,9 +24,11 @@
         <p class="eyebrow">{{ u.created_at.strftime('%d %b %Y · %H:%M') }} · {{ u.posted_by }}</p>
         <h3>{{ u.topic }}</h3>
         <div class="update-body">{{ u.body|linkify }}</div>
+        {{ update_share_buttons(u, true) }}
         <form method="post" action="{{ url_for('admin.delete_update', update_id=u.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="text-button" type="submit">Delete</button></form>
       </article>
     {% endfor %}</div>
   {% else %}<div class="empty-state compact"><h3>No updates yet.</h3></div>{% endif %}
 </section>
 </div></div>{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/update-sharing.js') }}" defer></script>{% endblock %}

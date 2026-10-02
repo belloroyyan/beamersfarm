@@ -1,0 +1,17 @@
+{% macro update_share_buttons(update, compact=false) %}
+  {% set share_url = url_for('shop.update_detail', update_id=update.id, _external=True) %}
+  {% set image_url = url_for('shop.update_share_image', update_id=update.id) %}
+  {% set share_image_url = url_for('shop.update_share_image', update_id=update.id, _external=True) %}
+  <div class="update-share-actions{% if compact %} update-share-compact{% endif %}" data-update-share
+       data-share-title="{{ update.topic }}"
+       data-share-text="{{ update.topic }} · Beamers Farm, Osogbo"
+       data-share-url="{{ share_url }}"
+       data-share-image="{{ share_image_url }}">
+    <button class="button button-dark" type="button" data-share-update>Share update</button>
+    <button class="button button-outline" type="button" data-share-image-button>Share image</button>
+    <a class="button button-outline" href="{{ image_url }}" download="beamers-farm-update-{{ update.id }}.png">Download image</a>
+    <a class="button button-outline" href="https://wa.me/?text={{ (update.topic ~ ' — ' ~ share_url)|urlencode }}" target="_blank" rel="noopener">WhatsApp</a>
+    <button class="button button-outline" type="button" data-copy-update-link>Copy link</button>
+    <span class="update-share-status" role="status" aria-live="polite"></span>
+  </div>
+{% endmacro %}

@@ -3,20 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Beamers Farm — your trusted local source for fresh, clean, hygienically packaged frozen chicken in Osogbo, Nigeria.">
-  <meta property="og:type" content="website">
+  <meta name="description" content="{{ social_description|default('Beamers Farm — your trusted local source for fresh, clean, hygienically packaged frozen chicken in Osogbo, Nigeria.') }}">
+  <meta property="og:type" content="{{ social_type|default('website') }}">
   <meta property="og:site_name" content="Beamers Farm">
-  <meta property="og:title" content="{{ self.title()|striptags|trim }}">
-  <meta property="og:description" content="Beamers Farm — fresh, clean, hygienically packaged frozen chicken in Osogbo, Nigeria.">
-  <meta property="og:image" content="{{ url_for('static', filename='images/brand-mark.png', _external=True) }}">
-  <meta property="og:image:alt" content="Beamers Farm brand mark">
-  <meta property="og:image:width" content="1254">
-  <meta property="og:image:height" content="1254">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="{{ self.title()|striptags|trim }}">
-  <meta name="twitter:description" content="Beamers Farm — fresh, clean, hygienically packaged frozen chicken in Osogbo, Nigeria.">
-  <meta name="twitter:image" content="{{ url_for('static', filename='images/brand-mark.png', _external=True) }}">
-  <meta name="twitter:image:alt" content="Beamers Farm brand mark">
+  <meta property="og:title" content="{{ social_title|default(self.title()|striptags|trim) }}">
+  <meta property="og:description" content="{{ social_description|default('Beamers Farm — fresh, clean, hygienically packaged frozen chicken in Osogbo, Nigeria.') }}">
+  <meta property="og:url" content="{{ social_url|default(request.url) }}">
+  <meta property="og:image" content="{{ social_image|default(url_for('static', filename='images/brand-mark.png', _external=True)) }}">
+  <meta property="og:image:alt" content="{{ social_image_alt|default('Beamers Farm brand mark') }}">
+  <meta property="og:image:width" content="{{ social_image_width|default('1254') }}">
+  <meta property="og:image:height" content="{{ social_image_height|default('1254') }}">
+  <meta name="twitter:card" content="{{ social_card|default('summary') }}">
+  <meta name="twitter:title" content="{{ social_title|default(self.title()|striptags|trim) }}">
+  <meta name="twitter:description" content="{{ social_description|default('Beamers Farm — fresh, clean, hygienically packaged frozen chicken in Osogbo, Nigeria.') }}">
+  <meta name="twitter:image" content="{{ social_image|default(url_for('static', filename='images/brand-mark.png', _external=True)) }}">
+  <meta name="twitter:image:alt" content="{{ social_image_alt|default('Beamers Farm brand mark') }}">
   <meta name="theme-color" content="#23382f">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Beamers">

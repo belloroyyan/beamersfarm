@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "macros/update_sharing.html" import update_share_buttons %}
+{% block title %}{{ update.topic }} · Beamers Farm updates{% endblock %}
+{% block content %}
+<section class="container page-shell update-detail-shell">
+  <div class="page-heading"><div><p class="eyebrow">News from the farm · {{ update.created_at.strftime('%d %b %Y · %H:%M') }}</p><h1>{{ update.topic }}</h1></div><a class="back-link" href="{{ url_for('shop.updates') }}">← All updates</a></div>
+  <article class="update-detail-card">
+    {% set img = update_image_url(update.image) %}{% if img %}<img class="update-detail-image" src="{{ img }}" alt="Photo for {{ update.topic }}">{% endif %}
+    <div class="update-detail-body">{{ update.body|linkify }}</div>
+    <p class="update-meta">Posted by {{ update.posted_by }}</p>
+    {{ update_share_buttons(update) }}
+  </article>
+</section>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/update-sharing.js') }}" defer></script>{% endblock %}

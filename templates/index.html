@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/update_sharing.html" import update_share_buttons %}
 {% block title %}Fresh frozen chicken in Osogbo · Beamers Farm{% endblock %}
 {% block content %}
 {% if not shop_is_open %}<div class="container shop-notice"><strong>Orders are currently closed.</strong><span>{{ shop_closed_message }}</span></div>{% endif %}
@@ -12,6 +13,7 @@
     <div class="update-body">{{ latest_update.body|linkify }}</div>
     <p class="update-meta">Posted by {{ latest_update.posted_by }}</p>
     <div class="update-popup-actions"><a class="button button-dark" href="{{ url_for('shop.updates') }}">See all updates <span>→</span></a><a class="button button-outline" href="{{ url_for('shop.dismiss_update') }}">Close</a></div>
+    {{ update_share_buttons(latest_update, true) }}
   </div>
 </div>
 {% endif %}
@@ -63,3 +65,4 @@
 
 <section class="container note-panel"><div><p class="eyebrow">Made for Osogbo kitchens</p><h2>Freshness, hygiene, affordability, and portions that fit your table.</h2></div><p>From everyday family meals to restaurant prep and catering orders, Beamers Farm keeps frozen chicken simple, clean, and convenient. Need help choosing? <a class="note-link" href="https://wa.me/2348062074302" target="_blank" rel="noopener">Chat with us on WhatsApp.</a></p></section>
 {% endblock %}
+{% block scripts %}{% if latest_update %}<script src="{{ url_for('static', filename='js/update-sharing.js') }}" defer></script>{% endif %}{% endblock %}

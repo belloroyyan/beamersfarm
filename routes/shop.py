@@ -10,6 +10,7 @@ from models import CustomerPushSubscription, DeliveryZone, Order, OrderFinancial
 from utils.helpers import build_cart, parse_requested_weight
 from utils.notifications import normalize_nigerian_phone
 from utils.push_subscriptions import valid_push_endpoint
+from utils.update_share import render_update_share_image
 from utils.web_push import send_customer_order_confirmed_push, send_owner_new_order_push, web_push_is_configured
 
 shop_bp = Blueprint("shop", __name__)
@@ -112,6 +113,38 @@ def mark_updates_seen(response):
 def updates():
     items = ShopUpdate.query.order_by(ShopUpdate.created_at.desc()).all()
     return mark_updates_seen(make_response(render_template("updates.html", updates=items)))
+
+
+@shop_bp.get("/updates/<int:update_id>")
+def update_detail(update_id):
+    update = ShopUpdate.query.get_or_404(update_id)
+    description = " ".join((update.body or "").split())
+    if len(description) > 220:
+        description = description[:217].rsplit(" ", 1)[0] + "…"
+    share_image_url = url_for("shop.update_share_image", update_id=update.id, _external=True)
+    return render_template(
+        "update_detail.html",
+        update=update,
+        social_title=f"{update.topic} · Beamers Farm",
+        social_description=description or "The latest news from Beamers Farm in Osogbo.",
+        social_url=url_for("shop.update_detail", update_id=update.id, _external=True),
+        social_image=share_image_url,
+        social_image_alt=f"Share card for Beamers Farm update: {update.topic}",
+        social_image_width="1200",
+        social_image_height="630",
+        social_type="article",
+        social_card="summary_large_image",
+    )
+
+
+@shop_bp.get("/updates/<int:update_id>/share-image.png")
+def update_share_image(update_id):
+    update = ShopUpdate.query.get_or_404(update_id)
+    response = make_response(render_update_share_image(update))
+    response.mimetype = "image/png"
+    response.headers["Content-Disposition"] = f'inline; filename="beamers-farm-update-{update.id}.png"'
+    response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=86400"
+    return response
 
 
 @shop_bp.get("/help")
