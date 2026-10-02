@@ -8,13 +8,10 @@
       <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <div class="cart-layout"><div class="cart-lines">
         {% for line in summary.lines %}
-        <div class="cart-line{% if line.product.is_sold_by_weight %} cart-line-weight{% endif %}">
+        <div class="cart-line">
           <div class="mini-art product-photo art-{{ line.product.image }}"><img src="{{ product_image_url(line.product.image) }}" alt="{{ line.product.name }}" loading="lazy"></div>
-          <div class="cart-line-main"><h3>{{ line.product.name }}</h3><span>{{ format_currency(line.product.price) }} · {{ line.product.unit }}</span>
-            {% if line.product.is_sold_by_weight %}<small class="pricing-line-note">{{ '%.3f'|format(line.requested_weight_kg) if line.requested_weight_kg is not none else 'Enter a total' }} kg requested across {{ line.quantity }} whole chicken{{ '' if line.quantity == 1 else 's' }}. Charged at the listed per-kg price.</small>{% endif %}
-          </div>
-          <label class="quantity-control">{% if line.product.is_sold_by_weight %}Birds{% else %}Qty{% endif %}<input type="number" name="quantity_{{ line.product.id }}" min="0" max="{{ line.product.stock }}" value="{{ line.quantity }}"></label>
-          {% if line.product.is_sold_by_weight %}<label class="requested-weight-control cart-weight-control">Combined total kg<input type="number" name="requested_weight_kg_{{ line.product.id }}" min="0.001" max="500" step="0.001" value="{{ '%.3f'|format(line.requested_weight_kg) if line.requested_weight_kg is not none else '' }}" placeholder="e.g. 2.500" required></label>{% endif %}
+          <div class="cart-line-main"><h3>{{ line.product.name }}</h3><span>{{ format_currency(line.product.price) }} per {{ line.product.unit }}</span></div>
+          <label class="quantity-control">Qty<input type="number" name="quantity_{{ line.product.id }}" min="0" max="{{ line.product.stock }}" value="{{ line.quantity }}"></label>
           <strong class="line-price">{{ format_currency(line.line_subtotal) }}</strong>
           <button class="remove-button" type="submit" formaction="{{ url_for('shop.remove_from_cart', product_id=line.product.id) }}" aria-label="Remove {{ line.product.name }}">×</button>
         </div>
@@ -22,8 +19,7 @@
         <button class="button button-outline" type="submit">Update crate</button>
       </div>
       <aside class="summary-card"><div class="summary-label">ORDER SUMMARY</div><div class="summary-row"><span>Items subtotal</span><strong>{{ format_currency(summary.subtotal) }}</strong></div><div class="summary-row"><span>Delivery / pickup</span><strong>Choose at checkout</strong></div><div class="summary-total"><span>Items subtotal</span><strong>{{ format_currency(summary.subtotal) }}</strong></div>
-        {% if summary.has_invalid_weight %}<p class="weight-pricing-disclaimer compact-disclaimer">Add the combined requested kg for each per-kilogram item before checkout.</p>{% endif %}
-        {% if shop_is_open and not summary.has_invalid_weight %}<a class="button button-lime button-full" href="{{ url_for('shop.checkout') }}">Choose delivery or pickup <span>→</span></a>{% elif not shop_is_open %}<div class="shop-closed-card"><strong>Orders are closed</strong><span>{{ shop_closed_message }}</span></div>{% else %}<button class="button button-lime button-full" type="submit">Enter size and update crate</button>{% endif %}
+        {% if shop_is_open %}<a class="button button-lime button-full" href="{{ url_for('shop.checkout') }}">Choose delivery or pickup <span>→</span></a>{% else %}<div class="shop-closed-card"><strong>Orders are closed</strong><span>{{ shop_closed_message }}</span></div>{% endif %}
         <small>Full order payment is due before confirmation. Choose a delivery zone or free farm pickup at checkout.</small>
       </aside></div>
     </form>

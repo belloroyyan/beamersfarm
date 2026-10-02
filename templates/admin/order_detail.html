@@ -32,7 +32,7 @@
       <section class="admin-panel payment-verification-panel">
         <p class="eyebrow">Bank transfer</p>
         <h2>{% if order.payment_status == 'Verified' %}Payment verified{% else %}Awaiting payment verification{% endif %}</h2>
-        {% if order.payment_status == 'Verified' %}<span class="status-pill status-delivered">Verified{% if order.payment_verified_at %} · {{ order.payment_verified_at.strftime('%d %b %Y · %H:%M') }}{% endif %}</span>
+        {% if order.payment_status == 'Verified' %}<span class="status-pill status-delivered">Verified{% if order.payment_verified_at %} · {{ order.payment_verified_at.strftime('%d %b %Y · %H:%M') }}{% endif %}</span><p class="form-note"><strong>Verified by:</strong> {% if order.payment_verified_by_role == 'owner' %}Owner{% elif order.payment_verified_by_role == 'salesperson' %}Salesperson · {{ order.payment_verified_by_name or 'Name not recorded' }}{% else %}Not recorded for this earlier order{% endif %}</p>
         {% else %}<p>Check that <strong>{{ format_currency(order.total) }}</strong> has actually appeared in Beamers Farm’s business bank account. An order is not confirmed until this payment is verified.</p><p class="form-note">Unpaid orders remain unconfirmed. Cancel an abandoned unpaid order to return its reserved stock to the catalog.</p>{% endif %}
       {% if order.has_weight_priced_items %}<p class="weight-balance-note">The final amount is calculated after weighing. The customer settlement receipt shows the final total and any balance/refund due; the Owner financial ledger remains private.</p>{% endif %}
       </section>

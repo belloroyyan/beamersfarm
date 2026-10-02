@@ -31,9 +31,9 @@ def seed_products():
         [
             Product(
                 name="Full Chicken",
-                description="A whole cleaned chicken, frozen fresh for family meals and Sunday roasts. Choose the number of birds and enter one combined target weight for the whole line; the order is charged at the listed price per kilogram.",
-                price=Decimal("4500.00"),
-                unit="kg",
+                description="A whole cleaned chicken, frozen fresh for family meals and Sunday roasts. Sold per bird at the listed price.",
+                price=Decimal("8500.00"),
+                unit="bird",
                 stock=24,
                 image="full",
             ),

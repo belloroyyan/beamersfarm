@@ -1,20 +1,77 @@
 {% extends "base.html" %}
 {% block title %}Salesperson access · Beamers Farm{% endblock %}
 {% block content %}
-<div class="admin-shell"><div class="container">
-  <div class="admin-topbar compact-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner settings</p><h1>Staff access.</h1><p class="form-note">Create an individual account for each salesperson. Deactivation blocks access on their next request; accounts are retained for accountability.</p></div></div>
-  <div class="staff-management-grid">
-    <section class="admin-panel"><div class="panel-heading"><div><p class="eyebrow">Named accounts</p><h2>Salespeople</h2></div><span class="section-note">{{ accounts|selectattr('active')|list|length }} active</span></div>
-      {% if accounts %}<div class="staff-account-list">{% for account in accounts %}<article class="staff-account-row {% if not account.active %}staff-account-inactive{% endif %}">
-        <div class="staff-account-heading"><div><strong>{{ account.display_name }}</strong><small>@{{ account.username }}</small></div><span class="status-pill {% if account.active %}status-confirmed{% else %}status-cancelled{% endif %}">{{ 'Active' if account.active else 'Inactive' }}</span></div>
-        <div class="staff-account-actions"><form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="account_id" value="{{ account.id }}"><input type="hidden" name="action" value="{{ 'deactivate' if account.active else 'activate' }}"><button class="button {% if account.active %}button-outline{% else %}button-lime{% endif %}" type="submit">{{ 'Revoke access' if account.active else 'Reactivate account' }}</button></form>
-          <form method="post" class="staff-reset-form"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="account_id" value="{{ account.id }}"><input type="hidden" name="action" value="reset_password"><label>New password<input type="password" name="password" minlength="12" maxlength="256" autocomplete="new-password" required></label><label>Confirm<input type="password" name="confirm_password" minlength="12" maxlength="256" autocomplete="new-password" required></label><button class="button button-dark" type="submit">Reset password</button></form></div>
-        <small class="form-note">Created {{ account.created_at.strftime('%d %b %Y') }}{% if account.disabled_at %} · Access revoked {{ account.disabled_at.strftime('%d %b %Y · %H:%M') }}{% endif %}</small>
-      </article>{% endfor %}</div>{% else %}<div class="empty-state compact"><h3>No salesperson accounts.</h3><p>The Salesperson role will appear on staff sign-in after you add an account.</p></div>{% endif %}
-    </section>
-    <aside class="admin-panel staff-add-panel"><p class="eyebrow">Add a hire</p><h2>New salesperson account</h2><p class="form-note">Each person gets their own sign-in. Give them their credentials privately and reset or revoke them when staffing changes.</p><form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="add"><label>Full name<input name="display_name" maxlength="120" required></label><label>Username<input name="username" minlength="3" maxlength="40" pattern="[a-z0-9][a-z0-9._-]{2,39}" autocomplete="off" required><small>3–40 lowercase letters, numbers, dots, underscores, or hyphens.</small></label><label>Password<input type="password" name="password" minlength="12" maxlength="256" autocomplete="new-password" required></label><label>Confirm password<input type="password" name="confirm_password" minlength="12" maxlength="256" autocomplete="new-password" required></label><button class="button button-dark button-full" type="submit">Add salesperson</button></form>
-      <div class="staff-permission-note"><strong>What Salespeople can do</strong><p>View website orders and customer contact/fulfillment details. After the owner verifies bank payment, they can confirm, prepare, assign delivery, or mark a ready pickup as collected.</p><p>They cannot verify payment, cancel orders, see owner-only final balances/refunds, record weights or settlements, change prices/zones, or manage staff.</p></div>
-    </aside>
+<div class="admin-shell">
+  <div class="container">
+    <div class="admin-topbar compact-topbar">
+      <div>
+        <a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a>
+        <p class="eyebrow">Owner settings</p>
+        <h1>Staff access.</h1>
+        <p class="form-note">Create an individual account for each salesperson and control their allowed operations. Deactivation blocks access on their next request; accounts are retained for accountability.</p>
+      </div>
+    </div>
+
+    <div class="staff-management-grid">
+      <section class="admin-panel staff-list-panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Named accounts</p><h2>Salespeople</h2></div>
+          <span class="section-note">{{ accounts|selectattr('active')|list|length }} active in this view</span>
+        </div>
+        <form method="get" class="record-search" role="search">
+          <label>Search staff<input type="search" name="q" maxlength="120" value="{{ search_query }}" placeholder="Account ID, name, username"></label>
+          <button class="button button-dark" type="submit">Search</button>
+          {% if search_query %}<a class="table-link" href="{{ url_for('admin.staff_accounts') }}">Clear</a>{% endif %}
+        </form>
+
+        {% if accounts %}
+          <div class="staff-account-list">
+            {% for account in accounts %}
+              <article class="staff-account-row {% if not account.active %}staff-account-inactive{% endif %}">
+                <div class="staff-account-heading">
+                  <div><strong>{{ account.display_name }}</strong><small>Staff ID #{{ account.id }} · @{{ account.username }}</small></div>
+                  <span class="status-pill {% if account.active %}status-confirmed{% else %}status-cancelled{% endif %}">{{ 'Active' if account.active else 'Inactive' }}</span>
+                </div>
+                <details class="staff-permissions-details">
+                  <summary><span><b>Manage operations and alerts</b></span><small><br>Choose exactly what this salesperson can do</small></summary>
+                  <form method="post" class="staff-permissions-form">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="account_id" value="{{ account.id }}"><input type="hidden" name="action" value="save_permissions">
+                    <div class="permission-checklist">
+                      {% for key, label, default_enabled in permission_definitions %}
+                        <label class="permission-option"><input type="checkbox" name="permissions" value="{{ key }}" {% if key in account_permissions[account.id] %}checked{% endif %}><span><strong>{{ label }}</strong></span></label><br>
+                      {% endfor %}
+                    </div>
+                    <br>
+                    <button class="button button-dark" type="submit">Save permissions</button>
+                  </form>
+                </details>
+                <div class="staff-account-actions">
+                  <form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="account_id" value="{{ account.id }}"><input type="hidden" name="action" value="{{ 'deactivate' if account.active else 'activate' }}"><button class="button {% if account.active %}button-outline{% else %}button-lime{% endif %}" type="submit">{{ 'Revoke access' if account.active else 'Reactivate account' }}</button></form>
+                  <form method="post" class="staff-reset-form"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="account_id" value="{{ account.id }}"><input type="hidden" name="action" value="reset_password"><label>New password<input type="password" name="password" minlength="12" maxlength="256" autocomplete="new-password" required></label><label>Confirm<input type="password" name="confirm_password" minlength="12" maxlength="256" autocomplete="new-password" required></label><button class="button button-dark" type="submit">Reset password</button></form>
+                </div>
+                <small class="form-note staff-account-meta">Created {{ account.created_at.strftime('%d %b %Y') }}{% if account.disabled_at %} · Access revoked {{ account.disabled_at.strftime('%d %b %Y · %H:%M') }}{% endif %}</small>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state compact"><h3>No salesperson accounts.</h3><p>The Salesperson role will appear on staff sign-in after you add an account.</p></div>
+        {% endif %}
+      </section>
+
+      <aside class="admin-panel staff-add-panel">
+        <p class="eyebrow">Add a hire</p><h2>New salesperson account</h2>
+        <p class="form-note">Each person gets their own sign-in. Give them their credentials privately and reset or revoke them when staffing changes.</p>
+        <form method="post">
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="add">
+          <label>Full name<input name="display_name" maxlength="120" required></label>
+          <label>Username<input name="username" minlength="3" maxlength="40" pattern="[a-z0-9][a-z0-9._-]{2,39}" autocomplete="off" required><small>3–40 lowercase letters, numbers, dots, underscores, or hyphens.</small></label>
+          <label>Password<input type="password" name="password" minlength="12" maxlength="256" autocomplete="new-password" required></label>
+          <label>Confirm password<input type="password" name="confirm_password" minlength="12" maxlength="256" autocomplete="new-password" required></label>
+          <button class="button button-dark button-full" type="submit">Add salesperson</button>
+        </form>
+        <div class="staff-permission-note"><strong>Default operating profile</strong><p>New accounts receive core order desk access, payment verification, order status changes, weigh-ins, customer receipts, and new-order alerts. Enable other capabilities above only when needed.</p><p>Payment-before-confirmation safeguards remain enforced regardless of permissions.</p></div>
+      </aside>
+    </div>
   </div>
-</div></div>
+</div>
 {% endblock %}

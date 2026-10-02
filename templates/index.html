@@ -30,7 +30,6 @@
     <div class="hero-card-bottom"><strong>Clean portions. Fair prices.</strong><span>Prices in ₦</span></div>
   </div>
 </section>
-
 <section class="trust-strip">
   <div class="container trust-grid">
     <div><span class="trust-number">01</span><strong>Choose your portions</strong><small>Whole birds and delicious parts</small></div>
@@ -38,7 +37,6 @@
     <div><span class="trust-number">03</span><strong>Pay by transfer</strong><small>We confirm every order</small></div>
   </div>
 </section>
-
 <section class="container section" id="products">
   <div class="section-heading"><div><p class="eyebrow">Beamers Farm quick menu</p><h2>Popular picks</h2></div><span class="section-note">Handpicked by the shop</span></div>
   {% if products %}
@@ -50,9 +48,9 @@
             <span class="photo-shade"></span>
           </a>
           <div class="product-info">
-            <div class="product-heading"><h3>{{ product.name }}</h3><span class="stock-badge">{{ product.stock }} {{ 'bird' if product.is_sold_by_weight and product.stock == 1 else 'birds' if product.is_sold_by_weight else 'left' }}</span></div>
+            <div class="product-heading"><h3>{{ product.name }}</h3><span class="stock-badge">{{ product.stock }} left</span></div>
             <p>{{ product.description }}</p>
-            <div class="product-buy"><div><strong>{{ format_currency(product.price) }}{% if product.is_sold_by_weight %} / kg{% endif %}</strong><small>{{ product.unit }}</small></div>{% if product.is_sold_by_weight %}<a class="button button-lime" href="{{ url_for('shop.product_detail', product_id=product.id) }}">Choose size <span>→</span></a>{% else %}<form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-lime" type="submit">Add to crate <span>+</span></button></form>{% endif %}</div>
+            <div class="product-buy"><div><strong>{{ format_currency(product.price) }}</strong><small>per {{ product.unit }}</small></div><form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-lime" type="submit">Add to crate <span>+</span></button></form></div>
           </div>
         </article>
       {% endfor %}
@@ -62,7 +60,6 @@
     <div class="empty-state"><h3>We are restocking soon.</h3><p>Message Beamers Farm on WhatsApp and we will let you know what is available.</p></div>
   {% endif %}
 </section>
-
 <section class="container note-panel"><div><p class="eyebrow">Made for Osogbo kitchens</p><h2>Freshness, hygiene, affordability, and portions that fit your table.</h2></div><p>From everyday family meals to restaurant prep and catering orders, Beamers Farm keeps frozen chicken simple, clean, and convenient. Need help choosing? <a class="note-link" href="https://wa.me/2348062074302" target="_blank" rel="noopener">Chat with us on WhatsApp.</a></p></section>
 {% endblock %}
 {% block scripts %}{% if latest_update %}<script src="{{ url_for('static', filename='js/update-sharing.js') }}" defer></script>{% endif %}{% endblock %}

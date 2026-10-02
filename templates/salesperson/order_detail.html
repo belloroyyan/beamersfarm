@@ -8,37 +8,37 @@
   </div>
   <div class="detail-admin-grid">
     <section class="admin-panel">
-      <div class="panel-heading"><div><p class="eyebrow">Customer order</p><h2>{{ order.customer_name }}</h2></div></div>
+      <div class="panel-heading"><div><p class="eyebrow">Customer order</p><h2>{% if permissions.view_customer_details %}{{ order.customer_name }}{% else %}Order contents{% endif %}</h2></div></div>
       {% for item in order.items %}
       <div class="admin-line"><div><strong>{{ item.quantity }} × {{ item.product_name }}</strong><small>{% if item.requested_weight_kg is not none %}Requested combined total: {{ '%.3f'|format(item.requested_weight_kg) }} kg · rate {{ format_currency(item.unit_price) }}/kg{% elif item.pricing_type == 'weight_deposit' %}Legacy order · deposit {{ format_currency(item.unit_price) }} per {{ item.unit }} · final rate {{ format_currency(item.weight_price_per_kg) }}/kg{% else %}{{ format_currency(item.unit_price) }} per {{ item.unit }}{% endif %}</small></div><strong>{{ format_currency(item.subtotal) }}</strong></div>
       {% endfor %}
       <div class="summary-row"><span>Items subtotal</span><strong>{{ format_currency(order.subtotal) }}</strong></div>
       <div class="summary-row"><span>{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}{{ order.delivery_zone_name }}{% endif %}</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div>
       <div class="summary-total"><span>Full order amount</span><strong>{{ format_currency(order.total) }}</strong></div>
-      <a class="button button-outline customer-receipt-link" href="{{ url_for('shop.customer_receipt', order_ref=order.public_id, token=order.public_token) }}" target="_blank" rel="noopener">Open / print customer receipt</a>
-      {% if order.payment_status == 'Verified' and order.has_weight_priced_items and order.weights_complete and order.weighing_completed_at and order.status != 'Cancelled' %}<a class="button button-lime customer-receipt-link" href="{{ url_for('salesperson.settlement_receipt', order_ref=order.public_id) }}" target="_blank" rel="noopener">Print legacy settlement receipt for rider</a>{% endif %}
+      {% if permissions.print_customer_receipts and permissions.view_customer_details %}<a class="button button-outline customer-receipt-link" href="{{ url_for('shop.customer_receipt', order_ref=order.public_id, token=order.public_token) }}" target="_blank" rel="noopener">Open / print customer receipt</a>{% endif %}
+      {% if permissions.print_customer_receipts and permissions.view_customer_details and permissions.view_customer_settlement and order.payment_status == 'Verified' and order.has_weight_priced_items and order.weights_complete and order.weighing_completed_at and order.status != 'Cancelled' %}<a class="button button-lime customer-receipt-link" href="{{ url_for('salesperson.settlement_receipt', order_ref=order.public_id) }}" target="_blank" rel="noopener">Print legacy settlement receipt for rider</a>{% endif %}
 
-      {% if order.payment_status == 'Verified' and order.has_weight_priced_items and order.status in ['Confirmed', 'Preparing'] %}
+      {% if permissions.record_weigh_ins and order.payment_status == 'Verified' and order.has_weight_priced_items and order.status in ['Confirmed', 'Preparing'] %}
       <section class="weight-entry-panel salesperson-weight-panel">
         <p class="eyebrow">Legacy-order outlet weigh-in</p><h2>Record actual weights</h2>
-        <p class="form-note">This control is only for older orders placed under the retired deposit-and-final-weighing flow. New orders use the customer's requested total kg and have no later balance or refund adjustment.</p>
+        <p class="form-note">This control is retained only for historical records. Current catalog orders use ordinary listed-price × quantity pricing.</p>
         <form method="post" class="weight-entry-form">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="save_weights" value="yes">
           {% for item in order.weight_priced_items %}<label>{{ item.quantity }} × {{ item.product_name }} · combined kg<input type="number" name="weight_{{ item.id }}" min="0.001" max="500" step="0.001" value="{{ '%.3f'|format(item.actual_weight_kg) if item.actual_weight_kg is not none else '' }}" placeholder="e.g. 4.250"></label>{% endfor %}
           <button class="button button-dark" type="submit">Save legacy weigh-in</button>
         </form>
-        {% if order.final_total is not none and order.weighing_completed_at %}
+        {% if permissions.view_customer_settlement and permissions.view_customer_details and order.final_total is not none and order.weighing_completed_at %}
         <div class="weigh-in-result"><div><span>Legacy final total</span><strong>{{ format_currency(order.final_total) }}</strong></div><div><span>Initial amount paid</span><strong>{{ format_currency(order.total) }}</strong></div>
           {% if order.balance_due and order.balance_due > 0 %}<div><span>Balance to collect</span><strong>{{ format_currency(order.balance_due) }}</strong></div>{% elif order.refund_due and order.refund_due > 0 %}<div><span>Refund due within 48 hours</span><strong>{{ format_currency(order.refund_due) }}</strong></div>{% else %}<div><span>Settlement</span><strong>No balance or refund outstanding</strong></div>{% endif %}
           <small>Weigh-in completed {{ order.weighing_completed_at.strftime('%d %b %Y · %H:%M') }}{% if order.weighing_recorded_by %} · recorded by {{ order.weighing_recorded_by }}{% endif %}.</small>
         </div>
-        {% endif %}
+        {% elif order.final_total is not none and order.weighing_completed_at %}<p class="form-note">Settlement totals are hidden because the Owner disabled final balance/refund access for this account.</p>{% endif %}
       </section>
       {% endif %}
     </section>
 
     <aside class="admin-side">
-      <section class="admin-panel payment-verification-panel">
+      {% if permissions.verify_payments %}<section class="admin-panel payment-verification-panel">
         <p class="eyebrow">POS / bank transfer</p>
         {% if order.payment_status == 'Verified' %}
           <h2>Payment verified</h2><span class="status-pill status-delivered">Verified{% if order.payment_verified_at %} · {{ order.payment_verified_at.strftime('%d %b %Y · %H:%M') }}{% endif %}</span>
@@ -55,17 +55,17 @@
           </form>
           {% else %}<p class="form-note">Payment cannot be verified after fulfillment has started.</p>{% endif %}
         {% endif %}
-      </section>
+      </section>{% endif %}
 
-      <section class="admin-panel"><p class="eyebrow">Fulfillment</p><h2>Update operational status</h2>
+      {% if permissions.change_order_status %}<section class="admin-panel"><p class="eyebrow">Fulfillment</p><h2>Update operational status</h2>
         {% if order.payment_status != 'Verified' %}<p class="form-note">Confirm and fulfillment actions remain locked until payment is verified on the POS/bank account.</p>{% endif %}
         {% if available_statuses|length > 1 %}
         <form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><label>Status<select name="status">{% for status in available_statuses %}<option value="{{ status }}" {% if status == order.status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select></label>
           <p class="form-note">You may confirm a verified order, prepare it, move a delivery to Out for delivery, or mark a ready pickup as collected. Out for delivery immediately appears in the Dispatch Rider queue; no extra Owner action is required.{% if order.has_weight_priced_items %} This older order also has its legacy weigh-in and settlement receipt controls above.{% endif %}</p>
           <button class="button button-dark button-full" type="submit">Save status</button>
         </form>{% endif %}
-      </section>
-      <section class="admin-panel contact-panel"><p class="eyebrow">{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}Delivery · {{ order.delivery_zone_name }}{% endif %}</p><h2>{{ order.customer_name }}</h2><a href="tel:{{ order.phone }}">{{ order.phone }}</a><p>{{ order.address }}</p><small>Placed {{ order.created_at.strftime('%d %b %Y · %H:%M') }}</small></section>
+      </section>{% endif %}
+      {% if permissions.view_customer_details %}<section class="admin-panel contact-panel"><p class="eyebrow">{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}Delivery · {{ order.delivery_zone_name }}{% endif %}</p><h2>{{ order.customer_name }}</h2><a href="tel:{{ order.phone }}">{{ order.phone }}</a><p>{{ order.address }}</p><small>Placed {{ order.created_at.strftime('%d %b %Y · %H:%M') }}</small></section>{% endif %}
     </aside>
   </div>
 </div></div>

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Inventory summary · Beamers Farm{% endblock %}
+{% block content %}
+<div class="admin-shell"><div class="container">
+  <div class="admin-topbar compact-topbar inventory-topbar">
+    <div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / inventory</p><h1>Inventory summary.</h1><p class="form-note">View current stock alongside verified, unverified-reserved, and cancelled units for the selected order period.</p></div>
+    <div class="receipt-toolbar-inline"><a class="button button-lime" href="{{ url_for('admin.inventory_summary_pdf', period=report.period, q=report.search_query, start_date=report.start_date, end_date=report.end_date) }}">Download watermarked PDF</a><a class="button button-outline" href="{{ url_for('admin.order_summary', period=report.period, start_date=report.start_date, end_date=report.end_date) }}">Printable order summary</a><button class="button button-outline" type="button" data-print>Print / Save as PDF</button></div>
+  </div>
+
+  <section class="admin-panel inventory-filter-panel">
+    <form method="get" action="{{ url_for('admin.inventory_summary') }}" class="inventory-filter-form">
+      <label>Order timeframe<select name="period">
+        {% for value, label in [('today','Today'),('7d','Last 7 days'),('30d','Last 30 days'),('month','This month'),('year','This year'),('all','All time'),('custom','Custom range')] %}<option value="{{ value }}" {% if report.period == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select></label>
+      <label>Start date<input type="date" name="start_date" value="{{ report.start_date }}"></label>
+      <label>End date<input type="date" name="end_date" value="{{ report.end_date }}"></label>
+      <label>Search product<input type="search" name="q" maxlength="120" value="{{ report.search_query }}" placeholder="Product name or ID"></label>
+      <button class="button button-dark" type="submit">Apply filters</button>
+      {% if report.search_query or report.period != '30d' %}<a class="table-link inventory-clear-link" href="{{ url_for('admin.inventory_summary') }}">Reset</a>{% endif %}
+    </form>
+    <p class="form-note">Date ranges use Osogbo local dates. Order activity follows order placement; Money Received and refunds use actual transaction settlement time. Current stock counts active catalog units after live reservations; cancelled orders return their units to stock. A product search filters the table, while summary cards cover all products in the selected period.</p>
+  </section>
+
+  <div class="metric-grid inventory-metrics">
+    <div class="metric-card"><span>Active stock units</span><strong>{{ report.metrics.active_stock_units }}</strong><small>Current on-hand count</small></div>
+    <div class="metric-card {% if report.metrics.low_stock_products %}metric-alert{% endif %}"><span>Low-stock products</span><strong>{{ report.metrics.low_stock_products }}</strong><small>Active products with 5 units or fewer</small></div>
+    <div class="metric-card"><span>Verified orders</span><strong>{{ report.metrics.verified_orders }}</strong><small>Non-cancelled · {{ report.period_label }}</small></div>
+    <div class="metric-card"><span>Gross verified item sales</span><strong>{{ format_currency(report.metrics.verified_item_sales) }}</strong><small>Before refunds · excludes delivery fees</small></div>
+    <div class="metric-card"><span>Money received</span><strong>{{ format_currency(report.metrics.money_received) }}</strong><small>Settled initial and balance payments</small></div>
+    <div class="metric-card"><span>Net cash inflow</span><strong>{{ format_currency(report.metrics.net_cash_inflow) }}</strong><small>Money received less {{ format_currency(report.metrics.money_refunded) }} refunded</small></div>
+  </div>
+
+  <article class="print-receipt inventory-report">
+    <div class="inventory-watermark" aria-hidden="true">BEAMERS FARM · INVENTORY REPORT</div>
+    <header class="print-receipt-header"><img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farm"><div><p class="eyebrow">Private · Owner copy</p><h1>Inventory summary</h1><p>{{ report.period_label }}{% if report.search_query %} · Product filter: {{ report.search_query }}{% endif %}</p></div><span class="status-pill status-confirmed">{{ report.rows|length }} product lines</span></header>
+    <div class="inventory-report-note"><strong>How to read this report.</strong> Current stock is counted in physical sale units. “Verified units” and gross item sales are non-cancelled orders with payment verified during orders placed in the selected period; requested kg is the customer's combined size on verified lines. Gross item sales are before recorded refunds and exclude delivery fees. Unverified orders reserve stock but are not counted as sales. Cancelled orders are excluded and their stock is restored.</div>
+    <section class="print-receipt-section">
+      <h2>Stock and period activity</h2>
+      {% if report.rows %}<div class="order-table-wrap inventory-table-wrap"><table class="order-table inventory-table"><thead><tr><th>Product</th><th>Catalog</th><th>On hand</th><th>Verified units</th><th>Verified kg</th><th>Unverified reserved</th><th>Cancelled units</th><th>Gross item sales</th></tr></thead><tbody>
+        {% for row in report.rows %}<tr><td><strong>{{ row.name }}</strong><small>{% if row.product_id is not none %}Product ID #{{ row.product_id }}{% else %}Legacy / removed product{% endif %} · {{ row.unit }}</small></td><td><span class="status-pill {% if row.active %}status-confirmed{% else %}status-cancelled{% endif %}">{{ 'Active' if row.active else ('Archived' if row.product_id is not none else 'Removed') }}</span></td><td><strong>{{ row.stock }}</strong></td><td>{{ row.verified_units }}</td><td>{{ '%.3f'|format(row.verified_requested_kg) }}</td><td>{{ row.pending_units }}{% if row.pending_requested_kg %}<small>{{ '%.3f'|format(row.pending_requested_kg) }} kg requested</small>{% endif %}</td><td>{{ row.cancelled_units }}</td><td><strong>{{ format_currency(row.verified_sales) }}</strong></td></tr>{% endfor %}
+      </tbody></table></div>{% else %}<div class="empty-state compact"><h3>No product records match.</h3><p>Try a different product name or ID.</p></div>{% endif %}
+    </section>
+    <div class="inventory-period-footnote"><span>{{ report.metrics.pending_orders }} unverified order(s) · {{ report.metrics.pending_units }} reserved unit(s)</span><span>{{ report.metrics.cancelled_orders }} cancelled order(s) · {{ report.metrics.cancelled_units }} returned unit(s)</span><span>Settled cash received: {{ format_currency(report.metrics.money_received) }} · refunds: {{ format_currency(report.metrics.money_refunded) }} · net: {{ format_currency(report.metrics.net_cash_inflow) }}</span><span>Gross item sales before refunds · delivery fees excluded · {{ report.period_label }}</span></div>
+    <footer class="print-receipt-footer"><span>Beamers Farm · Internal inventory report</span><span>Item sales exclude delivery fees</span></footer>
+  </article>
+</div></div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/receipt-print.js') }}" defer></script>{% endblock %}

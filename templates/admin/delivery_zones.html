@@ -4,12 +4,13 @@
 <div class="admin-shell"><div class="container">
   <div class="admin-topbar compact-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner settings</p><h1>Delivery zones.</h1><p class="form-note">Set grouped areas and fees here; no redeployment is needed. Existing orders retain their original zone and fee.</p></div></div>
   <div class="zone-management-grid">
-    <section class="admin-panel"><div class="panel-heading"><div><p class="eyebrow">Active and archived options</p><h2>Checkout options</h2></div><span class="section-note">{{ zones|length }} configured</span></div>
+    <section class="admin-panel"><div class="panel-heading"><div><p class="eyebrow">Active and archived options</p><h2>Checkout options</h2></div><span class="section-note">{{ zones|length }} shown</span></div>
+      <form method="get" class="record-search" role="search"><label>Search delivery options<input type="search" name="q" maxlength="120" value="{{ search_query }}" placeholder="Zone ID, name, included area"></label><button class="button button-dark" type="submit">Search</button>{% if search_query %}<a class="table-link" href="{{ url_for('admin.delivery_zones') }}">Clear</a>{% endif %}</form>
       {% if zones %}<div class="zone-list">
         {% for zone in zones %}<article class="zone-row {% if not zone.active %}zone-inactive{% endif %}">
           <form method="post" action="{{ url_for('admin.delivery_zones') }}" class="zone-edit-form">
             <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="update"><input type="hidden" name="zone_id" value="{{ zone.id }}">
-            <label>Option name<input name="name" value="{{ zone.name }}" maxlength="100" required></label>
+            <label>Option name <small>Zone ID #{{ zone.id }}</small><input name="name" value="{{ zone.name }}" maxlength="100" required></label>
             <label>Areas / customer guidance<input name="description" value="{{ zone.description }}" maxlength="240" placeholder="Neighborhoods included"></label>
             <label>Fee (₦)<input name="fee" type="number" min="0" max="1000000" step="0.01" value="{{ '%.2f'|format(zone.fee) }}" {% if zone.is_pickup %}readonly{% else %}required{% endif %}></label>
             <div class="zone-row-actions"><span class="status-pill {% if zone.active %}status-confirmed{% else %}status-cancelled{% endif %}">{% if zone.is_pickup %}Free pickup{% elif zone.active %}Active{% else %}Inactive{% endif %}</span><button class="button button-outline" type="submit">Save changes</button></div>

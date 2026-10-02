@@ -6,10 +6,12 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from models import (
     CustomerPushSubscription,
+    SalespersonAccount,
     StaffPushSubscription,
     db,
     order_customer_push_subscriptions,
 )
+from utils.salesperson_permissions import salesperson_has_permission
 
 
 logger = logging.getLogger(__name__)
@@ -89,18 +91,28 @@ def _send_to_subscriptions(subscriptions, title, body, url, audience):
 
 def send_staff_push(staff_role, title, body, url):
     """Send a minimal role-targeted push to every opted-in device for that role."""
-    if staff_role not in {"owner", "dispatch_rider"}:
+    if staff_role not in {"owner", "dispatch_rider", "salesperson"}:
         return {"configured": False, "total": 0, "sent": 0, "failed": 0, "expired": 0}
     if not web_push_is_configured():
         return {"configured": False, "total": 0, "sent": 0, "failed": 0, "expired": 0}
 
     try:
-        subscriptions = (
-            StaffPushSubscription.query
-            .filter_by(staff_role=staff_role)
-            .order_by(StaffPushSubscription.id.asc())
-            .all()
-        )
+        subscriptions_query = StaffPushSubscription.query.filter_by(staff_role=staff_role)
+        if staff_role == "salesperson":
+            eligible_ids = [
+                account.id for account in SalespersonAccount.query.filter_by(active=True).all()
+                if salesperson_has_permission(account, "receive_order_alerts")
+            ]
+            if not eligible_ids:
+                return {"configured": True, "total": 0, "sent": 0, "failed": 0, "expired": 0}
+            subscriptions_query = subscriptions_query.filter(
+                StaffPushSubscription.salesperson_account_id.in_(eligible_ids)
+            )
+        else:
+            subscriptions_query = subscriptions_query.filter(
+                StaffPushSubscription.salesperson_account_id.is_(None)
+            )
+        subscriptions = subscriptions_query.order_by(StaffPushSubscription.id.asc()).all()
     except SQLAlchemyError:
         db.session.rollback()
         logger.exception("Could not read %s push subscriptions.", staff_role)
@@ -147,4 +159,13 @@ def send_owner_new_order_push():
         "New order received",
         "A customer placed a new order. Sign in to the owner desk to review it.",
         "/admin/",
+    )
+
+
+def send_salesperson_new_order_push():
+    return send_staff_push(
+        "salesperson",
+        "New order received",
+        "A customer placed a new order. Sign in to the sales desk to review it.",
+        "/sales/",
     )

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Order Summary · Beamers Farm{% endblock %}
+{% block content %}
+<div class="admin-shell">
+  <div class="container">
+    <div class="admin-topbar compact-topbar inventory-topbar">
+      <div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / records</p><h1>Order Summary.</h1><p class="form-note">A compact view of orders placed in the selected period. Open an order for the full record.</p></div>
+      <div class="receipt-toolbar-inline"><a class="button button-outline" href="{{ url_for('admin.inventory_summary', period=period, start_date=start_date, end_date=end_date) }}">Inventory summary</a><button class="button button-dark" type="button" data-print>Print / Save as PDF</button></div>
+    </div>
+
+    <section class="admin-panel inventory-filter-panel">
+      <form method="get" action="{{ url_for('admin.order_summary') }}" class="inventory-filter-form">
+        <label>Order timeframe<select name="period">{% for value, label in [('today','Today'),('7d','Last 7 days'),('30d','Last 30 days'),('month','This month'),('year','This year'),('all','All time'),('custom','Custom range')] %}<option value="{{ value }}" {% if period == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <label>Start date<input type="date" name="start_date" value="{{ start_date }}"></label>
+        <label>End date<input type="date" name="end_date" value="{{ end_date }}"></label>
+        <label>Search orders<input type="search" name="q" maxlength="120" value="{{ search_query }}" placeholder="Order ID/reference, name, phone, status"></label>
+        <button class="button button-dark" type="submit">Apply filters</button>
+        {% if search_query or period != '30d' %}<a class="table-link inventory-clear-link" href="{{ url_for('admin.order_summary') }}">Reset</a>{% endif %}
+      </form>
+      <p class="form-note">Timeframes use Osogbo local dates. This owner-only page is suitable for printing or saving as PDF.</p>
+    </section>
+
+    <article class="print-receipt order-summary-report">
+      <div class="inventory-watermark" aria-hidden="true">BEAMERS FARM · ORDER SUMMARY</div>
+      <header class="print-receipt-header">
+        <img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farm">
+        <div><p class="eyebrow">Private · Owner copy</p><h1>Order Summary</h1><p>{{ period_label }}{% if search_query %} · Search: {{ search_query }}{% endif %}</p></div>
+        <span class="status-pill status-confirmed">{{ orders|length }} orders</span>
+      </header>
+      {% if orders %}
+        <section class="print-receipt-section">
+          <div class="order-table-wrap">
+            <table class="order-table order-summary-table">
+              <thead><tr><th>Order</th><th>Customer / fulfillment</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for order in orders %}
+                  <tr>
+                    <td><strong class="summary-order-id">#{{ order.public_id }}</strong><small>{{ order.created_at.strftime('%d %b %Y · %H:%M') }}</small></td>
+                    <td><strong>{{ order.customer_name }}</strong><small>{{ order.phone }} · {% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}{{ order.delivery_zone_name }}{% endif %}</small></td>
+                    <td class="order-summary-items-compact">{% for item in order.items %}<span class="summary-item">{{ item.quantity }} × {{ item.product_name }}</span>{% endfor %}<small>{{ order.items|length }} line item{{ '' if order.items|length == 1 else 's' }}</small></td>
+                    <td><strong class="summary-total">{{ format_currency(order.total) }}</strong><small>{{ 'Pickup' if order.fulfillment_type == 'pickup' else 'Delivery' }} · {{ format_currency(order.delivery_fee) }}</small></td>
+                    <td><span class="status-pill {% if order.payment_status == 'Verified' %}status-confirmed{% else %}status-received{% endif %}">{{ order.payment_status or 'Unverified' }}</span>{% if order.payment_verified_by_name %}<small>By {{ order.payment_verified_by_name }}</small>{% endif %}</td>
+                    <td><span class="status-pill status-{{ (order.status or 'received')|lower|replace(' ', '-') }}">{{ order.status }}</span><a class="table-link summary-view-link" href="{{ url_for('admin.order_detail', order_ref=order.public_id) }}">View →</a></td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      {% else %}
+        <div class="empty-state compact"><h3>No matching orders.</h3><p>Try a different date range or search term.</p></div>
+      {% endif %}
+      <div class="inventory-period-footnote"><span>{{ orders|length }} order record(s)</span><span>{{ period_label }}</span><span>Owner copy · customer/payment details are confidential</span></div>
+      <footer class="print-receipt-footer"><span>Beamers Farm · Order Summary</span><span>Generated {{ generated_at.strftime('%d %b %Y · %H:%M') }} WAT</span></footer>
+    </article>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/receipt-print.js') }}" defer></script>{% endblock %}

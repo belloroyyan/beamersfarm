@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Complaints · Sales desk{% endblock %}
+{% block content %}
+<div class="admin-shell"><div class="container"><div class="admin-topbar"><div><a class="back-link" href="{{ url_for('salesperson.dashboard') }}">← Back to sales desk</a><p class="eyebrow">Salesperson · {{ account.display_name }}</p><h1>Customer complaints.</h1></div></div>
+<section class="admin-panel"><form method="get" class="record-search" role="search"><label>Search complaints<input type="search" name="q" maxlength="120" value="{{ search_query }}" placeholder="Complaint ID, order ID/reference, customer, subject or status"></label><button class="button button-dark" type="submit">Search</button>{% if search_query %}<a class="table-link" href="{{ url_for('salesperson.complaints') }}">Clear</a>{% endif %}</form>
+{% if complaints %}<div class="order-table-wrap"><table class="order-table"><thead><tr><th>Complaint</th><th>Customer</th><th>Order</th><th>Subject</th><th>Details</th><th>Status</th><th>Date</th></tr></thead><tbody>{% for complaint in complaints %}<tr><td>#{{ complaint.id }}</td><td>{{ complaint.customer_name or '—' }}<small>{{ complaint.phone }}</small></td><td>{% if complaint.order %}{{ complaint.order.public_id or '#' ~ complaint.order.id }}{% else %}—{% endif %}</td><td>{{ complaint.subject or '—' }}<small>{{ complaint.category }}</small></td><td>{{ complaint.description or '—' }}</td><td>{{ complaint.status or 'Open' }}</td><td>{{ complaint.created_at.strftime('%d %b %Y · %H:%M') }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state compact"><h3>No matching complaints.</h3><p>Try another complaint, order or customer search.</p></div>{% endif %}</section>
+</div></div>
+{% endblock %}

@@ -39,14 +39,6 @@ class Product(db.Model):
     def is_available(self):
         return self.active and self.stock > 0
 
-    @property
-    def is_sold_by_weight(self):
-        """Whether price/unit is kilogram-based; inventory still counts sale units."""
-        return (self.unit or "").strip().casefold() in {
-            "kg", "per kg", "kilogram", "kilograms", "per kilogram"
-        }
-
-
 class DeliveryZone(db.Model):
     __tablename__ = "delivery_zones"
     __table_args__ = (
@@ -113,6 +105,8 @@ class Order(db.Model):
     status = db.Column(db.String(40), nullable=False, default="Received")
     payment_status = db.Column(db.String(30), nullable=False, default="Unverified", server_default="Unverified")
     payment_verified_at = db.Column(db.DateTime, nullable=True)
+    payment_verified_by_role = db.Column(db.String(20), nullable=True)
+    payment_verified_by_name = db.Column(db.String(120), nullable=True)
     fulfillment_type = db.Column(db.String(20), nullable=False, default="delivery", server_default="delivery")
     delivery_zone_name = db.Column(db.String(100), nullable=False, default="Pre-zone delivery", server_default="Pre-zone delivery")
     weighing_completed_at = db.Column(db.DateTime, nullable=True)
@@ -304,11 +298,12 @@ class ShopUpdate(db.Model):
 class StaffPushSubscription(db.Model):
     __tablename__ = "staff_push_subscriptions"
     __table_args__ = (
-        db.UniqueConstraint("staff_role", "endpoint_hash", name="uq_staff_push_subscriptions_role_endpoint_hash"),
+        db.UniqueConstraint("staff_role", "salesperson_account_id", "endpoint_hash", name="uq_staff_push_sub_role_account_endpoint"),
     )
 
     id = db.Column(db.Integer, primary_key=True)
     staff_role = db.Column(db.String(32), nullable=False)
+    salesperson_account_id = db.Column(db.Integer, db.ForeignKey("salesperson_accounts.id", ondelete="CASCADE"), nullable=True, index=True)
     endpoint_hash = db.Column(db.String(64), nullable=False)
     endpoint = db.Column(db.Text, nullable=False)
     p256dh = db.Column(db.String(200), nullable=False)
@@ -327,6 +322,7 @@ class SalespersonAccount(db.Model):
     username = db.Column(db.String(40), nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    permissions_json = db.Column(db.Text, nullable=False, default="{}", server_default="{}")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     disabled_at = db.Column(db.DateTime, nullable=True)
 

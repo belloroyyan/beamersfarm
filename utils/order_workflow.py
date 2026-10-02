@@ -17,12 +17,6 @@ PAYMENT_REQUIRED_STATUSES = {
 }
 DELIVERY_ONLY_STATUSES = {"Out for delivery", "Delivered"}
 PICKUP_ONLY_STATUSES = {"Ready for pickup", "Picked up"}
-SALESPERSON_STATUSES = {
-    "Received": {"Confirmed"},
-    "Confirmed": {"Preparing"},
-    "Preparing": {"Out for delivery", "Ready for pickup"},
-    "Ready for pickup": {"Picked up"},
-}
 
 
 def update_order_status(
@@ -32,15 +26,11 @@ def update_order_status(
     """Return (ok, message); commit a valid status/payment transition and send alerts."""
     if new_status not in ORDER_STATUSES:
         return False, "Choose a valid order status."
-    if actor == "salesperson":
-        is_payment_only = verify_payment and order.status == "Received" and new_status == order.status
-        if new_status not in SALESPERSON_STATUSES.get(order.status, set()) and not is_payment_only:
-            return False, "Salesperson access can only move verified orders through the allowed fulfillment steps."
     if verify_payment and actor not in {"owner", "salesperson"}:
         return False, "Only the Owner or an authorized Salesperson can verify payment in the business bank account."
-    if order.fulfillment_type == "pickup" and new_status in DELIVERY_ONLY_STATUSES:
+    if actor != "salesperson" and order.fulfillment_type == "pickup" and new_status in DELIVERY_ONLY_STATUSES:
         return False, "Farm-pickup orders cannot be assigned to delivery."
-    if order.fulfillment_type != "pickup" and new_status in PICKUP_ONLY_STATUSES:
+    if actor != "salesperson" and order.fulfillment_type != "pickup" and new_status in PICKUP_ONLY_STATUSES:
         return False, "Delivery orders cannot use pickup-only statuses."
 
     previous_status = order.status
@@ -77,6 +67,8 @@ def update_order_status(
     if payment_verified_now:
         order.payment_status = "Verified"
         order.payment_verified_at = datetime.utcnow()
+        order.payment_verified_by_role = actor if actor in {"owner", "salesperson"} else "owner"
+        order.payment_verified_by_name = actor_name.strip()[:120] if actor == "salesperson" and actor_name else None
         initial_record = next(
             (record for record in order.financial_records if record.event_type == "initial_payment"),
             None,

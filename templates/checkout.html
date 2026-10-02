@@ -36,13 +36,13 @@
       </div>
       <label class="consent-row"><input type="checkbox" name="whatsapp_opt_in" value="yes" {% if request.form.get('whatsapp_opt_in') == 'yes' %}checked{% endif %}><span>I agree to receive WhatsApp updates about this order from Beamers Farm. We will only use your number for order-related communication.</span></label>
       <button class="button button-dark button-full" type="submit">Place order <span>→</span></button>
-      <p class="form-note payment-before-confirmation"><strong>Full payment is required before confirmation.</strong> Placing an order does not confirm it. After submitting, pay the complete amount shown on your receipt using the order reference. Beamers Farm confirms only after funds appear in its business bank account. Any per-kilogram item is charged using the combined target kg you entered.</p>
+      <p class="form-note payment-before-confirmation"><strong>Full payment is required before confirmation.</strong> Placing an order does not confirm it. After submitting, pay the complete amount shown on your receipt using the order reference. Beamers Farm confirms only after funds appear in its business bank account.</p>
     </form>
     <aside class="summary-card checkout-zone-summary">
       <div class="summary-label">YOUR CRATE</div>
       {% for line in summary.lines %}
       <div class="checkout-line">
-        <span>{{ line.quantity }} × {{ line.product.name }}{% if line.requested_weight_kg is not none %}<small class="pricing-line-note">{{ '%.3f'|format(line.requested_weight_kg) }} kg total requested · {{ format_currency(line.product.price) }}/kg</small>{% endif %}</span>
+        <span>{{ line.quantity }} × {{ line.product.name }}<small>{{ format_currency(line.product.price) }} per {{ line.product.unit }} × {{ line.quantity }}</small></span>
         <strong>{{ format_currency(line.line_subtotal) }}</strong>
       </div>
       {% endfor %}

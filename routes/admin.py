@@ -3,8 +3,10 @@ from functools import wraps
 
 from datetime import datetime
 import re
+from zoneinfo import ZoneInfo
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, send_file, session, url_for
+from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -17,6 +19,10 @@ from utils.push_subscriptions import delete_staff_push_subscription, save_staff_
 from utils.web_push import send_customer_order_confirmed_push, send_dispatch_assignment_push, web_push_is_configured
 from utils.order_workflow import ORDER_STATUSES, update_order_status
 from utils.order_settlement import save_order_weights
+from utils.inventory_pdf import build_inventory_pdf
+from utils.inventory_reports import build_inventory_report
+from utils.order_search import order_search_filter
+from utils.salesperson_permissions import PERMISSION_DEFINITIONS, get_salesperson_permissions, serialize_salesperson_permissions
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 COMPLAINT_STATUSES = ["New", "Under Review", "Resolved", "Closed"]
@@ -24,6 +30,19 @@ COMPLAINT_CATEGORIES = ["Late delivery", "Missing item", "Incorrect item", "Prod
 
 MAX_PRODUCT_PRICE = Decimal("9999999999.99")
 MAX_DELIVERY_FEE = Decimal("1000000.00")
+
+
+def _inventory_report_from_request():
+    try:
+        return build_inventory_report(
+            period=request.args.get("period", "30d"),
+            search=request.args.get("q", ""),
+            start_raw=request.args.get("start_date", ""),
+            end_raw=request.args.get("end_date", ""),
+        )
+    except ValueError as error:
+        flash(str(error), "error")
+        return build_inventory_report(period="30d", search=request.args.get("q", ""))
 
 
 def parse_product_price_stock(form):
@@ -162,6 +181,13 @@ def staff_accounts():
                 db.session.commit()
                 flash(f"Password reset for {account.display_name}.", "success")
                 return redirect(url_for("admin.staff_accounts"))
+        elif action == "save_permissions" and account:
+            allowed = {key for key, _label, _default in PERMISSION_DEFINITIONS}
+            selected = set(request.form.getlist("permissions")) & allowed
+            account.permissions_json = serialize_salesperson_permissions(selected)
+            db.session.commit()
+            flash(f"Operation permissions saved for {account.display_name}.", "success")
+            return redirect(url_for("admin.staff_accounts"))
         elif action in {"activate", "deactivate"} and account:
             account.active = action == "activate"
             account.disabled_at = None if account.active else datetime.utcnow()
@@ -175,8 +201,22 @@ def staff_accounts():
         else:
             flash("Choose a valid salesperson account action.", "error")
         return redirect(url_for("admin.staff_accounts"))
-    accounts = SalespersonAccount.query.order_by(SalespersonAccount.active.desc(), SalespersonAccount.display_name.asc()).all()
-    return render_template("admin/staff_accounts.html", accounts=accounts)
+    search_query = request.args.get("q", "").strip()[:120]
+    accounts_query = SalespersonAccount.query.order_by(SalespersonAccount.active.desc(), SalespersonAccount.display_name.asc())
+    if search_query:
+        filters = [SalespersonAccount.display_name.ilike(f"%{search_query}%"), SalespersonAccount.username.ilike(f"%{search_query}%")]
+        if search_query.isdigit():
+            filters.append(SalespersonAccount.id == int(search_query))
+        accounts_query = accounts_query.filter(or_(*filters))
+    accounts = accounts_query.all()
+    return render_template(
+        "admin/staff_accounts.html",
+        accounts=accounts,
+        search_query=search_query,
+        permission_definitions=PERMISSION_DEFINITIONS,
+        account_permissions={account.id: get_salesperson_permissions(account) for account in accounts},
+    )
+
 
 
 @admin_bp.post("/logout")
@@ -214,7 +254,12 @@ def delete_owner_push_subscription():
 @admin_bp.get("/")
 @admin_required
 def dashboard():
-    orders = Order.query.order_by(Order.created_at.desc()).limit(100).all()
+    search_query = request.args.get("q", "").strip()[:120]
+    orders_query = Order.query.order_by(Order.created_at.desc())
+    order_filter = order_search_filter(search_query)
+    if order_filter is not None:
+        orders_query = orders_query.filter(order_filter)
+    orders = orders_query.limit(100).all()
     shop_settings = ShopSettings.query.get(1)
     stats = {
         "open": Order.query.filter(Order.status.notin_(["Delivered", "Picked up", "Cancelled"])).count(),
@@ -225,8 +270,66 @@ def dashboard():
     }
     return render_template(
         "admin/dashboard.html", orders=orders, stats=stats, statuses=ORDER_STATUSES,
+        search_query=search_query,
         shop_settings=shop_settings, push_configured=web_push_is_configured(),
         vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""),
+    )
+
+
+@admin_bp.get("/inventory")
+@admin_required
+def inventory_summary():
+    report = _inventory_report_from_request()
+    return render_template("admin/inventory.html", report=report)
+
+
+@admin_bp.get("/inventory.pdf")
+@admin_required
+def inventory_summary_pdf():
+    from io import BytesIO
+    from pathlib import Path
+
+    report = _inventory_report_from_request()
+    pdf_bytes = build_inventory_pdf(
+        report,
+        brand_mark_path=Path(current_app.root_path) / "static" / "images" / "brand-mark.png",
+    )
+    start = report["start_date"] or "all"
+    end = report["end_date"] or "time"
+    return send_file(
+        BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"beamers-inventory-{start}-to-{end}.pdf",
+    )
+
+
+@admin_bp.get("/orders/summary")
+@admin_required
+def order_summary():
+    report = _inventory_report_from_request()
+    query_text = request.args.get("q", "").strip()[:120]
+    orders = report["orders"]
+    if query_text:
+        lowered = query_text.casefold()
+        numeric_id = int(query_text) if query_text.isdigit() else None
+        orders = [
+            order for order in orders
+            if (numeric_id is not None and order.id == numeric_id)
+            or lowered in (order.public_id or "").casefold()
+            or lowered in (order.customer_name or "").casefold()
+            or lowered in (order.phone or "").casefold()
+            or lowered in (order.status or "").casefold()
+        ]
+    return render_template(
+        "admin/order_summary.html",
+        orders=orders,
+        period=report["period"],
+        period_label=report["period_label"],
+        start_date=report["start_date"],
+        end_date=report["end_date"],
+        search_query=query_text,
+        generated_at=datetime.now(ZoneInfo("Africa/Lagos")),
     )
 
 
@@ -259,6 +362,7 @@ def order_detail(order_ref):
             order.status if verify_only else request.form.get("status", ""),
             verify_payment=verify_only or request.form.get("verify_payment") == "yes",
             actor="owner",
+            actor_name="Owner",
         )
         flash(message, "success" if ok else "error")
         return redirect(url_for("admin.order_detail", order_ref=order.public_id))
@@ -389,8 +493,14 @@ def delivery_zones():
             return redirect(url_for("admin.delivery_zones"))
         db.session.commit()
         return redirect(url_for("admin.delivery_zones"))
-    zones = DeliveryZone.query.order_by(DeliveryZone.sort_order.asc(), DeliveryZone.id.asc()).all()
-    return render_template("admin/delivery_zones.html", zones=zones)
+    search_query = request.args.get("q", "").strip()[:120]
+    zones_query = DeliveryZone.query.order_by(DeliveryZone.sort_order.asc(), DeliveryZone.id.asc())
+    if search_query:
+        filters = [DeliveryZone.name.ilike(f"%{search_query}%"), DeliveryZone.description.ilike(f"%{search_query}%")]
+        if search_query.isdigit():
+            filters.append(DeliveryZone.id == int(search_query))
+        zones_query = zones_query.filter(or_(*filters))
+    return render_template("admin/delivery_zones.html", zones=zones_query.all(), search_query=search_query)
 
 
 @admin_bp.post("/delivery-zones/<int:zone_id>/toggle")
@@ -439,11 +549,19 @@ def products():
             db.session.commit()
             flash("Product added to the catalog.", "success")
         return redirect(url_for("admin.products"))
-    products = Product.query.order_by(Product.active.desc(), Product.name.asc()).all()
+    search_query = request.args.get("q", "").strip()[:120]
+    products_query = Product.query.order_by(Product.active.desc(), Product.name.asc())
+    if search_query:
+        filters = [Product.name.ilike(f"%{search_query}%")]
+        if search_query.isdigit():
+            filters.append(Product.id == int(search_query))
+        products_query = products_query.filter(or_(*filters))
+    products = products_query.all()
     featured_count = sum(1 for product in products if product.featured)
     return render_template(
         "admin/products.html",
         products=products,
+        search_query=search_query,
         featured_count=featured_count,
         featured_limit=FEATURED_LIMIT,
     )
@@ -520,10 +638,24 @@ def toggle_featured(product_id):
 @admin_required
 def complaints():
     status = request.args.get("status", "").strip()
-    query = Complaint.query.order_by(Complaint.created_at.desc())
+    search_query = request.args.get("q", "").strip()[:120]
+    query = Complaint.query.outerjoin(Order).order_by(Complaint.created_at.desc())
     if status in COMPLAINT_STATUSES:
-        query = query.filter_by(status=status)
-    return render_template("admin/complaints.html", complaints=query.all(), statuses=COMPLAINT_STATUSES, selected_status=status)
+        query = query.filter(Complaint.status == status)
+    if search_query:
+        filters = [
+            Complaint.subject.ilike(f"%{search_query}%"),
+            Complaint.customer_name.ilike(f"%{search_query}%"),
+            Complaint.phone.ilike(f"%{search_query}%"),
+            Order.public_id.ilike(f"%{search_query}%"),
+        ]
+        if search_query.isdigit():
+            filters.extend([Complaint.id == int(search_query), Order.id == int(search_query)])
+        query = query.filter(or_(*filters))
+    return render_template(
+        "admin/complaints.html", complaints=query.all(), statuses=COMPLAINT_STATUSES,
+        selected_status=status, search_query=search_query,
+    )
 
 
 @admin_bp.route("/complaints/<int:complaint_id>", methods=["GET", "POST"])
@@ -547,22 +679,29 @@ def complaint_detail(complaint_id):
 @admin_bp.route("/updates", methods=["GET", "POST"])
 @admin_required
 def updates():
+    search_query = request.args.get("q", "").strip()[:120]
     if request.method == "POST":
         topic = request.form.get("topic", "").strip()
         body = request.form.get("body", "").strip()
         posted_by = request.form.get("posted_by", "").strip() or "Admin"
         if not topic or not body:
             flash("Please add a topic and a message.", "error")
-            return render_template("admin/updates.html", updates=ShopUpdate.query.order_by(ShopUpdate.created_at.desc()).all())
+            return render_template("admin/updates.html", updates=ShopUpdate.query.order_by(ShopUpdate.created_at.desc()).all(), search_query=search_query)
         image, error = save_update_image(request.files.get("image"))
         if error:
             flash(error, "error")
-            return render_template("admin/updates.html", updates=ShopUpdate.query.order_by(ShopUpdate.created_at.desc()).all())
+            return render_template("admin/updates.html", updates=ShopUpdate.query.order_by(ShopUpdate.created_at.desc()).all(), search_query=search_query)
         db.session.add(ShopUpdate(topic=topic[:160], body=body, image=image, posted_by=posted_by[:80]))
         db.session.commit()
         flash("Update posted. Visitors will see it on the homepage.", "success")
         return redirect(url_for("admin.updates"))
-    return render_template("admin/updates.html", updates=ShopUpdate.query.order_by(ShopUpdate.created_at.desc()).all())
+    updates_query = ShopUpdate.query.order_by(ShopUpdate.created_at.desc())
+    if search_query:
+        filters = [ShopUpdate.topic.ilike(f"%{search_query}%"), ShopUpdate.body.ilike(f"%{search_query}%"), ShopUpdate.posted_by.ilike(f"%{search_query}%")]
+        if search_query.isdigit():
+            filters.append(ShopUpdate.id == int(search_query))
+        updates_query = updates_query.filter(or_(*filters))
+    return render_template("admin/updates.html", updates=updates_query.all(), search_query=search_query)
 
 
 @admin_bp.post("/updates/<int:update_id>/delete")

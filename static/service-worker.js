@@ -1,4 +1,4 @@
-const CACHE_NAME = "beamers-farm-pwa-v12";
+const CACHE_NAME = "beamers-farm-pwa-v13";
 const OFFLINE_URL = "/static/offline.html";
 const PRECACHE_URLS = [
   OFFLINE_URL,

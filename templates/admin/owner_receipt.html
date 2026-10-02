@@ -24,6 +24,7 @@
         {% endif %}
       {% endif %}
     </section>
+    <section class="print-receipt-section"><h2>Payment verification</h2><div class="print-receipt-row"><span><strong>{{ order.payment_status }}</strong><small>{% if order.payment_verified_at %}Verified {{ order.payment_verified_at.strftime('%d %b %Y · %H:%M') }}{% else %}No payment verification recorded{% endif %}</small></span><strong>{% if order.payment_verified_by_role == 'owner' %}Owner{% elif order.payment_verified_by_role == 'salesperson' %}Salesperson · {{ order.payment_verified_by_name or 'Name not recorded' }}{% elif order.payment_status == 'Verified' %}Verifier not recorded{% else %}—{% endif %}</strong></div></section>
     <section class="print-receipt-section"><h2>Payment and refund history</h2>
       {% if order.financial_records %}{% for record in order.financial_records %}<div class="print-receipt-row"><span><strong>{{ {'initial_payment':'Order payment','balance_payment':'Historical balance payment','refund':'Historical refund'}[record.event_type] }}</strong><small>{{ record.created_at.strftime('%d %b %Y · %H:%M') }} · {{ record.payment_method|title }} · {{ record.status|title }}{% if record.reference %} · Ref {{ record.reference }}{% endif %}{% if record.recorded_by %} · Recorded by {{ record.recorded_by }}{% endif %}</small>{% if record.notes %}<small>{{ record.notes }}</small>{% endif %}</span><strong>{{ format_currency(record.amount) }}</strong></div>{% endfor %}
       {% else %}<p>No financial records are available for this order.</p>{% endif %}

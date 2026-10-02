@@ -5,6 +5,7 @@ from flask import Blueprint, abort, current_app, flash, jsonify, redirect, rende
 from models import Order, db
 from utils.push_subscriptions import delete_staff_push_subscription, save_staff_push_subscription
 from utils.web_push import web_push_is_configured
+from utils.order_search import order_search_filter
 
 
 dispatch_bp = Blueprint("dispatch", __name__, url_prefix="/dispatch")
@@ -43,17 +44,18 @@ def delete_push_subscription():
 @rider_required
 def dashboard():
     queue = Order.query.filter_by(status="Out for delivery")
-    orders = (
-        queue
-        .order_by(Order.created_at.asc())
-        .limit(100)
-        .all()
-    )
+    search_query = request.args.get("q", "").strip()[:120]
+    filtered_queue = queue
+    order_filter = order_search_filter(search_query)
+    if order_filter is not None:
+        filtered_queue = filtered_queue.filter(order_filter)
+    orders = filtered_queue.order_by(Order.created_at.asc()).limit(100).all()
     queue_count = queue.count()
     completed_count = Order.query.filter_by(status="Delivered").count()
     return render_template(
         "dispatch/dashboard.html", orders=orders, queue_count=queue_count,
         completed_count=completed_count,
+        search_query=search_query,
         push_configured=web_push_is_configured(),
         vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""),
     )

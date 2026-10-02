@@ -39,6 +39,7 @@
         <div><p class="eyebrow">Delivery queue</p><h2>Orders out for delivery</h2></div>
         <span class="section-note">Oldest orders first · {{ orders|length }} shown</span>
       </div>
+      <form method="get" class="record-search" role="search"><label>Search delivery orders<input type="search" name="q" maxlength="120" value="{{ search_query }}" placeholder="Public or numeric ID, customer, phone"></label><button class="button button-dark" type="submit">Search</button>{% if search_query %}<a class="table-link" href="{{ url_for('dispatch.dashboard') }}">Clear</a>{% endif %}</form>
       {% if orders %}
         <div class="order-table-wrap">
           <table class="order-table dispatch-table">
@@ -46,7 +47,7 @@
             <tbody>
               {% for order in orders %}
                 <tr>
-                  <td><strong>#{{ order.public_id[:8] }}</strong></td>
+                  <td><strong>#{{ order.public_id[:8] }}</strong><small>Record ID #{{ order.id }}</small></td>
                   <td><strong>{{ order.customer_name }}</strong><small>{{ order.phone }}</small></td>
                   <td>{{ order.created_at.strftime('%d %b %Y · %H:%M') }}</td>
                   <td>{{ order.items|length }} item{{ '' if order.items|length == 1 else 's' }}</td>

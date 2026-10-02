@@ -10,13 +10,12 @@
       {% for product in products %}
         <article class="product-card">
           <a class="product-art product-photo art-{{ product.image }}" href="{{ url_for('shop.product_detail', product_id=product.id) }}" aria-label="View {{ product.name }}">
-            <img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy">
-            <span class="photo-shade"></span>
+            <img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy"><span class="photo-shade"></span>
           </a>
           <div class="product-info">
-            <div class="product-heading"><h3>{{ product.name }}</h3><span class="stock-badge">{{ product.stock }} {{ 'bird' if product.is_sold_by_weight and product.stock == 1 else 'birds' if product.is_sold_by_weight else 'left' }}</span></div>
+            <div class="product-heading"><h3>{{ product.name }}</h3><span class="stock-badge">{{ product.stock }} left</span></div>
             <p>{{ product.description }}</p>
-            <div class="product-buy"><div><strong>{{ format_currency(product.price) }}{% if product.is_sold_by_weight %} / kg{% endif %}</strong><small>{{ product.unit }}</small></div>{% if product.is_sold_by_weight %}<a class="button button-lime" href="{{ url_for('shop.product_detail', product_id=product.id) }}">Choose size <span>→</span></a>{% else %}<form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-lime" type="submit">Add to crate <span>+</span></button></form>{% endif %}</div>
+            <div class="product-buy"><div><strong>{{ format_currency(product.price) }}</strong><small>per {{ product.unit }}</small></div><form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-lime" type="submit">Add to crate <span>+</span></button></form></div>
           </div>
         </article>
       {% endfor %}

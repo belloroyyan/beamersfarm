@@ -14,42 +14,38 @@ def delivery_fee_for(subtotal, fee=1500):
     return Decimal(str(fee)) if as_decimal(subtotal) > 0 else Decimal("0.00")
 
 
-def _cart_entry(raw_value):
-    if isinstance(raw_value, dict):
-        quantity_value = raw_value.get("quantity", 0)
-        requested_weight = raw_value.get("requested_weight_kg")
-    else:
-        # Compatibility with carts created before the combined-kg input existed.
-        quantity_value = raw_value
-        requested_weight = None
+def _cart_quantity(raw_value):
+    value = raw_value.get("quantity", 0) if isinstance(raw_value, dict) else raw_value
     try:
-        quantity = max(0, int(quantity_value))
+        return max(0, int(value))
     except (TypeError, ValueError, OverflowError):
-        quantity = 0
-    return quantity, requested_weight
+        return 0
 
 
-def parse_requested_weight(value):
-    """Return a positive, bounded total kg amount rounded to 0.001 kg, or None."""
+def product_uses_requested_kg(product):
+    """All current catalog products use ordinary listed-price × quantity pricing."""
+    return False
+
+
+def _cart_requested_kg(raw_value):
+    if not isinstance(raw_value, dict):
+        return Decimal("0.000")
     try:
-        weight = Decimal(str(value or "").strip())
-        if not weight.is_finite() or weight <= 0 or weight > Decimal("500"):
-            return None
-        if weight.as_tuple().exponent < -3:
-            return None
-        return weight.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+        value = Decimal(str(raw_value.get("requested_weight_kg", "0") or "0"))
+        if not value.is_finite() or value <= 0:
+            return Decimal("0.000")
+        return value.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
     except (InvalidOperation, TypeError, ValueError):
-        return None
+        return Decimal("0.000")
 
 
 def cart_count(cart):
-    return sum(_cart_entry(quantity)[0] for quantity in (cart or {}).values())
+    return sum(_cart_quantity(value) for value in (cart or {}).values())
 
 
 def build_cart(cart, products, delivery_fee=1500):
     lines = []
     subtotal = Decimal("0.00")
-    has_invalid_weight = False
     for product_id, raw_value in (cart or {}).items():
         try:
             product = products.get(int(product_id))
@@ -57,35 +53,21 @@ def build_cart(cart, products, delivery_fee=1500):
             product = None
         if not product:
             continue
-        quantity, raw_weight = _cart_entry(raw_value)
+        quantity = _cart_quantity(raw_value)
         if quantity <= 0:
             continue
-
-        requested_weight = None
-        needs_weight = bool(getattr(product, "is_sold_by_weight", False))
-        if needs_weight:
-            requested_weight = parse_requested_weight(raw_weight)
-            if requested_weight is None:
-                has_invalid_weight = True
-                line_subtotal = Decimal("0.00")
-            else:
-                line_subtotal = (as_decimal(product.price) * requested_weight).quantize(
-                    Decimal("0.01"), rounding=ROUND_HALF_UP
-                )
-        else:
-            line_subtotal = (as_decimal(product.price) * quantity).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
-
-        lines.append(
-            {
-                "product": product,
-                "quantity": quantity,
-                "requested_weight_kg": requested_weight,
-                "needs_requested_weight": needs_weight and requested_weight is None,
-                "line_subtotal": line_subtotal,
-            }
+        requested_kg = _cart_requested_kg(raw_value) if product_uses_requested_kg(product) else None
+        price_multiplier = requested_kg if requested_kg is not None else Decimal(quantity)
+        line_subtotal = (as_decimal(product.price) * price_multiplier).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
         )
+        lines.append({
+            "product": product,
+            "quantity": quantity,
+            "uses_requested_weight": requested_kg is not None,
+            "requested_weight_kg": requested_kg,
+            "line_subtotal": line_subtotal,
+        })
         subtotal += line_subtotal
 
     fee = delivery_fee_for(subtotal, delivery_fee)
@@ -94,5 +76,4 @@ def build_cart(cart, products, delivery_fee=1500):
         "subtotal": subtotal,
         "delivery_fee": fee,
         "total": subtotal + fee,
-        "has_invalid_weight": has_invalid_weight,
     }

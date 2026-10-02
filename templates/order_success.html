@@ -33,7 +33,7 @@
   <div class="receipt-card">
     <div class="receipt-head"><span>ORDER #{{ order.public_id }}</span><span class="status-pill {% if order.payment_status == 'Verified' %}status-confirmed{% else %}status-received{% endif %}">{% if order.payment_status == 'Verified' %}Payment verified{% else %}Awaiting payment{% endif %}</span></div>
     {% for item in order.items %}
-    <div class="receipt-line"><span>{{ item.quantity }} × {{ item.product_name }}{% if item.requested_weight_kg is not none %}<small class="pricing-line-note">{{ '%.3f'|format(item.requested_weight_kg) }} kg requested in total · {{ format_currency(item.unit_price) }}/kg</small>{% elif item.pricing_type == 'weight_deposit' %}<small class="pricing-line-note">Legacy order · deposit-based price snapshot</small>{% endif %}</span><strong>{{ format_currency(item.subtotal) }}</strong></div>
+    <div class="receipt-line"><span>{{ item.quantity }} × {{ item.product_name }}<small class="pricing-line-note">{{ format_currency(item.unit_price) }} per {{ item.unit }} × {{ item.quantity }}</small></span><strong>{{ format_currency(item.subtotal) }}</strong></div>
     {% endfor %}
     <div class="summary-row"><span>Items subtotal</span><strong>{{ format_currency(order.subtotal) }}</strong></div>
     <div class="summary-row"><span>{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}Delivery · {{ order.delivery_zone_name }}{% endif %}</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div>

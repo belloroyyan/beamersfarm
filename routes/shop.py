@@ -2,16 +2,16 @@ import hashlib
 import hmac
 import re
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from flask import Blueprint, abort, current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 
-from models import CustomerPushSubscription, DeliveryZone, Order, OrderFinancialRecord, OrderItem, Product, ShopSettings, ShopUpdate, db
-from utils.helpers import build_cart, parse_requested_weight
+from models import CustomerPushSubscription, DeliveryZone, Order, OrderFinancialRecord, OrderItem, Product, SalespersonAccount, ShopSettings, ShopUpdate, db
+from utils.helpers import build_cart, product_uses_requested_kg
 from utils.notifications import normalize_nigerian_phone
 from utils.push_subscriptions import valid_push_endpoint
 from utils.update_share import render_update_share_image
-from utils.web_push import send_customer_order_confirmed_push, send_owner_new_order_push, web_push_is_configured
+from utils.web_push import send_customer_order_confirmed_push, send_owner_new_order_push, send_salesperson_new_order_push, web_push_is_configured
 
 shop_bp = Blueprint("shop", __name__)
 PICKUP_ADDRESS = (
@@ -51,7 +51,7 @@ def locked_cart_summary(delivery_fee=None):
     cart = current_cart()
     ids = [int(key) for key in cart if str(key).isdigit()]
     if not ids:
-        return {"lines": [], "subtotal": Decimal("0.00"), "delivery_fee": Decimal("0.00"), "total": Decimal("0.00"), "has_invalid_weight": False}
+        return {"lines": [], "subtotal": Decimal("0.00"), "delivery_fee": Decimal("0.00"), "total": Decimal("0.00")}
     products = db.session.execute(
         db.select(Product).where(Product.id.in_(ids)).with_for_update()
     ).scalars().all()
@@ -113,6 +113,7 @@ def mark_updates_seen(response):
 def updates():
     items = ShopUpdate.query.order_by(ShopUpdate.created_at.desc()).all()
     return mark_updates_seen(make_response(render_template("updates.html", updates=items)))
+
 
 
 @shop_bp.get("/updates/<int:update_id>")
@@ -191,30 +192,29 @@ def add_to_cart(product_id):
     cart = current_cart()
     key = str(product.id)
     existing = cart.get(key, 0)
-    if isinstance(existing, dict):
-        existing_quantity = int(existing.get("quantity", 0) or 0)
-        existing_weight = parse_requested_weight(existing.get("requested_weight_kg"))
-    else:
-        existing_quantity = int(existing or 0)
-        existing_weight = None
+    existing_value = existing.get("quantity", 0) if isinstance(existing, dict) else existing
+    try:
+        existing_quantity = max(0, int(existing_value or 0))
+    except (TypeError, ValueError, OverflowError):
+        existing_quantity = 0
     new_quantity = existing_quantity + quantity
     if new_quantity > product.stock:
         flash(f"Your crate would exceed the available stock of {product.name}.", "error")
         return redirect(request.referrer or url_for("shop.product_detail", product_id=product.id))
-    if product.is_sold_by_weight:
-        if existing_quantity and existing_weight is None:
-            flash("Update the existing crate line with one combined requested weight in kg before adding more birds.", "error")
-            return redirect(url_for("shop.cart"))
-        requested_weight = parse_requested_weight(request.form.get("requested_weight_kg"))
-        if requested_weight is None:
-            flash("Enter the combined requested weight in kilograms for this line.", "error")
-            return redirect(url_for("shop.product_detail", product_id=product.id))
-        if existing_weight is not None:
-            requested_weight += existing_weight
-        cart[key] = {
-            "quantity": new_quantity,
-            "requested_weight_kg": str(requested_weight),
-        }
+    if product_uses_requested_kg(product):
+        try:
+            requested_kg = Decimal(request.form.get("requested_weight_kg", ""))
+            if not requested_kg.is_finite() or requested_kg < Decimal("0.001") or requested_kg > Decimal("500"):
+                raise ValueError
+            requested_kg = requested_kg.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+            previous_kg = Decimal(str(existing.get("requested_weight_kg", "0") or "0")) if isinstance(existing, dict) else Decimal("0")
+            combined_kg = (previous_kg + requested_kg).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+            if combined_kg > Decimal("500"):
+                raise ValueError
+        except (InvalidOperation, TypeError, ValueError):
+            flash("Enter the combined requested weight for this product in kg (0.001–500 kg).", "error")
+            return redirect(request.referrer or url_for("shop.product_detail", product_id=product.id))
+        cart[key] = {"quantity": new_quantity, "requested_weight_kg": str(combined_kg)}
     else:
         cart[key] = new_quantity
     session.modified = True
@@ -225,7 +225,7 @@ def add_to_cart(product_id):
 @shop_bp.post("/cart/update")
 def update_cart():
     cart = current_cart()
-    invalid_weight = False
+    updated_cart = {}
     for key in list(cart):
         try:
             quantity = int(request.form.get(f"quantity_{key}", 0))
@@ -233,22 +233,24 @@ def update_cart():
             quantity = 0
         product = db.session.get(Product, int(key)) if str(key).isdigit() else None
         if not product or quantity <= 0:
-            cart.pop(key, None)
-        elif product.is_sold_by_weight:
-            requested_weight = parse_requested_weight(request.form.get(f"requested_weight_kg_{key}"))
-            cart[key] = {
-                "quantity": min(quantity, product.stock),
-                "requested_weight_kg": str(requested_weight) if requested_weight is not None else "",
-            }
-            invalid_weight = invalid_weight or requested_weight is None
+            continue
+        quantity = min(quantity, product.stock)
+        if product_uses_requested_kg(product):
+            try:
+                requested_kg = Decimal(request.form.get(f"requested_weight_kg_{key}", ""))
+                if not requested_kg.is_finite() or requested_kg < Decimal("0.001") or requested_kg > Decimal("500"):
+                    raise ValueError
+                requested_kg = requested_kg.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+            except (InvalidOperation, TypeError, ValueError):
+                flash("Enter a valid total requested weight in kg (0.001–500 kg). No crate changes were saved.", "error")
+                return redirect(url_for("shop.cart"))
+            updated_cart[key] = {"quantity": quantity, "requested_weight_kg": str(requested_kg)}
         else:
-            cart[key] = min(quantity, product.stock)
+            updated_cart[key] = quantity
+    cart.clear()
+    cart.update(updated_cart)
     session.modified = True
-    flash(
-        "Your crate has been updated. Enter a valid total requested weight in kg for each kg-priced item."
-        if invalid_weight else "Your crate has been updated.",
-        "error" if invalid_weight else "success",
-    )
+    flash("Your crate has been updated.", "success")
     return redirect(url_for("shop.cart"))
 
 
@@ -284,11 +286,10 @@ def checkout():
     if not summary["lines"]:
         flash("Add at least one product before checking out.", "error")
         return redirect(url_for("shop.index"))
-    if summary.get("has_invalid_weight"):
-        flash("Enter the combined requested weight in kg for each kg-priced item before checkout.", "error")
-        return redirect(url_for("shop.cart"))
-
     if request.method == "POST":
+        if any(line["uses_requested_weight"] and not line["requested_weight_kg"] for line in summary["lines"]):
+            flash("Review the quantities in your crate before checkout.", "error")
+            return redirect(url_for("shop.cart"))
         customer_name = request.form.get("customer_name", "").strip()
         phone = request.form.get("phone", "").strip()
         address = request.form.get("address", "").strip()
@@ -311,9 +312,6 @@ def checkout():
             if not summary["lines"]:
                 flash("Your crate is empty. Please add a product first.", "error")
                 return redirect(url_for("shop.index"))
-            if summary.get("has_invalid_weight"):
-                flash("Enter the combined requested weight in kg for each kg-priced item before checkout.", "error")
-                return redirect(url_for("shop.cart"))
             for line in summary["lines"]:
                 if not line["product"].is_available or line["quantity"] > line["product"].stock:
                     flash(f"Not enough stock for {line['product'].name}. Please update your crate.", "error")
@@ -356,7 +354,7 @@ def checkout():
                         quantity=line["quantity"],
                         unit_price=Decimal(str(product.price)),
                         unit=product.unit,
-                        pricing_type="unit_price",  # Neutral legacy snapshot marker; products no longer have pricing types.
+                        pricing_type="unit_price",  # New orders use the same ordinary per-unit price for every product.
                         requested_weight_kg=line["requested_weight_kg"],
                         subtotal=line["line_subtotal"],
                     )
@@ -367,6 +365,8 @@ def checkout():
             db.session.rollback()
             raise
         send_owner_new_order_push()
+        if shop_is_open() and SalespersonAccount.query.filter_by(active=True).count():
+            send_salesperson_new_order_push()
         session["cart"] = {}
         return redirect(url_for("shop.order_success", order_ref=order.public_id, token=order.public_token))
 
