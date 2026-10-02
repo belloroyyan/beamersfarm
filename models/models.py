@@ -322,7 +322,7 @@ class SalespersonAccount(db.Model):
     username = db.Column(db.String(40), nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
-    permissions_json = db.Column(db.Text, nullable=False, default="{}", server_default="{}")
+    permissions_json = db.Column(db.Text, nullable=False, default="{}")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     disabled_at = db.Column(db.DateTime, nullable=True)
 

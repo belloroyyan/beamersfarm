@@ -23,12 +23,23 @@ DEFAULT_PERMISSIONS = (
 def upgrade():
     op.add_column(
         "salesperson_accounts",
-        sa.Column("permissions_json", sa.Text(), nullable=False, server_default="{}"),
+        # MySQL does not allow a default value on TEXT columns. Add it
+        # nullable, backfill existing rows, then enforce NOT NULL below.
+        sa.Column("permissions_json", sa.Text(), nullable=True),
     )
     op.execute(
         sa.text("UPDATE salesperson_accounts SET permissions_json = :permissions")
         .bindparams(permissions=DEFAULT_PERMISSIONS)
     )
+    if op.get_bind().dialect.name == "sqlite":
+        # SQLite has no ALTER COLUMN support, so let Alembic recreate the
+        # small account table after the backfill.
+        with op.batch_alter_table("salesperson_accounts", recreate="always") as batch:
+            batch.alter_column("permissions_json", existing_type=sa.Text(), nullable=False)
+    else:
+        # MySQL can change TEXT nullability directly, but must not receive a
+        # TEXT default value.
+        op.alter_column("salesperson_accounts", "permissions_json", existing_type=sa.Text(), nullable=False)
 
     with op.batch_alter_table("staff_push_subscriptions", recreate="always") as batch:
         batch.drop_constraint("uq_staff_push_subscriptions_role_endpoint_hash", type_="unique")

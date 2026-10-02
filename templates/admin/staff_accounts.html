@@ -33,15 +33,14 @@
                   <span class="status-pill {% if account.active %}status-confirmed{% else %}status-cancelled{% endif %}">{{ 'Active' if account.active else 'Inactive' }}</span>
                 </div>
                 <details class="staff-permissions-details">
-                  <summary><span><b>Manage operations and alerts</b></span><small><br>Choose exactly what this salesperson can do</small></summary>
+                  <summary><span>Manage operations and alerts</span><small>Choose exactly what this salesperson can do</small></summary>
                   <form method="post" class="staff-permissions-form">
                     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="account_id" value="{{ account.id }}"><input type="hidden" name="action" value="save_permissions">
                     <div class="permission-checklist">
                       {% for key, label, default_enabled in permission_definitions %}
-                        <label class="permission-option"><input type="checkbox" name="permissions" value="{{ key }}" {% if key in account_permissions[account.id] %}checked{% endif %}><span><strong>{{ label }}</strong></span></label><br>
+                        <label class="permission-option"><input type="checkbox" name="permissions" value="{{ key }}" {% if key in account_permissions[account.id] %}checked{% endif %}><span><strong>{{ label }}</strong>{% if default_enabled %}<small>Enabled by default for existing accounts</small>{% endif %}</span></label>
                       {% endfor %}
                     </div>
-                    <br>
                     <button class="button button-dark" type="submit">Save permissions</button>
                   </form>
                 </details>
