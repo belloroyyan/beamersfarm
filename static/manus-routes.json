@@ -4,6 +4,7 @@
     { "path": "/product/:product_id", "title": "Product detail" },
     { "path": "/cart", "title": "Shopping cart" },
     { "path": "/help", "title": "Help and ordering guide" },
+    { "path": "/track-order", "title": "Track a guest order" },
     { "path": "/reviews", "title": "Leave a customer review" },
     { "path": "/testimonials", "title": "Customer testimonials" },
     { "path": "/checkout", "title": "Delivery details" },

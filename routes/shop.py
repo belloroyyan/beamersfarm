@@ -159,6 +159,36 @@ def help_page():
     return render_template("help.html")
 
 
+@shop_bp.route("/track-order", methods=["GET", "POST"])
+def track_order():
+    """Open one guest order after matching its public reference and phone."""
+    if request.method == "POST":
+        order_ref = request.form.get("order_ref", "").strip()
+        phone = request.form.get("phone", "").strip()
+        order = Order.query.filter_by(public_id=order_ref).first()
+        if order is None and order_ref.isdigit():
+            order = db.session.get(Order, int(order_ref))
+
+        submitted_phone = normalize_nigerian_phone(phone)
+        stored_phone = normalize_nigerian_phone(order.phone) if order else ""
+        if not order or not submitted_phone or not stored_phone or not hmac.compare_digest(
+            submitted_phone, stored_phone
+        ):
+            flash(
+                "We could not verify that order reference and phone combination. Please check both and try again.",
+                "error",
+            )
+            return render_template("track_order.html", order_ref=order_ref, phone=phone)
+
+        # The existing success page and receipt remain protected by the order's
+        # random public token. Only a successful two-field match reveals it.
+        return redirect(
+            url_for("shop.order_success", order_ref=order.public_id, token=order.public_token)
+        )
+
+    return render_template("track_order.html", order_ref="", phone="")
+
+
 @shop_bp.get("/updates/dismiss")
 def dismiss_update():
     return mark_updates_seen(redirect(url_for("shop.index")))

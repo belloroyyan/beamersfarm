@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Track an order · Beamers Farm{% endblock %}
+{% block content %}
+<div class="page-shell">
+  <div class="container tracking-shell">
+    <section class="tracking-intro">
+      <p class="eyebrow">Guest order access</p>
+      <h1>Track an order.</h1>
+      <p>Enter the public order reference and the phone number used at checkout to view the latest status, payment guidance, items, and receipt.</p>
+      <div class="tracking-trust"><strong>Private by design</strong><span>We verify both details before opening an order. No account or SMS provider is required.</span></div>
+    </section>
+    <section class="form-card tracking-form-card">
+      <p class="eyebrow">Find your order</p>
+      <h2>Order reference and phone</h2>
+      <form method="post">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <label>Public order reference<input name="order_ref" value="{{ order_ref }}" maxlength="64" required placeholder="Paste your public order UUID" autocomplete="off"><small class="field-help">Use the reference shown on your order confirmation or receipt.</small></label>
+        <label>Phone used for the order<input type="tel" name="phone" value="{{ phone }}" maxlength="40" required placeholder="08012345678" autocomplete="tel"><small class="field-help">Enter the same number used during checkout. Nigerian number formats are accepted.</small></label>
+        <button class="button button-lime button-full" type="submit">View order <span>→</span></button>
+      </form>
+      <p class="form-note">For your privacy, we will not reveal whether an order exists unless both details match.</p>
+    </section>
+  </div>
+</div>
+{% endblock %}
