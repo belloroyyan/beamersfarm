@@ -2,7 +2,26 @@
 {% block title %}Order desk · Beamers Farm{% endblock %}
 {% block content %}
 <div class="admin-shell"><div class="container">
-  <div class="admin-topbar"><div><p class="eyebrow">Owner desk / overview</p><h1>{{ greeting }}. Here’s the run sheet.</h1></div><div class="admin-actions"><a class="button button-lime" href="{{ url_for('admin.products') }}">Manage products <span>→</span></a><a class="button button-outline" href="{{ url_for('admin.partner_ads') }}">Partner advertisements</a><a class="button button-outline" href="{{ url_for('admin.reviews') }}">Manage reviews</a><a class="button button-outline" href="{{ url_for('admin.inventory_summary') }}">Inventory summary</a><a class="button button-outline" href="{{ url_for('admin.order_summary') }}">Order Summary</a><a class="button button-outline" href="{{ url_for('admin.delivery_zones') }}">Delivery zones</a><a class="button button-outline" href="{{ url_for('admin.staff_accounts') }}">Manage staff</a><a class="button button-outline" href="{{ url_for('admin.updates') }}">Post an update</a><form method="post" action="{{ url_for('admin.logout') }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="text-button" type="submit">Sign out</button></form></div></div>
+  <div class="admin-topbar">
+    <div><p class="eyebrow">Owner desk / overview</p><h1>{{ greeting }}. Here’s the run sheet.</h1></div>
+    <div class="admin-actions">
+      <details class="owner-actions-menu">
+        <summary><span>Actions</span><span class="owner-actions-caret" aria-hidden="true">⌄</span></summary>
+        <nav class="owner-actions-panel" aria-label="Owner actions">
+          <p class="owner-actions-title">Management shortcuts</p>
+          <a href="{{ url_for('admin.products') }}"><span>Manage products</span><span aria-hidden="true">→</span></a>
+          <a href="{{ url_for('admin.partner_ads') }}"><span>Partner advertisements</span><span aria-hidden="true">→</span></a>
+          <a href="{{ url_for('admin.reviews') }}"><span>Manage reviews</span><span aria-hidden="true">→</span></a>
+          <a href="{{ url_for('admin.inventory_summary') }}"><span>Inventory summary</span><span aria-hidden="true">→</span></a>
+          <a href="{{ url_for('admin.order_summary') }}"><span>Order Summary</span><span aria-hidden="true">→</span></a>
+          <a href="{{ url_for('admin.delivery_zones') }}"><span>Delivery zones</span><span aria-hidden="true">→</span></a>
+          <a href="{{ url_for('admin.staff_accounts') }}"><span>Manage staff</span><span aria-hidden="true">→</span></a>
+          <a href="{{ url_for('admin.updates') }}"><span>Post an update</span><span aria-hidden="true">→</span></a>
+        </nav>
+      </details>
+      <form method="post" action="{{ url_for('admin.logout') }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="text-button" type="submit">Sign out</button></form>
+    </div>
+  </div>
   <section class="shop-control {% if shop_settings.is_open %}shop-control-open{% else %}shop-control-closed{% endif %}"><div><p class="eyebrow">Order availability</p><h2>{{ 'Shop is open' if shop_settings.is_open else 'Shop is closed' }}</h2><p>{{ 'Customers can place orders now.' if shop_settings.is_open else shop_settings.closed_message }}</p></div><form method="post" action="{{ url_for('admin.toggle_shop') }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="button {% if shop_settings.is_open %}button-outline{% else %}button-lime{% endif %}" type="submit">{{ 'Close shop' if shop_settings.is_open else 'Open shop' }}</button></form></section>
   <section class="admin-panel dispatch-notification-panel" data-staff-push data-subscription-url="{{ url_for('admin.save_owner_push_subscription') }}" data-vapid-public-key="{{ vapid_public_key }}" data-csrf-token="{{ csrf_token() }}">
     <div class="dispatch-notification-copy"><p class="eyebrow">Stay informed</p><h2>New order alerts</h2>

@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const menuButton = document.querySelector('.menu-toggle');
   const menu = document.querySelector('#main-menu');
   const moreMenu = menu && menu.querySelector('.nav-more');
+  const ownerActionsMenus = document.querySelectorAll('.owner-actions-menu');
   if (menuButton && menu) {
     const closeMenu = () => {
       menu.classList.remove('is-open');
@@ -21,10 +22,21 @@ document.addEventListener('DOMContentLoaded', () => {
       if (event.key === 'Escape') {
         closeMenu();
         if (moreMenu) moreMenu.open = false;
+        ownerActionsMenus.forEach((actions) => {
+          if (actions.open) {
+            actions.open = false;
+            actions.querySelector('summary')?.focus();
+          }
+        });
       }
     });
     document.addEventListener('click', (event) => {
       if (moreMenu && !moreMenu.contains(event.target)) moreMenu.open = false;
+    });
+    document.addEventListener('click', (event) => {
+      ownerActionsMenus.forEach((actions) => {
+        if (actions.open && !actions.contains(event.target)) actions.open = false;
+      });
     });
   }
 

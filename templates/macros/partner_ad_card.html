@@ -6,16 +6,16 @@
     <span class="partner-ad-badge">Independent offer</span>
   </a>
   <div class="partner-ad-copy">
-    <p class="partner-ad-category">{{ listing.category }}</p>
+    <p class="partner-ad-category" title="{{ listing.category }} · {{ listing.supplier_name }}">{{ listing.category }} <span aria-hidden="true">·</span> {{ listing.supplier_name }}</p>
     <h3><a href="{{ url_for('shop.partner_offer', listing_id=listing.id) }}">{{ listing.name }}</a></h3>
-    <p class="partner-ad-description">{{ listing.description|truncate(190 if compact else 280) }}</p>
-    <div class="partner-ad-price">{% if listing.price is not none %}<strong>{{ format_currency(listing.price) }}</strong>{% else %}<strong>{{ listing.price_note or 'Contact supplier for current price' }}</strong>{% endif %}</div>
-    <p class="partner-ad-supplier"><strong>Supplier:</strong> {{ listing.supplier_name }}{% if listing.supplier_location %}<span> · {{ listing.supplier_location }}</span>{% endif %}</p>
-    <div class="partner-ad-actions">
-      <a class="button button-outline" href="{{ url_for('shop.partner_offer', listing_id=listing.id) }}">Supplier details</a>
-      {% if listing.supplier_phone %}<a class="partner-ad-contact" href="tel:{{ listing.supplier_phone|replace(' ', '')|replace('(', '')|replace(')', '')|replace('-', '') }}">Call supplier</a>{% endif %}
+    <p class="partner-ad-description">{{ listing.description|truncate(150 if compact else 120) }}</p>
+    <div class="partner-ad-footer">
+      <div class="partner-ad-price">
+        {% if listing.price is not none %}<strong>{{ format_currency(listing.price) }}</strong>{% else %}<strong>{{ listing.price_note or 'Contact supplier for current price' }}</strong>{% endif %}
+      </div>
+      <a class="button button-outline" href="{{ url_for('shop.partner_offer', listing_id=listing.id) }}">View offer <span aria-hidden="true">→</span></a>
     </div>
-    <small class="partner-ad-disclaimer">Independent listing. Sold and supplied by {{ listing.supplier_name }}, not Beamers Farm.</small>
+    <small class="partner-ad-disclaimer">Independent supplier · Not supplied by Beamers Farm</small>
   </div>
 </article>
 {%- endmacro %}
