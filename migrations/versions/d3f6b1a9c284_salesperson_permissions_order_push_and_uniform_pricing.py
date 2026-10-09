@@ -20,70 +20,48 @@ DEFAULT_PERMISSIONS = (
 )
 
 
-def _state():
-    insp = sa.inspect(op.get_bind())
-    return insp
-
-
 def upgrade():
-    # MySQL commits each ALTER TABLE immediately, so a previous failed deploy
-    # can leave this migration half-applied. Every step checks first so the
-    # migration can safely be re-run.
     bind = op.get_bind()
-    is_sqlite = bind.dialect.name == "sqlite"
-
-    insp = _state()
-    sp_cols = {c["name"] for c in insp.get_columns("salesperson_accounts")}
-    if "permissions_json" not in sp_cols:
+    account_columns = {column["name"]: column for column in sa.inspect(bind).get_columns("salesperson_accounts")}
+    if "permissions_json" not in account_columns:
         # MySQL does not allow a default value on TEXT columns. Add it
         # nullable, backfill existing rows, then enforce NOT NULL below.
-        op.add_column("salesperson_accounts", sa.Column("permissions_json", sa.Text(), nullable=True))
+        op.add_column(
+            "salesperson_accounts",
+            sa.Column("permissions_json", sa.Text(), nullable=True),
+        )
     op.execute(
-        sa.text("UPDATE salesperson_accounts SET permissions_json = :permissions WHERE permissions_json IS NULL")
+        sa.text(
+            "UPDATE salesperson_accounts SET permissions_json = :permissions "
+            "WHERE permissions_json IS NULL OR permissions_json = ''"
+        )
         .bindparams(permissions=DEFAULT_PERMISSIONS)
     )
-    if is_sqlite:
+    if account_columns.get("permissions_json", {}).get("nullable", True) and bind.dialect.name == "sqlite":
+        # SQLite has no ALTER COLUMN support, so let Alembic recreate the
+        # small account table after the backfill.
         with op.batch_alter_table("salesperson_accounts", recreate="always") as batch:
             batch.alter_column("permissions_json", existing_type=sa.Text(), nullable=False)
-    else:
+    elif account_columns.get("permissions_json", {}).get("nullable", True):
+        # MySQL can change TEXT nullability directly, but must not receive a
+        # TEXT default value.
         op.alter_column("salesperson_accounts", "permissions_json", existing_type=sa.Text(), nullable=False)
 
-    insp = _state()
-    t = "staff_push_subscriptions"
-    cols = {c["name"] for c in insp.get_columns(t)}
-    uniques = {u["name"] for u in insp.get_unique_constraints(t)}
-    indexes = {i["name"] for i in insp.get_indexes(t)}
-    fks = {f["name"] for f in insp.get_foreign_keys(t)}
-
-    if is_sqlite:
-        with op.batch_alter_table(t, recreate="always") as batch:
-            if "uq_staff_push_subscriptions_role_endpoint_hash" in uniques:
-                batch.drop_constraint("uq_staff_push_subscriptions_role_endpoint_hash", type_="unique")
-            if "salesperson_account_id" not in cols:
-                batch.add_column(sa.Column("salesperson_account_id", sa.Integer(), nullable=True))
-            if "fk_staff_push_salesperson_account" not in fks:
-                batch.create_foreign_key("fk_staff_push_salesperson_account", "salesperson_accounts",
-                                         ["salesperson_account_id"], ["id"], ondelete="CASCADE")
-            if "ix_staff_push_subscriptions_salesperson_account_id" not in indexes:
-                batch.create_index("ix_staff_push_subscriptions_salesperson_account_id", ["salesperson_account_id"])
-            if "uq_staff_push_sub_account_endpoint" not in uniques:
-                batch.create_unique_constraint("uq_staff_push_sub_account_endpoint",
-                                               ["staff_role", "salesperson_account_id", "endpoint_hash"])
-    else:
-        # MySQL reports unique constraints as indexes too.
-        all_idx = uniques | indexes
-        if "uq_staff_push_subscriptions_role_endpoint_hash" in all_idx:
-            op.drop_constraint("uq_staff_push_subscriptions_role_endpoint_hash", t, type_="unique")
-        if "salesperson_account_id" not in cols:
-            op.add_column(t, sa.Column("salesperson_account_id", sa.Integer(), nullable=True))
-        if "ix_staff_push_subscriptions_salesperson_account_id" not in all_idx:
-            op.create_index("ix_staff_push_subscriptions_salesperson_account_id", t, ["salesperson_account_id"])
-        if "fk_staff_push_salesperson_account" not in fks:
-            op.create_foreign_key("fk_staff_push_salesperson_account", t, "salesperson_accounts",
-                                  ["salesperson_account_id"], ["id"], ondelete="CASCADE")
-        if "uq_staff_push_sub_account_endpoint" not in all_idx:
-            op.create_unique_constraint("uq_staff_push_sub_account_endpoint", t,
-                                        ["staff_role", "salesperson_account_id", "endpoint_hash"])
+    with op.batch_alter_table("staff_push_subscriptions", recreate="always") as batch:
+        batch.drop_constraint("uq_staff_push_subscriptions_role_endpoint_hash", type_="unique")
+        batch.add_column(sa.Column("salesperson_account_id", sa.Integer(), nullable=True))
+        batch.create_foreign_key(
+            "fk_staff_push_salesperson_account",
+            "salesperson_accounts",
+            ["salesperson_account_id"],
+            ["id"],
+            ondelete="CASCADE",
+        )
+        batch.create_index("ix_staff_push_subscriptions_salesperson_account_id", ["salesperson_account_id"])
+        batch.create_unique_constraint(
+            "uq_staff_push_sub_account_endpoint",
+            ["staff_role", "salesperson_account_id", "endpoint_hash"],
+        )
 
     # The next migration sets the ordinary Full Chicken price unit to kg and
     # captures the customer's combined requested kg; no deposit workflow is used.

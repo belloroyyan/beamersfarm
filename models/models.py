@@ -31,6 +31,7 @@ class Product(db.Model):
     image = db.Column(db.String(80), nullable=False, default="chicken")
     active = db.Column(db.Boolean, nullable=False, default=True)
     featured = db.Column(db.Boolean, nullable=False, default=False)
+    recommended = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     order_items = db.relationship("OrderItem", back_populates="product")
@@ -100,10 +101,17 @@ class Order(db.Model):
     customer_name = db.Column(db.String(120), nullable=False)
     phone = db.Column(db.String(40), nullable=False)
     address = db.Column(db.Text, nullable=False)
+    email = db.Column(db.String(160), nullable=True)
     whatsapp_opt_in = db.Column(db.Boolean, nullable=False, default=False)
     whatsapp_opt_in_at = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(40), nullable=False, default="Received")
     payment_status = db.Column(db.String(30), nullable=False, default="Unverified", server_default="Unverified")
+    payment_method = db.Column(db.String(30), nullable=False, default="bank_transfer", server_default="bank_transfer")
+    payment_provider = db.Column(db.String(30), nullable=True)
+    payment_reference = db.Column(db.String(160), nullable=True, index=True)
+    payment_channel = db.Column(db.String(30), nullable=True)
+    payment_initiated_at = db.Column(db.DateTime, nullable=True)
+    payment_failure_reason = db.Column(db.String(500), nullable=True)
     payment_verified_at = db.Column(db.DateTime, nullable=True)
     payment_verified_by_role = db.Column(db.String(20), nullable=True)
     payment_verified_by_name = db.Column(db.String(120), nullable=True)
@@ -127,6 +135,7 @@ class Order(db.Model):
         "OrderNotification", back_populates="order", cascade="all, delete-orphan"
     )
     complaints = db.relationship("Complaint", back_populates="order")
+    review = db.relationship("Review", back_populates="order", uselist=False, cascade="all, delete-orphan")
     customer_push_subscriptions = db.relationship(
         "CustomerPushSubscription",
         secondary=order_customer_push_subscriptions,
@@ -293,6 +302,29 @@ class ShopUpdate(db.Model):
     image = db.Column(db.String(160), nullable=True)
     posted_by = db.Column(db.String(80), nullable=False, default="Admin")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class Review(db.Model):
+    __tablename__ = "reviews"
+    __table_args__ = (
+        db.UniqueConstraint("order_id", name="uq_reviews_order_id"),
+        db.CheckConstraint("rating >= 1 AND rating <= 5", name="ck_reviews_rating_range"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_name = db.Column(db.String(120), nullable=False)
+    phone = db.Column(db.String(40), nullable=False)
+    email = db.Column(db.String(160), nullable=True)
+    rating = db.Column(db.Integer, nullable=False)
+    title = db.Column(db.String(160), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(20), nullable=False, default="Pending", server_default="Pending")
+    owner_response = db.Column(db.Text, nullable=False, default="")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    published_at = db.Column(db.DateTime, nullable=True)
+
+    order = db.relationship("Order", back_populates="review")
 
 
 class StaffPushSubscription(db.Model):

@@ -70,6 +70,12 @@ def available_products_query():
     return Product.query.filter_by(active=True).filter(Product.stock > 0)
 
 
+def recommended_products_query():
+    return available_products_query().filter(Product.recommended.is_(True)).order_by(
+        Product.created_at.asc(), Product.name.asc()
+    )
+
+
 @shop_bp.get("/")
 def index():
     featured = (
@@ -161,7 +167,8 @@ def dismiss_update():
 @shop_bp.get("/products")
 def products():
     products = available_products_query().order_by(Product.created_at.asc()).all()
-    return render_template("products.html", products=products)
+    recommendations = recommended_products_query().all()
+    return render_template("products.html", products=products, recommendations=recommendations)
 
 
 @shop_bp.get("/product/<int:product_id>")
@@ -281,6 +288,7 @@ def checkout():
         return render_template(
             "checkout.html", summary=summary, delivery_zones=zones,
             selected_zone_id=selected_zone_id, selected_zone=selected_zone,
+            paystack_enabled=current_app.config.get("PAYSTACK_ENABLED", False),
         )
 
     if not summary["lines"]:
@@ -292,10 +300,24 @@ def checkout():
             return redirect(url_for("shop.cart"))
         customer_name = request.form.get("customer_name", "").strip()
         phone = request.form.get("phone", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        payment_method = request.form.get("payment_method", "bank_transfer")
         address = request.form.get("address", "").strip()
         whatsapp_opt_in = request.form.get("whatsapp_opt_in") == "yes"
         if not selected_zone:
             flash("Choose a delivery zone or free farm pickup to see the amount due.", "error")
+            return render_checkout()
+        if payment_method not in {"bank_transfer", "paystack"}:
+            flash("Choose a valid payment method.", "error")
+            return render_checkout()
+        if payment_method == "paystack" and not current_app.config.get("PAYSTACK_ENABLED", False):
+            flash("Online payment is not enabled yet. Please choose bank transfer.", "error")
+            return render_checkout()
+        if payment_method == "paystack" and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+            flash("Enter a valid email address for online payment, or choose bank transfer.", "error")
+            return render_checkout()
+        if email and len(email) > 160:
+            flash("Enter an email address shorter than 160 characters.", "error")
             return render_checkout()
         if (
             not customer_name or len(customer_name) > 120
@@ -320,11 +342,14 @@ def checkout():
             order = Order(
                 customer_name=customer_name,
                 phone=phone,
+                email=email or None,
                 address=PICKUP_ADDRESS if selected_zone.is_pickup else address,
                 whatsapp_opt_in=whatsapp_opt_in,
                 whatsapp_opt_in_at=datetime.utcnow() if whatsapp_opt_in else None,
                 status="Received",
-                payment_status="Verified" if summary["total"] <= 0 else "Unverified",
+                payment_status="Verified" if summary["total"] <= 0 else ("Pending" if payment_method == "paystack" else "Unverified"),
+                payment_method=payment_method,
+                payment_provider="paystack" if payment_method == "paystack" else "opay",
                 payment_verified_at=datetime.utcnow() if summary["total"] <= 0 else None,
                 fulfillment_type="pickup" if selected_zone.is_pickup else "delivery",
                 delivery_zone_name=selected_zone.name,
@@ -340,7 +365,7 @@ def checkout():
                         event_type="initial_payment",
                         amount=summary["total"],
                         status="pending",
-                        payment_method="bank transfer",
+                        payment_method="paystack" if payment_method == "paystack" else "bank transfer",
                         notes="Full order amount due before confirmation, including the selected delivery fee.",
                     )
                 )
@@ -368,6 +393,8 @@ def checkout():
         if shop_is_open() and SalespersonAccount.query.filter_by(active=True).count():
             send_salesperson_new_order_push()
         session["cart"] = {}
+        if payment_method == "paystack":
+            return redirect(url_for("payments.start_paystack_payment", order_ref=order.public_id, token=order.public_token))
         return redirect(url_for("shop.order_success", order_ref=order.public_id, token=order.public_token))
 
     return render_checkout()
@@ -382,7 +409,8 @@ def order_success(order_ref, token):
         from flask import abort
         abort(404)
     return render_template(
-        "order_success.html", order=order, push_configured=web_push_is_configured(),
+        "order_success.html", order=order, recommendations=recommended_products_query().all(),
+        push_configured=web_push_is_configured(),
         vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""),
     )
 

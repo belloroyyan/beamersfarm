@@ -10,6 +10,11 @@
     <label>Price per unit (₦)<input type="number" name="price" min="0" step="0.01" value="{{ product.price }}" required><small class="field-help">All products use standard unit pricing. The total is listed price × quantity.</small></label>
     <label>Replace product image <small class="field-help">Optional · leave empty to keep the current image</small><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
     <label>Stock count<input type="number" name="stock" min="0" step="1" value="{{ product.stock }}" required><small class="field-help">Counts physical sale units in stock, such as whole birds or packs.</small></label>
+    <section class="catalog-settings-panel" aria-labelledby="catalog-settings-heading">
+      <p class="eyebrow">Customer visibility</p><h2 id="catalog-settings-heading">Where should this product appear?</h2>
+      <label class="catalog-setting-toggle permission-option {% if not product.active %}is-disabled{% endif %}"><input type="checkbox" name="featured" value="yes" {% if product.featured %}checked{% endif %} {% if not product.active %}disabled{% endif %}><span><strong>Show on homepage</strong><small>{% if product.active %}Include this product in the homepage quick menu. {{ featured_count }}/{{ featured_limit }} other homepage slots are currently used.{% else %}Restore the product before showing it on the homepage.{% endif %}</small></span></label>
+      <label class="catalog-setting-toggle permission-option"><input type="checkbox" name="recommended" value="yes" {% if product.recommended %}checked{% endif %}><span><strong>Available to select</strong><small>Select this product for the customer “You may also like” sections. It must be active and have stock available when you save. {{ recommended_count }}/{{ recommended_limit }} other recommendation slots are currently used.</small></span></label>
+    </section>
     <div class="form-actions"><button class="button button-dark" type="submit">Save changes</button><a class="button button-outline" href="{{ url_for('admin.products') }}">Cancel</a></div>
   </form>
 </div></div>

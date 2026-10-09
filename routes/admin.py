@@ -10,7 +10,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import Complaint, CustomerPushSubscription, DeliveryZone, Order, OrderFinancialRecord, OrderItem, OrderNotification, Product, SalespersonAccount, ShopSettings, ShopUpdate, StaffPushSubscription, db, order_customer_push_subscriptions
+from models import Complaint, CustomerPushSubscription, DeliveryZone, Order, OrderFinancialRecord, OrderItem, OrderNotification, Product, Review, SalespersonAccount, ShopSettings, ShopUpdate, StaffPushSubscription, db, order_customer_push_subscriptions
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.product_images import save_product_image
 from utils.updates import delete_update_image, save_update_image
@@ -27,6 +27,7 @@ from utils.salesperson_permissions import PERMISSION_DEFINITIONS, get_salesperso
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 COMPLAINT_STATUSES = ["New", "Under Review", "Resolved", "Closed"]
 COMPLAINT_CATEGORIES = ["Late delivery", "Missing item", "Incorrect item", "Product quality", "Payment issue", "Delivery experience", "Other"]
+REVIEW_STATUSES = ["Pending", "Approved", "Rejected"]
 
 MAX_PRODUCT_PRICE = Decimal("9999999999.99")
 MAX_DELIVERY_FEE = Decimal("1000000.00")
@@ -558,12 +559,17 @@ def products():
         products_query = products_query.filter(or_(*filters))
     products = products_query.all()
     featured_count = sum(1 for product in products if product.featured)
+    recommended_count = Product.query.filter(
+        Product.recommended.is_(True), Product.active.is_(True), Product.stock > 0
+    ).count()
     return render_template(
         "admin/products.html",
         products=products,
         search_query=search_query,
         featured_count=featured_count,
         featured_limit=FEATURED_LIMIT,
+        recommended_count=recommended_count,
+        recommended_limit=RECOMMENDED_LIMIT,
     )
 
 
@@ -571,27 +577,61 @@ def products():
 @admin_required
 def edit_product(product_id):
     product = Product.query.get_or_404(product_id)
+    def render_edit():
+        return render_template(
+            "admin/product_edit.html",
+            product=product,
+            featured_count=Product.query.filter(Product.featured.is_(True), Product.id != product.id).count(),
+            recommended_count=Product.query.filter(
+                Product.recommended.is_(True), Product.active.is_(True), Product.stock > 0,
+                Product.id != product.id,
+            ).count(),
+            featured_limit=FEATURED_LIMIT,
+            recommended_limit=RECOMMENDED_LIMIT,
+        )
+
     if request.method == "POST":
         try:
             price, stock = parse_product_price_stock(request.form)
         except ValueError as error:
             flash(str(error), "error")
-            return render_template("admin/product_edit.html", product=product)
+            return render_edit()
+        show_on_homepage = request.form.get("featured") == "yes"
+        available_to_select = request.form.get("recommended") == "yes"
+        if show_on_homepage and not product.active:
+            flash("Restore the product before showing it on the homepage.", "error")
+            return render_edit()
+        if show_on_homepage and not product.featured and Product.query.filter(
+            Product.featured.is_(True), Product.id != product.id
+        ).count() >= FEATURED_LIMIT:
+            flash(f"You can only pin {FEATURED_LIMIT} products to the homepage. Remove one first.", "error")
+            return render_edit()
+        if available_to_select and (not product.active or stock <= 0):
+            flash("Only active products with stock available can be added to customer recommendations.", "error")
+            return render_edit()
+        if available_to_select and not product.recommended and Product.query.filter(
+            Product.recommended.is_(True), Product.active.is_(True), Product.stock > 0,
+            Product.id != product.id,
+        ).count() >= RECOMMENDED_LIMIT:
+            flash(f"You can show up to {RECOMMENDED_LIMIT} customer recommendations. Remove one first.", "error")
+            return render_edit()
         product.price = price
         product.stock = stock
+        product.featured = show_on_homepage
+        product.recommended = available_to_select
         product.name = request.form.get("name", "").strip()[:120] or product.name
         product.description = request.form.get("description", "").strip()[:2000]
         product.unit = request.form.get("unit", "per pack").strip()[:80] or "per pack"
         image_path, image_error = save_product_image(request.files.get("image"))
         if image_error:
             flash(image_error, "error")
-            return render_template("admin/product_edit.html", product=product)
+            return render_edit()
         if image_path:
             product.image = image_path
         db.session.commit()
         flash("Product details saved.", "success")
         return redirect(url_for("admin.products"))
-    return render_template("admin/product_edit.html", product=product)
+    return render_edit()
 
 
 @admin_bp.post("/products/<int:product_id>/toggle")
@@ -601,37 +641,14 @@ def toggle_product(product_id):
     product.active = not product.active
     if not product.active:
         product.featured = False
+        product.recommended = False
     db.session.commit()
     flash(f"{product.name} is now {'visible in the catalog' if product.active else 'archived from the catalog'}.", "success")
     return redirect(url_for("admin.products"))
 
 
 FEATURED_LIMIT = 3
-
-
-@admin_bp.post("/products/<int:product_id>/feature")
-@admin_required
-def toggle_featured(product_id):
-    product = Product.query.get_or_404(product_id)
-    if product.featured:
-        product.featured = False
-        db.session.commit()
-        flash(f"{product.name} removed from the homepage quick menu.", "success")
-        return redirect(url_for("admin.products"))
-    if not product.active:
-        flash("Restore the product before showing it on the homepage.", "error")
-        return redirect(url_for("admin.products"))
-    featured_count = Product.query.filter_by(featured=True).count()
-    if featured_count >= FEATURED_LIMIT:
-        flash(
-            f"You can only pin {FEATURED_LIMIT} products to the homepage. Remove one first.",
-            "error",
-        )
-        return redirect(url_for("admin.products"))
-    product.featured = True
-    db.session.commit()
-    flash(f"{product.name} now shows on the homepage quick menu.", "success")
-    return redirect(url_for("admin.products"))
+RECOMMENDED_LIMIT = 6
 
 
 @admin_bp.get("/complaints")
@@ -656,6 +673,35 @@ def complaints():
         "admin/complaints.html", complaints=query.all(), statuses=COMPLAINT_STATUSES,
         selected_status=status, search_query=search_query,
     )
+
+
+@admin_bp.get("/reviews")
+@admin_required
+def reviews():
+    status = request.args.get("status", "").strip()
+    query = Review.query.order_by(Review.created_at.desc())
+    if status in REVIEW_STATUSES:
+        query = query.filter(Review.status == status)
+    return render_template(
+        "admin/reviews.html", reviews=query.all(), statuses=REVIEW_STATUSES,
+        selected_status=status,
+    )
+
+
+@admin_bp.post("/reviews/<int:review_id>")
+@admin_required
+def review_detail(review_id):
+    review = Review.query.get_or_404(review_id)
+    status = request.form.get("status", "")
+    if status not in REVIEW_STATUSES:
+        flash("Choose a valid review status.", "error")
+    else:
+        review.status = status
+        review.owner_response = request.form.get("owner_response", "").strip()[:3000]
+        review.published_at = datetime.utcnow() if status == "Approved" else None
+        db.session.commit()
+        flash("Review moderation saved.", "success")
+    return redirect(url_for("admin.reviews"))
 
 
 @admin_bp.route("/complaints/<int:complaint_id>", methods=["GET", "POST"])

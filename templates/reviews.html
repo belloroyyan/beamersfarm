@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Leave a review · Beamers Farm{% endblock %}
+{% block content %}
+<div class="page-shell"><div class="container review-page-grid">
+  <section class="review-intro"><p class="eyebrow">Your experience matters</p><h1>Tell us how we did.</h1><p>Had an order delivered or picked up from Beamers Farm? Share a few words to help other families, restaurants, caterers, and neighbours shop with confidence.</p><div class="review-trust"><strong>Verified customer reviews</strong><span>We check the order reference and phone number before a review can be submitted.</span></div></section>
+  <section class="form-card review-form-card"><p class="eyebrow">Customer review</p><h2>Leave a review</h2><p class="form-note">Your review is checked by the owner before it appears on our testimonials page.</p><form method="post">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <div class="field-grid"><label>Your name<input name="customer_name" maxlength="120" required autocomplete="name"></label><label>Phone used for the order<input name="phone" maxlength="40" required autocomplete="tel" placeholder="0806 207 4302"></label></div>
+    <label>Order reference<input name="order_ref" maxlength="64" required placeholder="Paste your public order UUID"><small class="field-help">Your order must be marked Delivered or Picked up.</small></label>
+    <label>Email <span class="optional-label">optional</span><input type="email" name="email" maxlength="160" autocomplete="email"></label>
+    <fieldset class="star-rating"><legend>Rating</legend><div class="star-options"><input id="rating-5" type="radio" name="rating" value="5" required><label for="rating-5" title="5 stars">★<span>5</span></label><input id="rating-4" type="radio" name="rating" value="4"><label for="rating-4" title="4 stars">★<span>4</span></label><input id="rating-3" type="radio" name="rating" value="3"><label for="rating-3" title="3 stars">★<span>3</span></label><input id="rating-2" type="radio" name="rating" value="2"><label for="rating-2" title="2 stars">★<span>2</span></label><input id="rating-1" type="radio" name="rating" value="1"><label for="rating-1" title="1 star">★<span>1</span></label></div><small class="field-help">Click the number of stars you would like to give.</small></fieldset>
+    <label>Review title<input name="title" maxlength="160" required placeholder="Fresh and convenient"></label>
+    <label>Your review<textarea name="body" rows="6" minlength="10" maxlength="3000" required placeholder="What did you enjoy about your order?"></textarea></label>
+    <button class="button button-lime button-full" type="submit">Send review <span>→</span></button>
+  </form></section>
+</div></div>
+{% endblock %}

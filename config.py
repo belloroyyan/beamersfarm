@@ -94,6 +94,9 @@ class Config:
     PAYMENT_BANK = os.environ.get("PAYMENT_BANK", "Opay")
     PAYMENT_ACCOUNT_NUMBER = os.environ.get("PAYMENT_ACCOUNT_NUMBER", "8062074302")
     PAYMENT_ACCOUNT_NAME = os.environ.get("PAYMENT_ACCOUNT_NAME", "Dauda Akanni Bello")
+    PAYSTACK_ENABLED = os.environ.get("PAYSTACK_ENABLED", "false").lower() == "true"
+    PAYSTACK_PUBLIC_KEY = os.environ.get("PAYSTACK_PUBLIC_KEY", "").strip()
+    PAYSTACK_SECRET_KEY = os.environ.get("PAYSTACK_SECRET_KEY", "").strip()
     MESSAGING_ENABLED = os.environ.get("MESSAGING_ENABLED", "false").lower() == "true"
     MESSAGING_MODE = os.environ.get("MESSAGING_MODE", "mock").lower()
     WHATSAPP_ENABLED = os.environ.get("WHATSAPP_ENABLED", "false").lower() == "true"
@@ -156,3 +159,12 @@ class Config:
                 missing = [name for name, value in required.items() if not value]
                 if missing:
                     raise RuntimeError("WhatsApp is enabled but required variables are missing: " + ", ".join(missing))
+            if cls.PAYSTACK_ENABLED:
+                missing = [
+                    name for name, value in {
+                        "PAYSTACK_PUBLIC_KEY": cls.PAYSTACK_PUBLIC_KEY,
+                        "PAYSTACK_SECRET_KEY": cls.PAYSTACK_SECRET_KEY,
+                    }.items() if not value
+                ]
+                if missing:
+                    raise RuntimeError("Paystack is enabled but required variables are missing: " + ", ".join(missing))

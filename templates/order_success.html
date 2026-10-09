@@ -5,9 +5,10 @@
   <div class="success-mark">✓</div>
   <p class="eyebrow">Order received</p>
   <h1>Thank you, {{ order.customer_name }}.</h1>
-  <p class="success-lede">We have received order <strong>#{{ order.public_id }}</strong>. {% if order.payment_status == 'Verified' %}Your payment is verified and your order is {{ order.status|lower }}.{% else %}Your order is not confirmed yet. Transfer the amount due now below; Beamers Farm confirms only after funds appear in the business bank account.{% endif %} For help, <a class="text-link" href="https://wa.me/2348062074302" target="_blank" rel="noopener">message us on WhatsApp</a>.</p>
+  <p class="success-lede">We have received order <strong>#{{ order.public_id }}</strong>. {% if order.payment_status == 'Verified' %}Your payment is verified and your order is {{ order.status|lower }}.{% elif order.payment_method == 'paystack' %}Your online payment is not verified yet. Complete or retry the Paystack checkout below; Beamers Farm will confirm the order after payment is verified.{% else %}Your order is not confirmed yet. Transfer the amount due now below; Beamers Farm confirms only after funds appear in the business bank account.{% endif %} For help, <a class="text-link" href="https://wa.me/2348062074302" target="_blank" rel="noopener">message us on WhatsApp</a>.</p>
   {% if order.status == 'Out for delivery' %}<div class="delivery-alert"><strong>Your order is out for delivery.</strong><span>Our delivery team will contact you shortly.</span></div>{% endif %}
   {% if order.status == 'Ready for pickup' %}<div class="delivery-alert"><strong>Your order is ready for farm pickup.</strong><span>Please visit Beamers Farm during operating hours, 7:00 am–7:00 pm.</span></div>{% endif %}
+  <a class="button button-lime receipt-action-top" href="{{ url_for('shop.customer_receipt', order_ref=order.public_id, token=order.public_token) }}">View / print customer receipt</a>
   {% if push_configured %}
   <section class="order-notification-card" data-customer-push data-subscription-url="{{ url_for('shop.customer_push_subscription', order_ref=order.public_id, token=order.public_token) }}" data-vapid-public-key="{{ vapid_public_key }}" data-csrf-token="{{ csrf_token() }}">
     <div><p class="eyebrow">Order updates</p><h2>Know when we confirm your order</h2><p>Enable notifications on this device and we’ll let you know after payment is verified and your order is confirmed.</p><p class="order-notification-status" data-customer-push-status role="status" aria-live="polite">Checking notification availability…</p></div>
@@ -16,8 +17,9 @@
   {% endif %}
 
   <div class="payment-card">
-    <p class="eyebrow">{% if order.payment_status == 'Verified' %}Payment verified{% else %}Payment required before confirmation{% endif %}</p>
+    <p class="eyebrow">{% if order.payment_status == 'Verified' %}Payment verified{% elif order.payment_method == 'paystack' %}Paystack online payment{% else %}Direct Opay bank transfer{% endif %}</p>
     {% if order.payment_status == 'Verified' %}<h2>Payment verified: {{ format_currency(order.total) }}.</h2><p>Beamers Farm has verified the amount due now. {% if order.status == 'Received' %}Your order is awaiting confirmation; you do not need to transfer that amount again.{% else %}Your order is {{ order.status|lower }}. You do not need to transfer that amount again.{% endif %}</p>
+    {% elif order.payment_method == 'paystack' %}<h2>Complete payment of {{ format_currency(order.total) }}.</h2><p>Paystack status: <strong>{{ order.payment_status|lower }}</strong>. Use the button below to open secure checkout. If you prefer, you may instead transfer the amount to the Opay details shown below and tell Beamers Farm your order reference.</p><a class="button button-dark" href="{{ url_for('payments.start_paystack_payment', order_ref=order.public_id, token=order.public_token) }}">Continue with Paystack</a>
     {% else %}<h2>Transfer {{ format_currency(order.total) }} now.</h2><p>The amount below is due before the order can be confirmed. Use your order number as the transfer reference. We will confirm only after the payment appears in Beamers Farm’s business bank account.</p>{% endif %}
     <div class="payment-detail"><span>Bank</span><strong>{{ payment_bank }}</strong></div>
     <div class="payment-detail"><span>Account number</span><strong>{{ payment_account_number }}</strong></div>
@@ -41,7 +43,14 @@
     {% if order.has_weight_priced_items %}<p class="weight-pricing-disclaimer">This is a legacy order placed under the retired deposit-and-final-weighing workflow. See the customer receipt for its recorded settlement.</p>{% endif %}
     <div class="receipt-address"><span>{% if order.fulfillment_type == 'pickup' %}PICKUP LOCATION{% else %}DELIVER TO · {{ order.delivery_zone_name }}{% endif %}</span><strong>{{ order.address }}</strong></div>
   </div>
-  <a class="button button-lime" href="{{ url_for('shop.customer_receipt', order_ref=order.public_id, token=order.public_token) }}">View / print customer receipt</a>
+  {% if recommendations %}
+  <section class="success-recommendations" aria-labelledby="success-recommendations-heading">
+    <p class="eyebrow">While you are here</p><h2 id="success-recommendations-heading">You may also like</h2><p class="recommendation-copy">Add another available favourite to your next Beamers Farm order.</p>
+    <div class="success-recommendation-list">
+      {% for product in recommendations %}<article class="success-recommendation"><a class="mini-art product-photo art-{{ product.image }}" href="{{ url_for('shop.product_detail', product_id=product.id) }}"><img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy"></a><div><a href="{{ url_for('shop.product_detail', product_id=product.id) }}"><strong>{{ product.name }}</strong></a><small>{{ format_currency(product.price) }} per {{ product.unit }} · {{ product.stock }} available</small></div><form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-outline" type="submit">Add <span>+</span></button></form></article>{% endfor %}
+    </div>
+  </section>
+  {% endif %}
   <a class="button button-dark" href="{{ url_for('shop.index') }}">Back to Beamers Farm</a>
 </div>
 {% endblock %}

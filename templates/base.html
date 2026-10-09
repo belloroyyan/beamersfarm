@@ -41,6 +41,8 @@
         <a href="{{ url_for('shop.index') }}">Shop</a>
         <a href="{{ url_for('shop.products') }}">Products</a>
         <a href="{{ url_for('shop.updates') }}">Updates</a>
+        <a href="{{ url_for('reviews.testimonials') }}">Testimonials</a>
+        <a href="{{ url_for('reviews.submit_review') }}">Reviews</a>
         <a href="{{ url_for('shop.help_page') }}">Help</a>
         <a href="{{ url_for('complaints.create_complaint') }}">Customer care</a>
         <span class="shop-status {{ 'shop-open' if shop_is_open else 'shop-closed' }}">{{ 'Open' if shop_is_open else 'Closed' }}</span>
@@ -74,7 +76,7 @@
   <footer class="site-footer">
     <div class="container footer-inner">
       <span>Beamers Farm · Elapop Estate, Oke Baale, Osogbo, Nigeria</span>
-          <span><a href="https://wa.me/2348062074302?text={{ 'Hello Beamers Farm, I would like to make an enquiry about frozen chicken.'|urlencode }}" target="_blank" rel="noopener">WhatsApp 0806 207 4302</a> · <a href="{{ url_for('shop.help_page') }}">Help</a> · <a href="{{ url_for('complaints.create_complaint') }}">Customer care</a> · Bank transfer</span>
+          <span><a href="https://wa.me/2348062074302?text={{ 'Hello Beamers Farm, I would like to make an enquiry about frozen chicken.'|urlencode }}" target="_blank" rel="noopener">WhatsApp 0806 207 4302</a> · <a href="{{ url_for('reviews.testimonials') }}">Testimonials</a> · <a href="{{ url_for('reviews.submit_review') }}">Leave a review</a> · <a href="{{ url_for('shop.help_page') }}">Help</a> · <a href="{{ url_for('complaints.create_complaint') }}">Customer care</a> · Bank transfer</span>
     </div>
   </footer>
   <script src="{{ url_for('static', filename='js/cart.js') }}" defer></script>

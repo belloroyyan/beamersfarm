@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Customer testimonials · Beamers Farm{% endblock %}
+{% block content %}
+<div class="page-shell"><div class="container">
+  <div class="page-heading testimonials-heading"><div><p class="eyebrow">From our customers</p><h1>Testimonials.</h1><p class="section-intro">Real words from Beamers Farm customers in Osogbo and nearby communities.</p></div><a class="button button-lime" href="{{ url_for('reviews.submit_review') }}">Leave a review <span>→</span></a></div>
+  {% if reviews %}<div class="testimonial-grid">{% for review in reviews %}<article class="testimonial-card"><div class="testimonial-top"><div class="review-stars" aria-label="{{ review.rating }} out of 5 stars">{% for _ in range(review.rating) %}★{% endfor %}<span>{% for _ in range(5 - review.rating) %}☆{% endfor %}</span></div><time datetime="{{ review.published_at.isoformat() if review.published_at else review.created_at.isoformat() }}">{{ (review.published_at or review.created_at).strftime('%d %b %Y') }}</time></div><h2>{{ review.title }}</h2><p>{{ review.body }}</p><strong class="testimonial-name">{{ review.customer_name }}</strong>{% if review.owner_response %}<div class="owner-response"><strong>Beamers Farm says</strong><p>{{ review.owner_response }}</p></div>{% endif %}</article>{% endfor %}</div>{% else %}<div class="empty-state"><h2>Our first testimonials are on the way.</h2><p>Complete an order, then share your experience with the Beamers Farm community.</p><a class="button button-lime" href="{{ url_for('reviews.submit_review') }}">Leave a review</a></div>{% endif %}
+</div></div>
+{% endblock %}
