@@ -242,3 +242,6 @@ input[type=file]::file-selector-button:hover{opacity:.85}
 .danger-form>label>span{font-weight:600;color:#54665b}
 .danger-form>label>span strong{color:#b4412f;letter-spacing:.04em}
 .danger-form fieldset+label{margin-top:0}
+
+/* Product archive / restore and checkout location search */
+.archive-setting{border-color:#c5d2bd;background:#f5f9f1}.archive-setting.is-archived{border-color:#e5c4b9;background:#fff8f5}.archive-setting.is-archived strong{color:#995649}.location-search-wrap{display:grid;gap:6px}.location-match{display:grid;gap:9px;padding:12px 14px;border:1px solid #dfe8df;border-radius:8px;background:#f7faf4;color:#637577;font-size:.76rem}.location-match>strong{color:var(--ink);font-size:.75rem}.location-match>span{font-size:.72rem}.location-match-list{display:grid;gap:7px}.location-match-button{padding:10px 12px;border:1px solid #dfe8df;border-radius:7px;background:#fff;text-align:left;color:var(--ink);font-size:.76rem;font-weight:600}.location-match-button:hover{border-color:#9caf91;background:var(--lime-soft);color:#607f26}

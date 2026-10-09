@@ -12,6 +12,50 @@ document.addEventListener("DOMContentLoaded", () => {
   const zoneDescription = document.querySelector("[data-zone-description]");
   const subtotal = Number(select.dataset.subtotal || 0);
   const money = (value) => `₦${Number(value).toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const locationSearch = document.querySelector("[data-location-search]");
+  const locationMatch = document.querySelector("[data-location-match]");
+  const zoneOptions = Array.from(select.options).filter((option) => option.value);
+  const normalize = (value) => (value || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+
+  const selectZone = (option) => {
+    select.value = option.value;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+
+  const showLocationMatches = () => {
+    if (!locationSearch || !locationMatch) return;
+    const query = normalize(locationSearch.value);
+    if (!query) {
+      locationMatch.hidden = true;
+      locationMatch.innerHTML = "";
+      return;
+    }
+    const words = query.split(" ").filter((word) => word.length > 1);
+    const matches = zoneOptions.map((option) => {
+      const haystack = normalize(option.dataset.search || option.textContent);
+      const score = words.reduce((total, word) => total + (haystack.includes(word) ? 1 : 0), 0);
+      return { option, score };
+    }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score);
+    locationMatch.hidden = false;
+    if (!matches.length) {
+      locationMatch.innerHTML = "<strong>No configured zone matched that search.</strong><span>Choose a delivery option below or contact Beamers Farm to confirm your area.</span>";
+      return;
+    }
+    const bestScore = matches[0].score;
+    const best = matches.filter((item) => item.score === bestScore).slice(0, 3);
+    locationMatch.innerHTML = `<strong>Possible match${best.length > 1 ? "es" : ""}</strong><div class="location-match-list">${best.map(({ option }) => `<button type="button" class="location-match-button" data-zone-match="${option.value}">${option.textContent.trim()}</button>`).join("")}</div>`;
+    locationMatch.querySelectorAll("[data-zone-match]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const option = zoneOptions.find((candidate) => candidate.value === button.dataset.zoneMatch);
+        if (option) {
+          selectZone(option);
+          locationSearch.value = option.textContent.trim().replace(/ · .*/, "");
+          locationMatch.hidden = true;
+        }
+      });
+    });
+    if (best.length === 1) selectZone(best[0].option);
+  };
 
   const refresh = () => {
     const option = select.options[select.selectedIndex];
@@ -38,5 +82,6 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   select.addEventListener("change", refresh);
+  if (locationSearch) locationSearch.addEventListener("input", showLocationMatches);
   refresh();
 });

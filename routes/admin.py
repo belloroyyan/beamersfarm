@@ -596,8 +596,9 @@ def edit_product(product_id):
         except ValueError as error:
             flash(str(error), "error")
             return render_edit()
-        show_on_homepage = request.form.get("featured") == "yes"
-        available_to_select = request.form.get("recommended") == "yes"
+        active = request.form.get("active") == "yes"
+        show_on_homepage = active and request.form.get("featured") == "yes"
+        available_to_select = active and request.form.get("recommended") == "yes"
         if show_on_homepage and not product.active:
             flash("Restore the product before showing it on the homepage.", "error")
             return render_edit()
@@ -617,6 +618,7 @@ def edit_product(product_id):
             return render_edit()
         product.price = price
         product.stock = stock
+        product.active = active
         product.featured = show_on_homepage
         product.recommended = available_to_select
         product.name = request.form.get("name", "").strip()[:120] or product.name
