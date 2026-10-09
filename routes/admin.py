@@ -10,9 +10,10 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import Complaint, CustomerPushSubscription, DeliveryZone, Order, OrderFinancialRecord, OrderItem, OrderNotification, Product, Review, SalespersonAccount, ShopSettings, ShopUpdate, StaffPushSubscription, db, order_customer_push_subscriptions
+from models import Complaint, CustomerPushSubscription, DeliveryZone, Order, OrderFinancialRecord, OrderItem, OrderNotification, PartnerListing, Product, Review, SalespersonAccount, ShopSettings, ShopUpdate, StaffPushSubscription, db, order_customer_push_subscriptions
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.product_images import save_product_image
+from utils.partner_ads import delete_partner_image, normalize_http_url, parse_social_links, save_partner_image, social_links_text
 from utils.updates import delete_update_image, save_update_image
 from utils.security import is_safe_redirect_url
 from utils.push_subscriptions import delete_staff_push_subscription, save_staff_push_subscription
@@ -559,17 +560,12 @@ def products():
         products_query = products_query.filter(or_(*filters))
     products = products_query.all()
     featured_count = sum(1 for product in products if product.featured)
-    recommended_count = Product.query.filter(
-        Product.recommended.is_(True), Product.active.is_(True), Product.stock > 0
-    ).count()
     return render_template(
         "admin/products.html",
         products=products,
         search_query=search_query,
         featured_count=featured_count,
         featured_limit=FEATURED_LIMIT,
-        recommended_count=recommended_count,
-        recommended_limit=RECOMMENDED_LIMIT,
     )
 
 
@@ -582,12 +578,7 @@ def edit_product(product_id):
             "admin/product_edit.html",
             product=product,
             featured_count=Product.query.filter(Product.featured.is_(True), Product.id != product.id).count(),
-            recommended_count=Product.query.filter(
-                Product.recommended.is_(True), Product.active.is_(True), Product.stock > 0,
-                Product.id != product.id,
-            ).count(),
             featured_limit=FEATURED_LIMIT,
-            recommended_limit=RECOMMENDED_LIMIT,
         )
 
     if request.method == "POST":
@@ -598,7 +589,6 @@ def edit_product(product_id):
             return render_edit()
         active = request.form.get("active") == "yes"
         show_on_homepage = active and request.form.get("featured") == "yes"
-        available_to_select = active and request.form.get("recommended") == "yes"
         if show_on_homepage and not product.active:
             flash("Restore the product before showing it on the homepage.", "error")
             return render_edit()
@@ -607,20 +597,10 @@ def edit_product(product_id):
         ).count() >= FEATURED_LIMIT:
             flash(f"You can only pin {FEATURED_LIMIT} products to the homepage. Remove one first.", "error")
             return render_edit()
-        if available_to_select and (not product.active or stock <= 0):
-            flash("Only active products with stock available can be added to customer recommendations.", "error")
-            return render_edit()
-        if available_to_select and not product.recommended and Product.query.filter(
-            Product.recommended.is_(True), Product.active.is_(True), Product.stock > 0,
-            Product.id != product.id,
-        ).count() >= RECOMMENDED_LIMIT:
-            flash(f"You can show up to {RECOMMENDED_LIMIT} customer recommendations. Remove one first.", "error")
-            return render_edit()
         product.price = price
         product.stock = stock
         product.active = active
         product.featured = show_on_homepage
-        product.recommended = available_to_select
         product.name = request.form.get("name", "").strip()[:120] or product.name
         product.description = request.form.get("description", "").strip()[:2000]
         product.unit = request.form.get("unit", "per pack").strip()[:80] or "per pack"
@@ -643,14 +623,155 @@ def toggle_product(product_id):
     product.active = not product.active
     if not product.active:
         product.featured = False
-        product.recommended = False
     db.session.commit()
     flash(f"{product.name} is now {'visible in the catalog' if product.active else 'archived from the catalog'}.", "success")
     return redirect(url_for("admin.products"))
 
 
 FEATURED_LIMIT = 3
-RECOMMENDED_LIMIT = 6
+
+
+def parse_partner_listing_form(form):
+    name = form.get("name", "").strip()
+    category = form.get("category", "Other").strip() or "Other"
+    description = form.get("description", "").strip()
+    supplier_name = form.get("supplier_name", "").strip()
+    phone = form.get("supplier_phone", "").strip()
+    email = form.get("supplier_email", "").strip().lower()
+    location = form.get("supplier_location", "").strip()
+    website = normalize_http_url(form.get("supplier_website", ""), "Supplier website")
+    links = parse_social_links(form.get("social_links", ""))
+    price_note = form.get("price_note", "").strip() or "Contact supplier for current price"
+    price_raw = form.get("price", "").strip()
+    try:
+        price = Decimal(price_raw) if price_raw else None
+        sort_order = int(form.get("sort_order", "0") or 0)
+    except (ArithmeticError, TypeError, ValueError) as error:
+        raise ValueError("Enter a valid optional price and whole-number display order.") from error
+    if not -100_000 <= sort_order <= 100_000:
+        raise ValueError("Display order must be between -100,000 and 100,000.")
+    if price is not None and (not price.is_finite() or price < 0 or price > MAX_PRODUCT_PRICE):
+        raise ValueError("Enter a non-negative price within the supported limit, or leave price blank.")
+    if not name or len(name) > 120 or not supplier_name or len(supplier_name) > 120:
+        raise ValueError("Enter a product/offer name and supplier name, each no longer than 120 characters.")
+    if not description or len(description) > 4000:
+        raise ValueError("Add a description up to 4,000 characters.")
+    if len(category) > 80 or len(price_note) > 180 or len(phone) > 40 or len(email) > 160 or len(location) > 180:
+        raise ValueError("One or more supplier details exceed the allowed length.")
+    if phone and (not re.fullmatch(r"[+0-9().\-\s]{7,40}", phone) or not 7 <= len(re.sub(r"\D", "", phone)) <= 15):
+        raise ValueError("Enter a valid supplier phone number, or leave it blank.")
+    if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise ValueError("Enter a valid supplier email address, or leave it blank.")
+    return {
+        "name": name,
+        "category": category,
+        "description": description,
+        "price": price,
+        "price_note": price_note,
+        "supplier_name": supplier_name,
+        "supplier_phone": phone,
+        "supplier_email": email,
+        "supplier_website": website,
+        "supplier_location": location,
+        "social_links_json": links,
+        "sort_order": sort_order,
+        "active": form.get("active") == "yes",
+    }
+
+
+@admin_bp.route("/partner-advertisements", methods=["GET", "POST"])
+@admin_required
+def partner_ads():
+    if request.method == "POST":
+        try:
+            values = parse_partner_listing_form(request.form)
+        except ValueError as error:
+            flash(str(error), "error")
+            return redirect(url_for("admin.partner_ads"))
+        image_path, image_error = save_partner_image(request.files.get("image"))
+        if image_error:
+            flash(image_error, "error")
+            return redirect(url_for("admin.partner_ads"))
+        values["image"] = image_path
+        db.session.add(PartnerListing(**values))
+        db.session.commit()
+        flash("Independent supplier advertisement added. It is not part of Beamers Farm stock or checkout.", "success")
+        return redirect(url_for("admin.partner_ads"))
+
+    search_query = request.args.get("q", "").strip()[:120]
+    listings_query = PartnerListing.query.order_by(
+        PartnerListing.active.desc(), PartnerListing.sort_order.asc(), PartnerListing.updated_at.desc()
+    )
+    if search_query:
+        filters = [
+            PartnerListing.name.ilike(f"%{search_query}%"),
+            PartnerListing.category.ilike(f"%{search_query}%"),
+            PartnerListing.supplier_name.ilike(f"%{search_query}%"),
+            PartnerListing.description.ilike(f"%{search_query}%"),
+        ]
+        if search_query.isdigit():
+            filters.append(PartnerListing.id == int(search_query))
+        listings_query = listings_query.filter(or_(*filters))
+    return render_template(
+        "admin/partner_ads.html", listings=listings_query.all(), search_query=search_query,
+    )
+
+
+@admin_bp.route("/partner-advertisements/<int:listing_id>/edit", methods=["GET", "POST"])
+@admin_required
+def edit_partner_ad(listing_id):
+    listing = PartnerListing.query.get_or_404(listing_id)
+
+    def render_edit():
+        return render_template(
+            "admin/partner_ad_edit.html", listing=listing,
+            social_links_text=social_links_text(listing),
+        )
+
+    if request.method == "POST":
+        try:
+            values = parse_partner_listing_form(request.form)
+        except ValueError as error:
+            flash(str(error), "error")
+            return render_edit()
+        image_path, image_error = save_partner_image(request.files.get("image"))
+        if image_error:
+            flash(image_error, "error")
+            return render_edit()
+        old_image = listing.image
+        for key, value in values.items():
+            setattr(listing, key, value)
+        if image_path:
+            listing.image = image_path
+        elif request.form.get("remove_image") == "yes":
+            listing.image = None
+        db.session.commit()
+        if old_image and old_image != listing.image:
+            delete_partner_image(old_image)
+        flash("Partner advertisement and supplier details updated.", "success")
+        return redirect(url_for("admin.partner_ads"))
+    return render_edit()
+
+
+@admin_bp.post("/partner-advertisements/<int:listing_id>/toggle")
+@admin_required
+def toggle_partner_ad(listing_id):
+    listing = PartnerListing.query.get_or_404(listing_id)
+    listing.active = not listing.active
+    db.session.commit()
+    flash(f"{listing.name} is now {'visible' if listing.active else 'paused'} on the public partner-offers sections.", "success")
+    return redirect(url_for("admin.partner_ads"))
+
+
+@admin_bp.post("/partner-advertisements/<int:listing_id>/delete")
+@admin_required
+def delete_partner_ad(listing_id):
+    listing = PartnerListing.query.get_or_404(listing_id)
+    delete_partner_image(listing.image)
+    db.session.delete(listing)
+    db.session.commit()
+    flash("Partner advertisement and its uploaded image were deleted.", "success")
+    return redirect(url_for("admin.partner_ads"))
 
 
 @admin_bp.get("/complaints")
@@ -775,8 +896,11 @@ def clear_database():
     clear_complaints = request.form.get("clear_complaints") == "yes"
     clear_messages = request.form.get("clear_messages") == "yes"
     clear_updates = request.form.get("clear_updates") == "yes"
+    clear_reviews = request.form.get("clear_reviews") == "yes"
+    clear_partner_ads = request.form.get("clear_partner_ads") == "yes"
+    clear_customer_push = request.form.get("clear_customer_push") == "yes"
     reset_pins = request.form.get("reset_pins") == "yes"
-    if not any((clear_orders, clear_complaints, clear_messages, clear_updates, reset_pins)):
+    if not any((clear_orders, clear_complaints, clear_messages, clear_updates, clear_reviews, clear_partner_ads, clear_customer_push, reset_pins)):
         flash("Choose at least one data category or homepage option to clear.", "error")
         return redirect(url_for("admin.dashboard"))
 
@@ -793,7 +917,7 @@ def clear_database():
         OrderFinancialRecord.query.delete(synchronize_session=False)
         OrderItem.query.delete(synchronize_session=False)
         Order.query.delete(synchronize_session=False)
-        cleared.append("orders and delivery records (including items, payment/refund history, WhatsApp logs, and customer push subscriptions)")
+        cleared.append("orders and delivery records (including items, payment/refund history, linked reviews, WhatsApp logs, and customer push subscriptions)")
     elif clear_messages:
         OrderNotification.query.delete(synchronize_session=False)
         cleared.append("WhatsApp message logs")
@@ -809,6 +933,21 @@ def clear_database():
             delete_update_image(item.image)
         ShopUpdate.query.delete(synchronize_session=False)
         cleared.append("shop updates")
+
+    if clear_reviews:
+        Review.query.delete(synchronize_session=False)
+        cleared.append("customer reviews and owner responses")
+
+    if clear_partner_ads:
+        for listing in PartnerListing.query.all():
+            delete_partner_image(listing.image)
+        PartnerListing.query.delete(synchronize_session=False)
+        cleared.append("independent partner advertisements and supplier contact details")
+
+    if clear_customer_push and not clear_orders:
+        db.session.execute(order_customer_push_subscriptions.delete())
+        CustomerPushSubscription.query.delete(synchronize_session=False)
+        cleared.append("customer push-notification subscriptions")
 
     if reset_pins:
         Product.query.update({Product.featured: False}, synchronize_session=False)

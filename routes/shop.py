@@ -6,12 +6,12 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from flask import Blueprint, abort, current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 
-from models import CustomerPushSubscription, DeliveryZone, Order, OrderFinancialRecord, OrderItem, Product, SalespersonAccount, ShopSettings, ShopUpdate, db
+from models import CustomerPushSubscription, DeliveryZone, Order, OrderFinancialRecord, OrderItem, PartnerListing, Product, SalespersonAccount, ShopSettings, ShopUpdate, db
 from utils.helpers import build_cart, product_uses_requested_kg
 from utils.notifications import normalize_nigerian_phone
 from utils.push_subscriptions import valid_push_endpoint
 from utils.update_share import render_update_share_image
-from utils.web_push import send_customer_order_confirmed_push, send_owner_new_order_push, send_salesperson_new_order_push, web_push_is_configured
+from utils.web_push import send_customer_order_confirmed_push, send_customer_order_out_for_delivery_push, send_owner_new_order_push, send_salesperson_new_order_push, web_push_is_configured
 
 shop_bp = Blueprint("shop", __name__)
 PICKUP_ADDRESS = (
@@ -29,6 +29,14 @@ def customer_notification_key(phone):
         normalized.encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
+
+
+def notify_customer_of_current_order_status(order, subscription_id):
+    if order.status == "Out for delivery" and order.fulfillment_type == "delivery":
+        return send_customer_order_out_for_delivery_push(order, subscription_ids=[subscription_id])
+    if order.status in {"Confirmed", "Preparing", "Out for delivery", "Delivered", "Ready for pickup", "Picked up"}:
+        return send_customer_order_confirmed_push(order, subscription_ids=[subscription_id])
+    return None
 
 
 def current_cart():
@@ -70,10 +78,10 @@ def available_products_query():
     return Product.query.filter_by(active=True).filter(Product.stock > 0)
 
 
-def recommended_products_query():
-    return available_products_query().filter(Product.recommended.is_(True)).order_by(
-        Product.created_at.asc(), Product.name.asc()
-    )
+def partner_advertisements_query():
+    return PartnerListing.query.filter_by(active=True).order_by(
+        PartnerListing.sort_order.asc(), PartnerListing.updated_at.desc(), PartnerListing.id.desc()
+    ).limit(6)
 
 
 @shop_bp.get("/")
@@ -98,6 +106,7 @@ def index():
     return render_template(
         "index.html", products=featured, total_products=total_products,
         latest_update=latest_update if show_update else None,
+        partner_ads=partner_advertisements_query().all(),
     )
 
 
@@ -197,8 +206,16 @@ def dismiss_update():
 @shop_bp.get("/products")
 def products():
     products = available_products_query().order_by(Product.created_at.asc()).all()
-    recommendations = recommended_products_query().all()
-    return render_template("products.html", products=products, recommendations=recommendations)
+    return render_template(
+        "products.html", products=products,
+        partner_ads=partner_advertisements_query().all(),
+    )
+
+
+@shop_bp.get("/partner-offers/<int:listing_id>")
+def partner_offer(listing_id):
+    listing = PartnerListing.query.filter_by(id=listing_id, active=True).first_or_404()
+    return render_template("partner_offer.html", listing=listing)
 
 
 @shop_bp.get("/product/<int:product_id>")
@@ -236,7 +253,7 @@ def add_to_cart(product_id):
         existing_quantity = 0
     new_quantity = existing_quantity + quantity
     if new_quantity > product.stock:
-        flash(f"Your crate would exceed the available stock of {product.name}.", "error")
+        flash(f"Your cart would exceed the available stock of {product.name}.", "error")
         return redirect(request.referrer or url_for("shop.product_detail", product_id=product.id))
     if product_uses_requested_kg(product):
         try:
@@ -255,7 +272,7 @@ def add_to_cart(product_id):
     else:
         cart[key] = new_quantity
     session.modified = True
-    flash(f"{product.name} added to your crate.", "success")
+    flash(f"{product.name} added to your cart.", "success")
     return redirect(request.referrer or url_for("shop.index"))
 
 
@@ -279,7 +296,7 @@ def update_cart():
                     raise ValueError
                 requested_kg = requested_kg.quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
             except (InvalidOperation, TypeError, ValueError):
-                flash("Enter a valid total requested weight in kg (0.001–500 kg). No crate changes were saved.", "error")
+                flash("Enter a valid total requested weight in kg (0.001–500 kg). No cart changes were saved.", "error")
                 return redirect(url_for("shop.cart"))
             updated_cart[key] = {"quantity": quantity, "requested_weight_kg": str(requested_kg)}
         else:
@@ -287,7 +304,7 @@ def update_cart():
     cart.clear()
     cart.update(updated_cart)
     session.modified = True
-    flash("Your crate has been updated.", "success")
+    flash("Your cart has been updated.", "success")
     return redirect(url_for("shop.cart"))
 
 
@@ -295,7 +312,7 @@ def update_cart():
 def remove_from_cart(product_id):
     current_cart().pop(str(product_id), None)
     session.modified = True
-    flash("Item removed from your crate.", "success")
+    flash("Item removed from your cart.", "success")
     return redirect(url_for("shop.cart"))
 
 
@@ -326,7 +343,7 @@ def checkout():
         return redirect(url_for("shop.index"))
     if request.method == "POST":
         if any(line["uses_requested_weight"] and not line["requested_weight_kg"] for line in summary["lines"]):
-            flash("Review the quantities in your crate before checkout.", "error")
+            flash("Review the quantities in your cart before checkout.", "error")
             return redirect(url_for("shop.cart"))
         customer_name = request.form.get("customer_name", "").strip()
         phone = request.form.get("phone", "").strip()
@@ -362,11 +379,11 @@ def checkout():
         try:
             summary = locked_cart_summary(delivery_fee=selected_zone.fee)
             if not summary["lines"]:
-                flash("Your crate is empty. Please add a product first.", "error")
+                flash("Your cart is empty. Please add a product first.", "error")
                 return redirect(url_for("shop.index"))
             for line in summary["lines"]:
                 if not line["product"].is_available or line["quantity"] > line["product"].stock:
-                    flash(f"Not enough stock for {line['product'].name}. Please update your crate.", "error")
+                    flash(f"Not enough stock for {line['product'].name}. Please update your cart.", "error")
                     return redirect(url_for("shop.cart"))
 
             order = Order(
@@ -439,7 +456,7 @@ def order_success(order_ref, token):
         from flask import abort
         abort(404)
     return render_template(
-        "order_success.html", order=order, recommendations=recommended_products_query().all(),
+        "order_success.html", order=order, partner_ads=partner_advertisements_query().all(),
         push_configured=web_push_is_configured(),
         vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""),
     )
@@ -487,8 +504,7 @@ def customer_push_subscription(order_ref, token):
         if not already_linked:
             order.customer_push_subscriptions.append(subscription)
             db.session.commit()
-            if order.status in {"Confirmed", "Preparing", "Out for delivery", "Delivered", "Ready for pickup", "Picked up"}:
-                send_customer_order_confirmed_push(order, subscription_ids=[subscription.id])
+            notify_customer_of_current_order_status(order, subscription.id)
         return jsonify(enabled=True, message="Order notifications were already enabled on this device."), 200
 
     if payload.get("action") != "subscribe":
@@ -517,8 +533,8 @@ def customer_push_subscription(order_ref, token):
     if not already_linked:
         order.customer_push_subscriptions.append(subscription)
     db.session.commit()
-    if not already_linked and order.status in {"Confirmed", "Preparing", "Out for delivery", "Delivered"}:
-        send_customer_order_confirmed_push(order, subscription_ids=[subscription.id])
+    if not already_linked:
+        notify_customer_of_current_order_status(order, subscription.id)
     return jsonify(
         enabled=True,
         message="Order notifications are enabled for this customer on this device. Future orders for this customer will not need another prompt.",

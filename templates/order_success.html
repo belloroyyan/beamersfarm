@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/partner_ad_card.html" import partner_ad_card with context %}
 {% block title %}Order received · Beamers Farm{% endblock %}
 {% block content %}
 <div class="container success-shell">
@@ -11,7 +12,7 @@
   <a class="button button-lime receipt-action-top" href="{{ url_for('shop.customer_receipt', order_ref=order.public_id, token=order.public_token) }}">View / print customer receipt</a>
   {% if push_configured %}
   <section class="order-notification-card" data-customer-push data-subscription-url="{{ url_for('shop.customer_push_subscription', order_ref=order.public_id, token=order.public_token) }}" data-vapid-public-key="{{ vapid_public_key }}" data-csrf-token="{{ csrf_token() }}">
-    <div><p class="eyebrow">Order updates</p><h2>Know when we confirm your order</h2><p>Enable notifications on this device and we’ll let you know after payment is verified and your order is confirmed.</p><p class="order-notification-status" data-customer-push-status role="status" aria-live="polite">Checking notification availability…</p></div>
+    <div><p class="eyebrow">Order updates</p><h2>Confirmation and delivery alerts</h2><p>Enable notifications on this device to hear when your payment is verified and the order is confirmed, and when a delivery order goes out for delivery.</p><p class="order-notification-status" data-customer-push-status role="status" aria-live="polite">Checking notification availability…</p></div>
     <button class="button button-dark" type="button" data-customer-push-enable hidden>Enable order notifications</button>
   </section>
   {% endif %}
@@ -43,12 +44,10 @@
     {% if order.has_weight_priced_items %}<p class="weight-pricing-disclaimer">This is a legacy order placed under the retired deposit-and-final-weighing workflow. See the customer receipt for its recorded settlement.</p>{% endif %}
     <div class="receipt-address"><span>{% if order.fulfillment_type == 'pickup' %}PICKUP LOCATION{% else %}DELIVER TO · {{ order.delivery_zone_name }}{% endif %}</span><strong>{{ order.address }}</strong></div>
   </div>
-  {% if recommendations %}
-  <section class="success-recommendations" aria-labelledby="success-recommendations-heading">
-    <p class="eyebrow">While you are here</p><h2 id="success-recommendations-heading">You may also like</h2><p class="recommendation-copy">Add another available favourite to your next Beamers Farm order.</p>
-    <div class="success-recommendation-list">
-      {% for product in recommendations %}<article class="success-recommendation"><a class="mini-art product-photo art-{{ product.image }}" href="{{ url_for('shop.product_detail', product_id=product.id) }}"><img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy"></a><div><a href="{{ url_for('shop.product_detail', product_id=product.id) }}"><strong>{{ product.name }}</strong></a><small>{{ format_currency(product.price) }} per {{ product.unit }} · {{ product.stock }} available</small></div><form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-outline" type="submit">Add <span>+</span></button></form></article>{% endfor %}
-    </div>
+  {% if partner_ads %}
+  <section class="success-recommendations partner-success-offers" aria-labelledby="success-recommendations-heading">
+    <p class="eyebrow">Independent supplier advertisements</p><h2 id="success-recommendations-heading">Partner offers</h2><p class="recommendation-copy">These are separate third-party listings. Beamers Farm does not stock, sell, fulfil, or take payment for them.</p>
+    <div class="partner-ad-grid">{% for listing in partner_ads %}{{ partner_ad_card(listing, true) }}{% endfor %}</div>
   </section>
   {% endif %}
   <a class="button button-dark" href="{{ url_for('shop.index') }}">Back to Beamers Farm</a>

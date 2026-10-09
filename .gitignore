@@ -9,3 +9,5 @@ instance/vapid_private.pem
 .DS_Store
 static/uploads/products/*
 !static/uploads/products/.gitkeep
+static/uploads/partners/*
+!static/uploads/partners/.gitkeep

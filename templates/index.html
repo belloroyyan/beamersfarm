@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/update_sharing.html" import update_share_buttons %}
+{% from "macros/partner_ad_card.html" import partner_ad_card with context %}
 {% block title %}Fresh frozen chicken in Osogbo · Beamers Farm{% endblock %}
 {% block content %}
 {% if not shop_is_open %}<div class="container shop-notice"><strong>Orders are currently closed.</strong><span>{{ shop_closed_message }}</span></div>{% endif %}
@@ -50,7 +51,7 @@
           <div class="product-info">
             <div class="product-heading"><h3>{{ product.name }}</h3><span class="stock-badge">{{ product.stock }} left</span></div>
             <p>{{ product.description }}</p>
-            <div class="product-buy"><div><strong>{{ format_currency(product.price) }}</strong><small>per {{ product.unit }}</small></div><form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-lime" type="submit">Add to crate <span>+</span></button></form></div>
+            <div class="product-buy"><div><strong>{{ format_currency(product.price) }}</strong><small>per {{ product.unit }}</small></div><form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-lime" type="submit">Add to cart <span>+</span></button></form></div>
           </div>
         </article>
       {% endfor %}
@@ -60,6 +61,13 @@
     <div class="empty-state"><h3>We are restocking soon.</h3><p>Message Beamers Farm on WhatsApp and we will let you know what is available.</p></div>
   {% endif %}
 </section>
+{% if partner_ads %}
+<section class="container section partner-offers-section" id="partner-offers" aria-labelledby="partner-offers-heading">
+  <div class="section-heading"><div><p class="eyebrow">Independent local suppliers</p><h2 id="partner-offers-heading">Partner offers</h2><p class="section-intro">Advertisements from independent suppliers. These offers are not Beamers Farm products or part of our checkout.</p></div><span class="section-note">{{ partner_ads|length }} listings</span></div>
+  <div class="partner-ad-grid">{% for listing in partner_ads %}{{ partner_ad_card(listing) }}{% endfor %}</div>
+</section>
+{% endif %}
 <section class="container note-panel"><div><p class="eyebrow">Made for Osogbo kitchens</p><h2>Freshness, hygiene, affordability, and portions that fit your table.</h2></div><p>From everyday family meals to restaurant prep and catering orders, Beamers Farm keeps frozen chicken simple, clean, and convenient. Need help choosing? <a class="note-link" href="https://wa.me/2348062074302" target="_blank" rel="noopener">Chat with us on WhatsApp.</a></p></section>
+{% if cart_count %}<a class="cart-float" href="{{ url_for('shop.cart') }}">View cart <span class="cart-count">{{ cart_count }}</span></a>{% endif %}
 {% endblock %}
 {% block scripts %}{% if latest_update %}<script src="{{ url_for('static', filename='js/update-sharing.js') }}" defer></script>{% endif %}{% endblock %}

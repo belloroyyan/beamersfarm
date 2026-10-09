@@ -14,7 +14,7 @@
       <form class="quantity-form" action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
         <label for="quantity">Quantity ({{ product.unit }})</label>
-        <div class="quantity-row"><input id="quantity" name="quantity" type="number" min="1" max="{{ product.stock }}" value="1" required><button class="button button-dark" type="submit">Add to crate <span>+</span></button></div>
+        <div class="quantity-row"><input id="quantity" name="quantity" type="number" min="1" max="{{ product.stock }}" value="1" required><button class="button button-dark" type="submit">Add to cart <span>+</span></button></div>
       </form>
       {% else %}<div class="out-of-stock">Currently unavailable</div>{% endif %}
     </div>

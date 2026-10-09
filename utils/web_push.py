@@ -144,6 +144,32 @@ def send_customer_order_confirmed_push(order, subscription_ids=None):
     )
 
 
+def send_customer_order_out_for_delivery_push(order, subscription_ids=None):
+    """Notify devices associated with a delivery order when it leaves for delivery."""
+    if order.fulfillment_type != "delivery":
+        return {"configured": web_push_is_configured(), "total": 0, "sent": 0, "failed": 0, "expired": 0}
+    if not web_push_is_configured():
+        return {"configured": False, "total": 0, "sent": 0, "failed": 0, "expired": 0}
+
+    try:
+        subscriptions = list(order.customer_push_subscriptions)
+        if subscription_ids is not None:
+            allowed = set(subscription_ids)
+            subscriptions = [item for item in subscriptions if item.id in allowed]
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Could not read customer push subscriptions for delivery order %s.", order.id)
+        return {"configured": True, "total": 0, "sent": 0, "failed": 1, "expired": 0}
+
+    return _send_to_subscriptions(
+        subscriptions,
+        "Order out for delivery",
+        "Your order is on its way. Please keep your phone nearby to receive it.",
+        "/track-order",
+        "customer delivery status",
+    )
+
+
 def send_dispatch_assignment_push():
     return send_staff_push(
         "dispatch_rider",

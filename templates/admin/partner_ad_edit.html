@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ listing.name }} · Partner ads{% endblock %}
+{% block content %}
+<div class="admin-shell"><div class="container">
+  <div class="page-heading admin-heading"><div><a class="back-link" href="{{ url_for('admin.partner_ads') }}">← Back to partner advertisements</a><p class="eyebrow">Independent supplier listing #{{ listing.id }}</p><h1>{{ listing.name }}</h1></div></div>
+  <form class="form-card edit-product-card partner-edit-card" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <div class="third-party-notice"><strong>Independent supplier listing.</strong> This offer is not part of Beamers Farm products, stock, order totals, or checkout.</div>
+    <div class="field-grid"><label>Offer / product name<input type="text" name="name" maxlength="120" value="{{ listing.name }}" required></label><label>Category<input type="text" name="category" maxlength="80" value="{{ listing.category }}"></label></div>
+    <label>Supplier / business name<input type="text" name="supplier_name" maxlength="120" value="{{ listing.supplier_name }}" required></label>
+    <label>Description<textarea name="description" rows="5" maxlength="4000" required>{{ listing.description }}</textarea></label>
+    <div class="field-grid"><label>Price (₦)<input type="number" name="price" min="0" step="0.01" value="{{ listing.price if listing.price is not none else '' }}" placeholder="Leave blank if not fixed"></label><label>Price note<input type="text" name="price_note" maxlength="180" value="{{ listing.price_note }}"></label></div>
+    <div class="partner-current-image">{% set image_src = partner_image_url(listing.image) %}{% if image_src %}<img src="{{ image_src }}" alt="Current listing image">{% else %}<span>No image uploaded</span>{% endif %}</div>
+    <label>Replace listing image <small class="field-help">Optional · JPG, PNG, or WEBP · max 1 MB</small><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
+    {% if listing.image %}<label class="catalog-setting-toggle"><input type="checkbox" name="remove_image" value="yes"><span><strong>Remove current image</strong><small>Only the image file for this listing will be removed.</small></span></label>{% endif %}
+    <div class="field-grid"><label>Supplier phone<input type="tel" name="supplier_phone" maxlength="40" value="{{ listing.supplier_phone }}"></label><label>Supplier email<input type="email" name="supplier_email" maxlength="160" value="{{ listing.supplier_email }}"></label></div>
+    <label>Website URL<input type="url" name="supplier_website" maxlength="500" value="{{ listing.supplier_website }}" placeholder="https://example.com"></label>
+    <label>Social / profile links <small class="field-help">One per line, optionally formatted as Label | https://… (up to 10 links).</small><textarea name="social_links" rows="5">{{ social_links_text }}</textarea></label>
+    <div class="field-grid"><label>Supplier location<input type="text" name="supplier_location" maxlength="180" value="{{ listing.supplier_location }}"></label><label>Display order<input type="number" name="sort_order" value="{{ listing.sort_order }}" step="1"><small class="field-help">Lower numbers appear first.</small></label></div>
+    <label class="catalog-setting-toggle"><input type="checkbox" name="active" value="yes" {% if listing.active %}checked{% endif %}><span><strong>{{ 'Published on the site' if listing.active else 'Paused listing' }}</strong><small>Uncheck to pause this advertisement without deleting it.</small></span></label>
+    <div class="form-actions"><button class="button button-dark" type="submit">Save partner listing</button><a class="button button-outline" href="{{ url_for('admin.partner_ads') }}">Cancel</a></div>
+  </form>
+</div></div>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ listing.name }} · Independent supplier offer{% endblock %}
+{% block content %}
+<section class="container partner-offer-shell">
+  <a class="back-link" href="{{ url_for('shop.products') }}#partner-offers">← Back to products and partner offers</a>
+  <div class="partner-offer-card">
+    {% set image_src = partner_image_url(listing.image) %}
+    <div class="partner-offer-visual">{% if image_src %}<img src="{{ image_src }}" alt="{{ listing.name }}">{% else %}<span>{{ listing.category }}</span>{% endif %}</div>
+    <div class="partner-offer-content">
+      <p class="eyebrow">Independent supplier · {{ listing.category }}</p>
+      <h1>{{ listing.name }}</h1>
+      <p class="partner-offer-description">{{ listing.description }}</p>
+      <div class="partner-offer-price">{% if listing.price is not none %}<strong>{{ format_currency(listing.price) }}</strong>{% else %}<strong>{{ listing.price_note or 'Contact supplier for current price' }}</strong>{% endif %}</div>
+      <section class="partner-supplier-panel">
+        <p class="eyebrow">Supplier information</p>
+        <h2>{{ listing.supplier_name }}</h2>
+        {% if listing.supplier_location %}<p><strong>Location:</strong> {{ listing.supplier_location }}</p>{% endif %}
+        <div class="partner-supplier-actions">
+          {% if listing.supplier_phone %}<a class="button button-dark" href="tel:{{ listing.supplier_phone|replace(' ', '')|replace('(', '')|replace(')', '')|replace('-', '') }}">Call supplier</a>{% endif %}
+          {% if listing.supplier_email %}<a class="button button-outline" href="mailto:{{ listing.supplier_email }}">Email supplier</a>{% endif %}
+          {% if listing.supplier_website %}<a class="button button-outline" href="{{ listing.supplier_website }}" target="_blank" rel="noopener noreferrer nofollow">Supplier website ↗</a>{% endif %}
+          {% for link in listing.social_links %}<a class="button button-outline" href="{{ link.url }}" target="_blank" rel="noopener noreferrer nofollow">{{ link.label }} ↗</a>{% endfor %}
+        </div>
+      </section>
+      <aside class="third-party-notice"><strong>Important:</strong> This listing is provided for visibility only. {{ listing.supplier_name }} is responsible for the product, its availability, price, delivery, payment, and customer service. Beamers Farm does not stock, sell, take payment for, or fulfil this offer.</aside>
+    </div>
+  </div>
+</section>
+{% endblock %}

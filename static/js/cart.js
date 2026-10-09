@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const menuButton = document.querySelector('.menu-toggle');
   const menu = document.querySelector('#main-menu');
+  const moreMenu = menu && menu.querySelector('.nav-more');
   if (menuButton && menu) {
     const closeMenu = () => {
       menu.classList.remove('is-open');
@@ -17,7 +18,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!menu.contains(event.target) && !menuButton.contains(event.target)) closeMenu();
     });
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') closeMenu();
+      if (event.key === 'Escape') {
+        closeMenu();
+        if (moreMenu) moreMenu.open = false;
+      }
+    });
+    document.addEventListener('click', (event) => {
+      if (moreMenu && !moreMenu.contains(event.target)) moreMenu.open = false;
     });
   }
 

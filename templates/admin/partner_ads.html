@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Partner advertisements · Owner desk{% endblock %}
+{% block content %}
+<div class="admin-shell"><div class="container">
+  <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / independent offers</p><h1>Partner advertisements</h1><p class="form-note">These are third-party listings only. They are not Beamers Farm products, stock, or checkout items.</p></div><a class="button button-outline light-outline" href="{{ url_for('shop.index') }}#partner-offers">View public offers ↗</a></div>
+  <div class="partner-admin-grid">
+    <section class="admin-panel">
+      <div class="panel-heading"><div><p class="eyebrow">Supplier listings</p><h2>Offers and availability</h2></div><span class="section-note">{{ listings|length }} shown</span></div>
+      <form method="get" class="record-search" role="search"><label>Search listings<input type="search" name="q" maxlength="120" value="{{ search_query }}" placeholder="Offer, supplier, category, or ID"></label><button class="button button-dark" type="submit">Search</button>{% if search_query %}<a class="table-link" href="{{ url_for('admin.partner_ads') }}">Clear</a>{% endif %}</form>
+      {% if listings %}<div class="partner-admin-list">
+        {% for listing in listings %}<article class="partner-admin-row">
+          {% set image_src = partner_image_url(listing.image) %}{% if image_src %}<img class="partner-admin-thumb" src="{{ image_src }}" alt="" loading="lazy">{% else %}<div class="partner-admin-thumb partner-admin-placeholder">{{ listing.category }}</div>{% endif %}
+          <div class="partner-admin-main"><div class="partner-admin-title"><strong>{{ listing.name }}</strong><span class="status-pill {{ 'status-delivered' if listing.active else 'status-cancelled' }}">{{ 'Live' if listing.active else 'Paused' }}</span></div><small>Listing #{{ listing.id }} · {{ listing.category }} · Supplied by {{ listing.supplier_name }}</small><small>{% if listing.price is not none %}{{ format_currency(listing.price) }}{% else %}{{ listing.price_note }}{% endif %} · Display order {{ listing.sort_order }}</small></div>
+          <div class="partner-admin-actions"><a class="table-link" href="{{ url_for('admin.edit_partner_ad', listing_id=listing.id) }}">Edit</a><form method="post" action="{{ url_for('admin.toggle_partner_ad', listing_id=listing.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="text-button" type="submit">{{ 'Pause' if listing.active else 'Publish' }}</button></form><form method="post" action="{{ url_for('admin.delete_partner_ad', listing_id=listing.id) }}" onsubmit="return confirm('Permanently delete this partner advertisement and its uploaded image?')"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="text-button danger-text" type="submit">Delete</button></form></div>
+        </article>{% endfor %}
+      </div>{% else %}<div class="empty-state compact"><h3>{{ 'No matching listings.' if search_query else 'No partner offers yet.' }}</h3><p>{{ 'Try another supplier, category, offer name, or ID.' if search_query else 'Add a supplier offer using the form.' }}</p></div>{% endif %}
+    </section>
+    <section class="admin-panel add-product-panel partner-add-panel">
+      <p class="eyebrow">New independent listing</p><h2>Add an offer</h2>
+      <p class="form-note">Only publish offers with the supplier’s permission. Supplier name is required; other contact channels are optional.</p>
+      <form method="post" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <label>Offer / product name<input type="text" name="name" maxlength="120" required placeholder="e.g. Freshly baked bread"></label>
+        <div class="field-grid"><label>Category<input type="text" name="category" maxlength="80" value="Other" placeholder="Bakery, groceries, services"></label><label>Supplier / business name<input type="text" name="supplier_name" maxlength="120" required></label></div>
+        <label>Description<textarea name="description" rows="4" maxlength="4000" required placeholder="Describe the offer and any important terms."></textarea></label>
+        <div class="field-grid"><label>Price (₦)<input type="number" name="price" min="0" step="0.01" placeholder="Leave blank if not fixed"></label><label>Price note<input type="text" name="price_note" maxlength="180" value="Contact supplier for current price"></label></div>
+        <label>Listing image <small class="field-help">Optional · JPG, PNG, or WEBP · max 1 MB</small><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
+        <div class="field-grid"><label>Supplier phone<input type="tel" name="supplier_phone" maxlength="40" placeholder="+234 …"></label><label>Supplier email<input type="email" name="supplier_email" maxlength="160"></label></div>
+        <label>Website URL<input type="url" name="supplier_website" maxlength="500" placeholder="https://example.com"></label>
+        <label>Social / profile links <small class="field-help">One per line, optionally formatted as Label | https://… (up to 10 links).</small><textarea name="social_links" rows="3" placeholder="Instagram | https://instagram.com/example&#10;Facebook | https://facebook.com/example"></textarea></label>
+        <div class="field-grid"><label>Supplier location<input type="text" name="supplier_location" maxlength="180" placeholder="Area or town (optional)"></label><label>Display order<input type="number" name="sort_order" value="0" step="1"><small class="field-help">Lower numbers appear first.</small></label></div>
+        <label class="catalog-setting-toggle"><input type="checkbox" name="active" value="yes" checked><span><strong>Publish immediately</strong><small>Uncheck to save this listing as paused.</small></span></label>
+        <button class="button button-lime button-full" type="submit">Add partner offer <span>+</span></button>
+      </form>
+    </section>
+  </div>
+</div></div>
+{% endblock %}

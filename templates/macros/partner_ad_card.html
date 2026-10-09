@@ -1,0 +1,21 @@
+{% macro partner_ad_card(listing, compact=false) -%}
+<article class="partner-ad-card{% if compact %} partner-ad-card-compact{% endif %}">
+  <a class="partner-ad-image" href="{{ url_for('shop.partner_offer', listing_id=listing.id) }}" aria-label="View {{ listing.name }} from {{ listing.supplier_name }}">
+    {% set image_src = partner_image_url(listing.image) %}
+    {% if image_src %}<img src="{{ image_src }}" alt="{{ listing.name }}" loading="lazy">{% else %}<span>{{ listing.category }}</span>{% endif %}
+    <span class="partner-ad-badge">Independent offer</span>
+  </a>
+  <div class="partner-ad-copy">
+    <p class="partner-ad-category">{{ listing.category }}</p>
+    <h3><a href="{{ url_for('shop.partner_offer', listing_id=listing.id) }}">{{ listing.name }}</a></h3>
+    <p class="partner-ad-description">{{ listing.description|truncate(190 if compact else 280) }}</p>
+    <div class="partner-ad-price">{% if listing.price is not none %}<strong>{{ format_currency(listing.price) }}</strong>{% else %}<strong>{{ listing.price_note or 'Contact supplier for current price' }}</strong>{% endif %}</div>
+    <p class="partner-ad-supplier"><strong>Supplier:</strong> {{ listing.supplier_name }}{% if listing.supplier_location %}<span> · {{ listing.supplier_location }}</span>{% endif %}</p>
+    <div class="partner-ad-actions">
+      <a class="button button-outline" href="{{ url_for('shop.partner_offer', listing_id=listing.id) }}">Supplier details</a>
+      {% if listing.supplier_phone %}<a class="partner-ad-contact" href="tel:{{ listing.supplier_phone|replace(' ', '')|replace('(', '')|replace(')', '')|replace('-', '') }}">Call supplier</a>{% endif %}
+    </div>
+    <small class="partner-ad-disclaimer">Independent listing. Sold and supplied by {{ listing.supplier_name }}, not Beamers Farm.</small>
+  </div>
+</article>
+{%- endmacro %}

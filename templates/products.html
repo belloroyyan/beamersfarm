@@ -1,9 +1,10 @@
 {% extends "base.html" %}
+{% from "macros/partner_ad_card.html" import partner_ad_card with context %}
 {% block title %}All products · Beamers Farm{% endblock %}
 {% block content %}
 {% if not shop_is_open %}<div class="container shop-notice"><strong>Orders are currently closed.</strong><span>{{ shop_closed_message }}</span></div>{% endif %}
 <section class="container section" id="products">
-  <a class="crate-bar" href="{{ url_for('shop.cart') }}"><span class="crate-bar-icon">🧺</span><span><strong>Your crate</strong><small>{% if cart_count %}{{ cart_count }} item{{ 's' if cart_count != 1 }} ready for checkout{% else %}Empty for now — add items below{% endif %}</small></span><span class="crate-bar-cta">View crate <span class="cart-count">{{ cart_count }}</span> →</span></a>
+  <a class="cart-bar" href="{{ url_for('shop.cart') }}"><span class="cart-bar-icon">🧺</span><span><strong>Your cart</strong><small>{% if cart_count %}{{ cart_count }} item{{ 's' if cart_count != 1 }} ready for checkout{% else %}Empty for now — add items below{% endif %}</small></span><span class="cart-bar-cta">View cart <span class="cart-count">{{ cart_count }}</span> →</span></a>
   <div class="section-heading"><div><p class="eyebrow">Beamers Farm selection</p><h2>All products</h2></div><span class="section-note">{{ products|length }} products ready to go</span></div>
   {% if products %}
     <div class="product-grid">
@@ -15,7 +16,7 @@
           <div class="product-info">
             <div class="product-heading"><h3>{{ product.name }}</h3><span class="stock-badge">{{ product.stock }} left</span></div>
             <p>{{ product.description }}</p>
-            <div class="product-buy"><div><strong>{{ format_currency(product.price) }}</strong><small>per {{ product.unit }}</small></div><form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-lime" type="submit">Add to crate <span>+</span></button></form></div>
+            <div class="product-buy"><div><strong>{{ format_currency(product.price) }}</strong><small>per {{ product.unit }}</small></div><form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-lime" type="submit">Add to cart <span>+</span></button></form></div>
           </div>
         </article>
       {% endfor %}
@@ -24,20 +25,11 @@
     <div class="empty-state"><h3>We are restocking soon.</h3><p>Message Beamers Farm on WhatsApp and we will let you know what is available.</p></div>
   {% endif %}
 </section>
-{% if recommendations %}
-<section class="container section recommendations-section" aria-labelledby="recommendations-heading">
-  <div class="section-heading"><div><p class="eyebrow">A few good additions</p><h2 id="recommendations-heading">You may also like</h2><p class="section-intro">Owner-selected favourites that are currently available at Beamers Farm.</p></div><span class="section-note">{{ recommendations|length }} available</span></div>
-  <div class="product-grid recommendation-grid">
-    {% for product in recommendations %}
-    <article class="product-card recommendation-card">
-      <a class="product-art product-photo art-{{ product.image }}" href="{{ url_for('shop.product_detail', product_id=product.id) }}" aria-label="View {{ product.name }}">
-        <img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy"><span class="photo-shade"></span><span class="recommendation-ribbon">Recommended</span>
-      </a>
-      <div class="product-info"><div class="product-heading"><h3>{{ product.name }}</h3><span class="stock-badge">{{ product.stock }} left</span></div><p>{{ product.description }}</p><div class="product-buy"><div><strong>{{ format_currency(product.price) }}</strong><small>per {{ product.unit }}</small></div><form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-lime" type="submit">Add to crate <span>+</span></button></form></div></div>
-    </article>
-    {% endfor %}
-  </div>
+{% if partner_ads %}
+<section class="container section partner-offers-section" id="partner-offers" aria-labelledby="partner-offers-heading">
+  <div class="section-heading"><div><p class="eyebrow">Independent local suppliers</p><h2 id="partner-offers-heading">Partner offers</h2><p class="section-intro">Third-party advertisements. Products here are supplied by the listed businesses, not Beamers Farm, and cannot be added to our cart.</p></div><span class="section-note">{{ partner_ads|length }} listings</span></div>
+  <div class="partner-ad-grid">{% for listing in partner_ads %}{{ partner_ad_card(listing) }}{% endfor %}</div>
 </section>
 {% endif %}
-{% if cart_count %}<a class="crate-float" href="{{ url_for('shop.cart') }}">View crate <span class="cart-count">{{ cart_count }}</span></a>{% endif %}
+{% if cart_count %}<a class="cart-float" href="{{ url_for('shop.cart') }}">View cart <span class="cart-count">{{ cart_count }}</span></a>{% endif %}
 {% endblock %}

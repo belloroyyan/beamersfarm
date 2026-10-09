@@ -5,6 +5,7 @@ from models import OrderFinancialRecord, OrderNotification, db
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.web_push import (
     send_customer_order_confirmed_push,
+    send_customer_order_out_for_delivery_push,
     send_dispatch_assignment_push,
 )
 
@@ -117,6 +118,8 @@ def update_order_status(
     if status_changed and new_status == "Confirmed" and previous_status != "Confirmed":
         send_customer_order_confirmed_push(order)
     if status_changed and new_status == "Out for delivery" and previous_status != "Out for delivery":
+        if order.fulfillment_type == "delivery":
+            send_customer_order_out_for_delivery_push(order)
         push_result = send_dispatch_assignment_push()
         if not push_result["configured"]:
             return True, "Order assigned to dispatch. Push alerts are not configured yet; the rider can refresh the queue."

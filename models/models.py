@@ -1,7 +1,9 @@
+import json
 import secrets
 import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
+from urllib.parse import urlsplit
 
 from flask_sqlalchemy import SQLAlchemy
 
@@ -302,6 +304,51 @@ class ShopUpdate(db.Model):
     image = db.Column(db.String(160), nullable=True)
     posted_by = db.Column(db.String(80), nullable=False, default="Admin")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class PartnerListing(db.Model):
+    """An independent supplier advertisement, not a Beamers Farm product."""
+    __tablename__ = "partner_listings"
+    __table_args__ = (
+        db.CheckConstraint("price IS NULL OR price >= 0", name="ck_partner_listings_price_nonnegative"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    category = db.Column(db.String(80), nullable=False, default="Other")
+    description = db.Column(db.Text, nullable=False, default="")
+    price = db.Column(db.Numeric(12, 2), nullable=True)
+    price_note = db.Column(db.String(180), nullable=False, default="Contact supplier for current price")
+    supplier_name = db.Column(db.String(120), nullable=False)
+    supplier_phone = db.Column(db.String(40), nullable=False, default="")
+    supplier_email = db.Column(db.String(160), nullable=False, default="")
+    supplier_website = db.Column(db.String(500), nullable=False, default="")
+    supplier_location = db.Column(db.String(180), nullable=False, default="")
+    social_links_json = db.Column(db.Text, nullable=False, default="[]", server_default="[]")
+    image = db.Column(db.String(160), nullable=True)
+    active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    sort_order = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @property
+    def social_links(self):
+        try:
+            entries = json.loads(self.social_links_json or "[]")
+        except (TypeError, ValueError):
+            return []
+        if not isinstance(entries, list):
+            return []
+        safe_links = []
+        for entry in entries[:10]:
+            if not isinstance(entry, dict):
+                continue
+            label = str(entry.get("label", "Social link"))[:60]
+            url = str(entry.get("url", ""))[:500]
+            parsed = urlsplit(url)
+            if parsed.scheme in {"http", "https"} and parsed.netloc and not parsed.username and not parsed.password:
+                safe_links.append({"label": label, "url": url})
+        return safe_links
 
 
 class Review(db.Model):
