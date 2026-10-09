@@ -324,7 +324,7 @@ class PartnerListing(db.Model):
     supplier_email = db.Column(db.String(160), nullable=False, default="")
     supplier_website = db.Column(db.String(500), nullable=False, default="")
     supplier_location = db.Column(db.String(180), nullable=False, default="")
-    social_links_json = db.Column(db.Text, nullable=False, default="[]", server_default="[]")
+    social_links_json = db.Column(db.Text, nullable=False, default="[]")
     image = db.Column(db.String(160), nullable=True)
     active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
     sort_order = db.Column(db.Integer, nullable=False, default=0, server_default="0")
