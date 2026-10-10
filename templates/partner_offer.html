@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ listing.name }} · Independent supplier offer{% endblock %}
+{% block title %}{{ page_title|default("Beamers Farm") }}{% endblock %}
 {% block content %}
 <section class="container partner-offer-shell">
   <a class="back-link" href="{{ url_for('shop.products') }}#partner-offers">← Back to products and partner offers</a>

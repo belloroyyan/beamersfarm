@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Customer receipt · Order #{{ order.public_id }} · Beamers Farm{% endblock %}
+{% block head %}<meta name="robots" content="noindex,follow">{% endblock %}
 {% block content %}
 <div class="container page-shell printable-page">
   <div class="receipt-toolbar"><a class="back-link" href="{{ url_for('shop.order_success', order_ref=order.public_id, token=order.public_token) }}">← Back to order</a><button class="button button-dark" type="button" data-print>Print receipt</button></div>

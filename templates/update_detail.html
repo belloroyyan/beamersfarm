@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/update_sharing.html" import update_share_buttons %}
-{% block title %}{{ update.topic }} · Beamers Farm updates{% endblock %}
+{% block title %}{{ page_title|default("Beamers Farm") }}{% endblock %}
 {% block content %}
 <section class="container page-shell update-detail-shell">
   <div class="page-heading"><div><p class="eyebrow">News from the farm · {{ update.created_at.strftime('%d %b %Y · %H:%M') }}</p><h1>{{ update.topic }}</h1></div><a class="back-link" href="{{ url_for('shop.updates') }}">← All updates</a></div>

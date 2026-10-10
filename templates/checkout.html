@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Delivery or pickup · Beamers Farm{% endblock %}
+{% block title %}{{ page_title|default("Beamers Farm") }}{% endblock %}
+{% block head %}<meta name="robots" content="noindex,follow">{% endblock %}
 {% block content %}
 <div class="container page-shell">
   <div class="page-heading"><div><p class="eyebrow">Order fulfillment</p><h1>Choose delivery or pickup.</h1></div><a class="back-link" href="{{ url_for('shop.cart') }}">← Back to cart</a></div>

@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% from "macros/partner_ad_card.html" import partner_ad_card with context %}
-{% block title %}All products · Beamers Farm{% endblock %}
+{% block title %}{{ page_title|default("Beamers Farm") }}{% endblock %}
 {% block content %}
 {% if not shop_is_open %}<div class="container shop-notice"><strong>Orders are currently closed.</strong><span>{{ shop_closed_message }}</span></div>{% endif %}
 <section class="container section" id="products">
   <form class="product-search" method="get" action="{{ url_for('shop.products') }}" role="search"><label for="product-search-input">Search products</label><div><input id="product-search-input" type="search" name="q" maxlength="120" value="{{ search_query }}" placeholder="Search by product name or details"><button class="button button-dark" type="submit">Search</button>{% if search_query %}<a class="table-link" href="{{ url_for('shop.products') }}">Clear</a>{% endif %}</div></form>
   <a class="cart-bar" href="{{ url_for('shop.cart') }}"><span class="cart-bar-icon">🧺</span><span><strong>Your cart</strong><small>{% if cart_count %}{{ format_quantity(cart_count) }} item{{ 's' if cart_count != 1 }} ready for checkout{% else %}Empty for now — add items below{% endif %}</small></span><span class="cart-bar-cta">View cart <span class="cart-count">{{ format_quantity(cart_count) }}</span> →</span></a>
-  <div class="section-heading"><div><p class="eyebrow">Beamers Farm selection</p><h2>{{ 'Search results' if search_query else 'All products' }}</h2></div><span class="section-note">{{ products|length }} product{{ '' if products|length == 1 else 's' }}{% if search_query %} found{% else %} ready to go{% endif %}</span></div>
+  <div class="section-heading"><div><p class="eyebrow">Beamers Farm selection</p><h1>{{ 'Search results' if search_query else 'Fresh frozen chicken products' }}</h1></div><span class="section-note">{{ products|length }} product{{ '' if products|length == 1 else 's' }}{% if search_query %} found{% else %} ready to go{% endif %}</span></div>
   {% if products %}
     <div class="product-grid">
       {% for product in products %}

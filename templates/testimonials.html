@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Customer testimonials · Beamers Farm{% endblock %}
+{% block title %}{{ page_title|default("Beamers Farm") }}{% endblock %}
 {% block content %}
 <div class="page-shell"><div class="container">
   <div class="page-heading testimonials-heading"><div><p class="eyebrow">From our customers</p><h1>Testimonials.</h1><p class="section-intro">Real words from Beamers Farm customers in Osogbo and nearby communities.</p></div><a class="button button-lime" href="{{ url_for('reviews.submit_review') }}">Leave a review <span>→</span></a></div>

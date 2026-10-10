@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/update_sharing.html" import update_share_buttons %}
-{% block title %}Updates · Beamers Farm{% endblock %}
+{% block title %}{{ page_title|default("Beamers Farm") }}{% endblock %}
 {% block content %}
 <section class="container page-shell">
   <div class="page-heading"><div><p class="eyebrow">News from the farm</p><h1>Updates</h1></div><a class="back-link" href="{{ url_for('shop.index') }}">← Back to shop</a></div>

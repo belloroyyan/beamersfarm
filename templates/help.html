@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Help · Beamers Farm{% endblock %}
+{% block title %}{{ page_title|default("Beamers Farm") }}{% endblock %}
 {% block content %}
 <section class="container page-shell help-shell">
   <div class="page-heading help-heading">

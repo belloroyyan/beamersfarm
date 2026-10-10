@@ -4,11 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="{{ social_description|default('Beamers Farm — your trusted local source for fresh, clean, hygienically packaged frozen chicken in Osogbo, Nigeria.') }}">
+  <meta name="keywords" content="{{ meta_keywords|default('frozen chicken Osogbo, fresh chicken Nigeria, chicken delivery Osogbo, Beamers Farm, wholesale chicken Osogbo') }}">
   <meta property="og:type" content="{{ social_type|default('website') }}">
   <meta property="og:site_name" content="Beamers Farm">
   <meta property="og:title" content="{{ social_title|default(self.title()|striptags|trim) }}">
   <meta property="og:description" content="{{ social_description|default('Beamers Farm — fresh, clean, hygienically packaged frozen chicken in Osogbo, Nigeria.') }}">
-  <meta property="og:url" content="{{ social_url|default(request.url) }}">
+  <meta property="og:url" content="{{ social_url|default(request.base_url) }}">
   <meta property="og:image" content="{{ social_image|default(url_for('static', filename='images/brand-mark.png', _external=True)) }}">
   <meta property="og:image:alt" content="{{ social_image_alt|default('Beamers Farm brand mark') }}">
   <meta property="og:image:width" content="{{ social_image_width|default('1254') }}">
@@ -21,8 +22,8 @@
   <meta name="theme-color" content="#23382f">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Beamers">
-  <link rel="canonical" href="{{ request.base_url }}">
-  <meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="{{ canonical_url|default(social_url|default(request.base_url)) }}">
+  <meta name="robots" content="{{ meta_robots|default('index,follow,max-image-preview:large') }}">
   <meta name="author" content="Beamers Farm">
   <title>{% block title %}Beamers Farm{% endblock %}</title>
   <link rel="manifest" href="{{ url_for('pwa_manifest') }}">
@@ -34,6 +35,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/refinement.css') }}">
   {% block head %}{% endblock %}
+  {% block structured_data %}{% endblock %}
 </head>
 <body>
   <header class="site-header">

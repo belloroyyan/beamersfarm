@@ -220,16 +220,16 @@ def create_app():
 
     @app.errorhandler(400)
     def bad_request(error):
-        return render_template("error.html", code=400, message=error.description or "Bad request."), 400
+        return render_template("error.html", code=400, message=error.description or "Bad request.", meta_robots="noindex,follow"), 400
 
     @app.errorhandler(404)
     def not_found(error):
-        return render_template("error.html", code=404, message="That page could not be found."), 404
+        return render_template("error.html", code=404, message="That page could not be found.", meta_robots="noindex,follow"), 404
 
     @app.errorhandler(500)
     def server_error(error):
         db.session.rollback()
-        return render_template("error.html", code=500, message="Something went wrong on our side."), 500
+        return render_template("error.html", code=500, message="Something went wrong on our side.", meta_robots="noindex,follow"), 500
 
     with app.app_context():
         if app.config["AUTO_CREATE_SCHEMA"]:

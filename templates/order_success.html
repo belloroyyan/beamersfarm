@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "macros/partner_ad_card.html" import partner_ad_card with context %}
 {% block title %}Order received · Beamers Farm{% endblock %}
+{% block head %}<meta name="robots" content="noindex,follow">{% endblock %}
 {% block content %}
 {% set has_recommendations = recommended_products or recommended_partner_listings %}
 <div class="container success-shell{% if has_recommendations %} success-shell-with-recommendations{% endif %}">

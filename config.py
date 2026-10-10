@@ -78,6 +78,9 @@ DATABASE_URI, DATABASE_CONNECT_ARGS = database_config()
 class Config:
     ENVIRONMENT = os.environ.get("APP_ENV", "development").lower()
     IS_PRODUCTION = ENVIRONMENT == "production"
+    # Set this to the real HTTPS site origin in deployment. SEO URLs fall back
+    # to the current request host for local development when it is not set.
+    PUBLIC_ORIGIN = os.environ.get("PUBLIC_ORIGIN", "").strip().rstrip("/")
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-frost-and-fowl-key")
     SQLALCHEMY_DATABASE_URI = DATABASE_URI
     SQLALCHEMY_TRACK_MODIFICATIONS = False

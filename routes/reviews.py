@@ -1,12 +1,18 @@
 from datetime import datetime
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 
 from models import Order, Review, ShopSettings, db
 from utils.notifications import normalize_nigerian_phone
 
 reviews_bp = Blueprint("reviews", __name__)
 COMPLETED_ORDER_STATUSES = {"Delivered", "Picked up"}
+
+
+def review_public_url(endpoint):
+    path = url_for(endpoint)
+    origin = current_app.config.get("PUBLIC_ORIGIN", "").rstrip("/")
+    return f"{origin}{path}" if origin else url_for(endpoint, _external=True)
 
 
 def find_order(order_ref):
@@ -63,7 +69,7 @@ def submit_review():
             db.session.commit()
             flash("Thank you. Your review is now live." if review.status == "Approved" else "Thank you. Your review has been sent for approval.", "success")
             return redirect(url_for("reviews.testimonials"))
-    return render_template("reviews.html")
+    return render_template("reviews.html", meta_robots="noindex,follow", page_title="Leave a Verified Review | Beamers Farm", social_title="Leave a Verified Review | Beamers Farm", social_description="Share your verified Beamers Farm order experience with customers in Osogbo.", social_url=review_public_url("reviews.submit_review"), canonical_url=review_public_url("reviews.submit_review"))
 
 
 @reviews_bp.get("/testimonials")
@@ -71,4 +77,4 @@ def testimonials():
     reviews = Review.query.filter_by(status="Approved").order_by(
         Review.published_at.desc(), Review.created_at.desc()
     ).all()
-    return render_template("testimonials.html", reviews=reviews)
+    return render_template("testimonials.html", reviews=reviews, page_title="Customer Testimonials | Beamers Farm", social_title="Customer Testimonials | Beamers Farm", social_description="Read verified customer testimonials about Beamers Farm frozen chicken, delivery, and farm pickup in Osogbo.", social_url=review_public_url("reviews.testimonials"), canonical_url=review_public_url("reviews.testimonials"), meta_keywords="Beamers Farm reviews, chicken delivery reviews Osogbo, customer testimonials")
