@@ -386,6 +386,13 @@ def robots():
     return response
 
 
+@shop_bp.get("/google89b2be7fbcad5379.html")
+def google_search_console_verification():
+    response = make_response("google-site-verification: google89b2be7fbcad5379.html\n", 200)
+    response.headers["Content-Type"] = "text/html; charset=utf-8"
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return response
+
 @shop_bp.get("/sitemap.xml")
 def sitemap():
     urls=[public_url("shop.index"), public_url("shop.products"), public_url("shop.gallery"), public_url("shop.updates"), public_url("shop.wholesale"), public_url("shop.help_page"), public_url("shop.privacy"), public_url("reviews.testimonials")]
