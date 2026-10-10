@@ -36,7 +36,7 @@
     <div class="receipt-line"><span>{{ format_quantity(item.quantity) }} × {{ item.product_name }}<small class="pricing-line-note">{{ format_currency(item.unit_price) }} per {{ item.unit }} × {{ format_quantity(item.quantity) }}</small></span><strong>{{ format_currency(item.subtotal) }}</strong></div>
     {% endfor %}
     <div class="summary-row"><span>Items subtotal</span><strong>{{ format_currency(order.subtotal) }}</strong></div>
-    <div class="summary-row"><span>{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}Delivery · {{ order.delivery_zone_name }}{% endif %}</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div>
+    <div class="summary-row"><span>{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}Delivery · {{ order.delivery_zone_name }}{% endif %}</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div><div class="summary-row coupon-summary-row"><span>Coupon</span><strong>{% if order.coupon_code %}{{ order.coupon_code }} applied · -{{ format_currency(order.discount_amount) }}{% else %}No coupon applied{% endif %}</strong></div>
     <div class="summary-total"><span>Full amount due now</span><strong>{{ format_currency(order.total) }}</strong></div>
     {% if order.has_weight_priced_items %}<p class="weight-pricing-disclaimer">This is a legacy order placed under the retired deposit-and-final-weighing workflow. See the customer receipt for its recorded settlement.</p>{% endif %}
     <div class="receipt-address"><span>{% if order.fulfillment_type == 'pickup' %}PICKUP LOCATION{% else %}DELIVER TO · {{ order.delivery_zone_name }}{% endif %}</span><strong>{{ order.address }}</strong></div>

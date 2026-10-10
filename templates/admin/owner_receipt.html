@@ -12,7 +12,7 @@
     </section>
     <section class="print-receipt-section"><h2>Order totals</h2>
       <div class="print-receipt-row"><span>Items subtotal</span><strong>{{ format_currency(order.subtotal) }}</strong></div>
-      <div class="print-receipt-row"><span>{% if order.fulfillment_type == 'pickup' %}Farm pickup fee{% else %}{{ order.delivery_zone_name }} fee{% endif %}</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div>
+      <div class="print-receipt-row"><span>{% if order.fulfillment_type == 'pickup' %}Farm pickup fee{% else %}{{ order.delivery_zone_name }} fee{% endif %}</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div><div class="print-receipt-row coupon-summary-row"><span>Coupon</span><strong>{% if order.coupon_code %}{{ order.coupon_code }} applied · -{{ format_currency(order.discount_amount) }}{% else %}No coupon applied{% endif %}</strong></div>
       <div class="print-receipt-total"><span>Full order amount paid/required before confirmation</span><strong>{{ format_currency(order.total) }}</strong></div>
       {% if order.has_weight_priced_items %}
         {% if order.final_total is none %}<div class="settlement-status-card"><strong>Historical final total not ready</strong><span>Record the measured weight for each old weight-priced line to calculate its settlement.</span></div>

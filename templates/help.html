@@ -63,6 +63,43 @@
     </section>
   </div>
 
+
+  <div class="help-grid">
+    <section class="help-card" aria-labelledby="coupon-help-title">
+      <div class="help-section-heading"><span class="help-number">06</span><div><p class="eyebrow">Save</p><h2 id="coupon-help-title">Use a coupon code</h2></div></div>
+      <ol class="help-list">
+        <li>At <strong>Checkout</strong>, type your code in the <strong>Have a coupon?</strong> box.</li>
+        <li>Tap <strong>Apply coupon</strong> (or press Enter). A message confirms the code and shows the discount.</li>
+        <li>The discount appears in your cart summary and is taken off the full amount due.</li>
+        <li>Your order confirmation and receipt show the coupon used and the amount saved, or “No coupon applied”.</li>
+      </ol>
+      <p class="help-note">Some coupons need a minimum spend, may exclude certain products, or have an expiry date or usage limit.</p>
+    </section>
+    <section class="help-card" aria-labelledby="account-help-title">
+      <div class="help-section-heading"><span class="help-number">07</span><div><p class="eyebrow">Your account</p><h2 id="account-help-title">Accounts &amp; tracking</h2></div></div>
+      <ol class="help-list">
+        <li><a class="text-link" href="{{ url_for('customer.login') }}">Sign in or create an account</a> to save your details and see past orders.</li>
+        <li>Use <a class="text-link" href="{{ url_for('shop.track_order') }}">Track order</a> with your order reference and phone number to check its status.</li>
+        <li>Forgot your password? Use the “Forgot password” link on the sign-in page.</li>
+      </ol>
+    </section>
+  </div>
+
+  <section class="help-card" aria-labelledby="nav-help-title">
+    <div class="help-section-heading"><span class="help-number">08</span><div><p class="eyebrow">Find your way</p><h2 id="nav-help-title">Navigating the site</h2></div></div>
+    <p>Use the menu at the top of every page (tap the menu icon on mobile). Here’s what each page is for:</p>
+    <ul class="help-list">
+      <li><a class="text-link" href="{{ url_for('shop.index') }}">Home</a> — popular picks, offers and shop news.</li>
+      <li><a class="text-link" href="{{ url_for('shop.products') }}">Products</a> — the full list of chicken and farm produce with prices.</li>
+      <li><a class="text-link" href="{{ url_for('shop.cart') }}">Cart</a> — review items, change quantities, then go to checkout.</li>
+      <li><a class="text-link" href="{{ url_for('shop.wholesale') }}">Wholesale</a> — request bulk orders for businesses and events.</li>
+      <li><a class="text-link" href="{{ url_for('shop.gallery') }}">Gallery</a> and <a class="text-link" href="{{ url_for('shop.updates') }}">Updates</a> — photos and the latest farm news.</li>
+      <li><a class="text-link" href="{{ url_for('reviews.testimonials') }}">Reviews</a> — read what customers say, or <a class="text-link" href="{{ url_for('reviews.submit_review') }}">leave a review</a>.</li>
+      <li><a class="text-link" href="{{ url_for('complaints.create_complaint') }}">Customer care</a> — report a problem with an order.</li>
+      <li><a class="text-link" href="{{ url_for('shop.privacy') }}">Privacy</a> — how we use your information.</li>
+    </ul>
+  </section>
+
   <section class="help-card help-contact">
     <div><p class="eyebrow">Still need a hand?</p><h2>We’re happy to help.</h2><p>For help with the website, directions, or an existing order, contact Beamers Farm and include your order reference if you have one.</p></div>
     <a class="button button-dark" href="https://wa.me/2348062074302?text={{ 'Hello Beamers Farm, I need help.'|urlencode }}" target="_blank" rel="noopener">Message 0806 207 4302 <span>↗</span></a>
