@@ -17,8 +17,8 @@ def upgrade():
         sa.Column("customer_id", sa.Integer(), nullable=True), sa.Column("customer_name", sa.String(120), nullable=False),
         sa.Column("business_name", sa.String(160), nullable=False), sa.Column("phone", sa.String(40), nullable=False),
         sa.Column("email", sa.String(160), nullable=True), sa.Column("delivery_address", sa.Text(), nullable=False),
-        sa.Column("requested_date", sa.Date(), nullable=True), sa.Column("notes", sa.Text(), nullable=False, server_default=""),
-        sa.Column("status", sa.String(30), nullable=False, server_default="New"), sa.Column("owner_notes", sa.Text(), nullable=False, server_default=""),
+        sa.Column("requested_date", sa.Date(), nullable=True), sa.Column("notes", sa.Text(), nullable=False),
+        sa.Column("status", sa.String(30), nullable=False, server_default="New"), sa.Column("owner_notes", sa.Text(), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False), sa.ForeignKeyConstraint(["customer_id"], ["customers.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"), sa.UniqueConstraint("public_id"))
       op.create_index("ix_wholesale_orders_customer_id", "wholesale_orders", ["customer_id"])
