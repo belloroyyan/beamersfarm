@@ -4,6 +4,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const moreMenu = menu && menu.querySelector('.nav-more');
   const ownerActionsMenus = document.querySelectorAll('.owner-actions-menu');
   if (menuButton && menu) {
+    const mobileNavQuery = window.matchMedia('(max-width: 700px)');
+    const syncMoreMenu = () => {
+      // On mobile, More is not a second menu: its links are part of the
+      // hamburger list. Keep the native details element open so its children
+      // remain visible when the summary is hidden by CSS.
+      if (moreMenu) moreMenu.open = mobileNavQuery.matches;
+    };
+    syncMoreMenu();
+    mobileNavQuery.addEventListener?.('change', syncMoreMenu);
     const closeMenu = () => {
       menu.classList.remove('is-open');
       menuButton.setAttribute('aria-expanded', 'false');
@@ -13,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const open = menu.classList.toggle('is-open');
       menuButton.setAttribute('aria-expanded', String(open));
       menuButton.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+      syncMoreMenu();
     });
     menu.querySelectorAll('a').forEach((link) => link.addEventListener('click', closeMenu));
     document.addEventListener('click', (event) => {
@@ -21,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
         closeMenu();
-        if (moreMenu) moreMenu.open = false;
+        if (moreMenu && !mobileNavQuery.matches) moreMenu.open = false;
         ownerActionsMenus.forEach((actions) => {
           if (actions.open) {
             actions.open = false;
@@ -31,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
     document.addEventListener('click', (event) => {
-      if (moreMenu && !moreMenu.contains(event.target)) moreMenu.open = false;
+      if (moreMenu && !mobileNavQuery.matches && !moreMenu.contains(event.target)) moreMenu.open = false;
     });
     document.addEventListener('click', (event) => {
       ownerActionsMenus.forEach((actions) => {
