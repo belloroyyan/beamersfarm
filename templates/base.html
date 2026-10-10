@@ -50,6 +50,11 @@
             <a href="{{ url_for('shop.gallery') }}">Gallery</a>
             <a href="{{ url_for('shop.help_page') }}">Help</a>
             <a href="{{ url_for('complaints.create_complaint') }}">Customer care</a>
+            {% if current_customer %}
+              <a href="{{ url_for('customer.account') }}">My account</a>
+            {% else %}
+              <a href="{{ url_for('customer.login') }}">Customer sign in</a>
+            {% endif %}
             {% if session.get('staff_role') == 'owner' or session.get('admin_logged_in') %}
               <a href="{{ url_for('admin.dashboard') }}">Owner desk</a>
             {% elif session.get('staff_role') == 'dispatch_rider' %}

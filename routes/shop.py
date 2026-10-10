@@ -7,7 +7,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from flask import Blueprint, abort, current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 from sqlalchemy import or_
 
-from models import CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, PartnerListing, Product, SalespersonAccount, ShopSettings, ShopUpdate, db
+from models import Customer, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, PartnerListing, Product, SalespersonAccount, ShopSettings, ShopUpdate, db
 from utils.helpers import build_cart, format_quantity, parse_quantity, product_uses_requested_kg
 from utils.notifications import normalize_nigerian_phone
 from utils.push_subscriptions import valid_push_endpoint
@@ -363,11 +363,13 @@ def checkout():
     selected_zone_id = request.values.get("delivery_zone_id", "")
     selected_zone = next((zone for zone in zones if str(zone.id) == selected_zone_id), None)
     summary = cart_summary(delivery_fee=selected_zone.fee if selected_zone else None)
+    signed_in_customer = db.session.get(Customer, session.get("customer_id")) if session.get("customer_id") else None
 
     def render_checkout():
         return render_template(
             "checkout.html", summary=summary, delivery_zones=zones,
             selected_zone_id=selected_zone_id, selected_zone=selected_zone,
+            customer=signed_in_customer if signed_in_customer and signed_in_customer.active else None,
             paystack_enabled=current_app.config.get("PAYSTACK_ENABLED", False),
         )
 
@@ -399,6 +401,18 @@ def checkout():
         if email and len(email) > 160:
             flash("Enter an email address shorter than 160 characters.", "error")
             return render_checkout()
+        if signed_in_customer and normalize_nigerian_phone(phone):
+            duplicate_phone = Customer.query.filter(
+                Customer.id != signed_in_customer.id,
+                Customer.phone == normalize_nigerian_phone(phone),
+            ).first()
+            duplicate_email = Customer.query.filter(
+                Customer.id != signed_in_customer.id,
+                Customer.email == email,
+            ).first() if email else None
+            if duplicate_phone or duplicate_email:
+                flash("That phone number or email is already used by another customer account.", "error")
+                return render_checkout()
         if (
             not customer_name or len(customer_name) > 120
             or not phone or len(phone) > 40
@@ -420,6 +434,7 @@ def checkout():
                     return redirect(url_for("shop.cart"))
 
             order = Order(
+                customer_id=signed_in_customer.id if signed_in_customer and signed_in_customer.active else None,
                 customer_name=customer_name,
                 phone=phone,
                 email=email or None,
@@ -437,6 +452,12 @@ def checkout():
                 delivery_fee=summary["delivery_fee"],
                 total=summary["total"],
             )
+            if signed_in_customer and signed_in_customer.active:
+                signed_in_customer.name = customer_name
+                signed_in_customer.phone = normalize_nigerian_phone(phone) or phone
+                signed_in_customer.email = email or signed_in_customer.email
+                if not selected_zone.is_pickup:
+                    signed_in_customer.address = address
             db.session.add(order)
             if summary["total"] > 0:
                 db.session.add(

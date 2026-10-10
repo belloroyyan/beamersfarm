@@ -93,6 +93,30 @@ class Complaint(db.Model):
 
     order = db.relationship("Order", back_populates="complaints")
 
+
+class Customer(db.Model):
+    __tablename__ = "customers"
+    __table_args__ = (
+        db.UniqueConstraint("phone", name="uq_customers_phone"),
+        db.UniqueConstraint("email", name="uq_customers_email"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    phone = db.Column(db.String(40), nullable=False)
+    email = db.Column(db.String(160), nullable=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    address = db.Column(db.Text, nullable=False, default="")
+    push_notifications_enabled = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    whatsapp_notifications_enabled = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+
+    orders = db.relationship("Order", back_populates="customer")
+
+
 class Order(db.Model):
     __tablename__ = "orders"
 
@@ -105,6 +129,7 @@ class Order(db.Model):
     phone = db.Column(db.String(40), nullable=False)
     address = db.Column(db.Text, nullable=False)
     email = db.Column(db.String(160), nullable=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
     whatsapp_opt_in = db.Column(db.Boolean, nullable=False, default=False)
     whatsapp_opt_in_at = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(40), nullable=False, default="Received")
@@ -130,6 +155,7 @@ class Order(db.Model):
     items = db.relationship(
         "OrderItem", back_populates="order", cascade="all, delete-orphan"
     )
+    customer = db.relationship("Customer", back_populates="orders")
     financial_records = db.relationship(
         "OrderFinancialRecord", back_populates="order", cascade="all, delete-orphan",
         order_by="OrderFinancialRecord.created_at, OrderFinancialRecord.id",

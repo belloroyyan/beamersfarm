@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config, INSTANCE_DIR
-from models import DeliveryZone, Product, ShopSettings, db
+from models import Customer, DeliveryZone, Product, ShopSettings, db
 from routes.admin import admin_bp
 from routes.shop import shop_bp
 from routes.whatsapp import whatsapp_bp
@@ -17,6 +17,7 @@ from routes.dispatch import dispatch_bp
 from routes.salesperson import salesperson_bp
 from routes.payments import payments_bp
 from routes.reviews import reviews_bp
+from routes.customer import current_customer, customer_bp
 from utils.helpers import cart_count, format_currency, format_quantity
 from utils.greetings import time_of_day_greeting
 from utils.updates import linkify, update_image_url
@@ -113,6 +114,7 @@ def create_app():
     app.register_blueprint(salesperson_bp)
     app.register_blueprint(payments_bp)
     app.register_blueprint(reviews_bp)
+    app.register_blueprint(customer_bp)
 
     app.jinja_env.filters["linkify"] = linkify
 
@@ -136,6 +138,7 @@ def create_app():
             "paystack_public_key": app.config["PAYSTACK_PUBLIC_KEY"],
             "shop_is_open": shop_settings.is_open if shop_settings else app.config["SHOP_OPEN_DEFAULT"],
             "shop_closed_message": shop_settings.closed_message if shop_settings else app.config["SHOP_CLOSED_MESSAGE"],
+            "current_customer": current_customer(),
         }
 
     @app.before_request
