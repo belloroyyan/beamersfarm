@@ -188,6 +188,24 @@ def send_owner_new_order_push():
     )
 
 
+def send_owner_low_stock_push(product):
+    return send_staff_push(
+        "owner",
+        "Low stock alert",
+        f"{product.name} is low on stock ({product.stock:g} remaining). Review inventory in the owner desk.",
+        "/admin/inventory",
+    )
+
+
+def send_owner_wholesale_request_push():
+    return send_staff_push(
+        "owner",
+        "New wholesale request",
+        "A business sent a new wholesale request. Review quantities and follow up from the owner desk.",
+        "/admin/wholesale-orders",
+    )
+
+
 def send_salesperson_new_order_push():
     return send_staff_push(
         "salesperson",

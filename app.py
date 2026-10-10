@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config, INSTANCE_DIR
-from models import Customer, DeliveryZone, Product, ShopSettings, db
+from models import AnalyticsEvent, Customer, DeliveryZone, Product, ShopSettings, db
 from routes.admin import admin_bp
 from routes.shop import shop_bp
 from routes.whatsapp import whatsapp_bp
@@ -140,6 +140,25 @@ def create_app():
             "shop_closed_message": shop_settings.closed_message if shop_settings else app.config["SHOP_CLOSED_MESSAGE"],
             "current_customer": current_customer(),
         }
+
+    @app.before_request
+    def record_site_analytics():
+        ignored_paths = {
+            "/service-worker.js",
+            "/manifest.webmanifest",
+            "/.well-known/appspecific/com.chrome.devtools.json",
+        }
+        ignored_prefixes = (
+            "/static", "/admin", "/dispatch", "/sales", "/health", "/ready",
+            "/manus-routes", "/manus-storage/async-images/",
+        )
+        customer_path = request.path not in ignored_paths and not request.path.startswith(ignored_prefixes)
+        if request.method == "GET" and customer_path:
+            try:
+                db.session.add(AnalyticsEvent(event_type="page_view", path=request.path[:255], referrer=request.referrer or "", user_agent=request.user_agent.string[:500], customer_id=session.get("customer_id")))
+                db.session.commit()
+            except SQLAlchemyError:
+                db.session.rollback()
 
     @app.before_request
     def protect_state_changes():

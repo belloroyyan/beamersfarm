@@ -4,6 +4,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const feeOutput = document.querySelector("[data-delivery-fee-output]");
   const totalOutput = document.querySelector("[data-total-output]");
+  const discountOutput = document.querySelector("[data-discount-output]");
+  let discount = Number(document.body.dataset.couponDiscount || 0);
   const note = document.querySelector("[data-zone-fee-note]");
   const addressWrap = document.querySelector("[data-delivery-address-wrap]");
   const address = document.querySelector("#delivery-address");
@@ -67,7 +69,8 @@ document.addEventListener("DOMContentLoaded", () => {
       zoneDescription.hidden = !chosen || pickup || !option.dataset.description;
     }
     if (feeOutput) feeOutput.textContent = chosen ? money(fee) : "Choose an option";
-    if (totalOutput) totalOutput.textContent = chosen ? money(subtotal + fee) : "Choose an option";
+    if (discountOutput) discountOutput.textContent = discount > 0 ? `-${money(discount)}` : "—";
+    if (totalOutput) totalOutput.textContent = chosen ? money(Math.max(0, subtotal + fee - discount)) : "Choose an option";
     if (addressWrap) addressWrap.hidden = !chosen || pickup;
     if (address) address.required = chosen && !pickup;
     if (pickupCard) pickupCard.hidden = !pickup;
@@ -81,6 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  window.updateCheckoutDiscount = (value) => { discount = Number(value || 0); refresh(); };
   select.addEventListener("change", refresh);
   if (locationSearch) locationSearch.addEventListener("input", showLocationMatches);
   refresh();

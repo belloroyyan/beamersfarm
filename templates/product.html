@@ -21,4 +21,6 @@
     </div>
   </div>
 </div>
+{% if reorder_order %}<aside class="reorder-popover" data-reorder-popover role="dialog" aria-label="Reorder suggestion"><button type="button" class="reorder-close" data-reorder-close aria-label="Close suggestion">×</button><p class="eyebrow">Welcome back</p><h2>Reorder {{ product.name }}?</h2><p>You bought this in your last matching order on {{ reorder_order.created_at.strftime('%d %b %Y') }}.</p><form method="post" action="{{ url_for('customer.reorder', order_id=reorder_order.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="button button-lime" type="submit">Reorder last order <span>→</span></button></form></aside>{% endif %}
 {% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/reorder-popover.js') }}" defer></script>{% endblock %}

@@ -1,6 +1,8 @@
+from datetime import datetime
+
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
-from models import Order, Review, db
+from models import Order, Review, ShopSettings, db
 from utils.notifications import normalize_nigerian_phone
 
 reviews_bp = Blueprint("reviews", __name__)
@@ -45,7 +47,8 @@ def submit_review():
         elif email and (len(email) > 160 or "@" not in email):
             flash("Enter a valid email address or leave it blank.", "error")
         else:
-            db.session.add(Review(
+            settings = ShopSettings.query.get(1)
+            review = Review(
                 order_id=order.id,
                 customer_name=customer_name,
                 phone=phone,
@@ -53,9 +56,12 @@ def submit_review():
                 rating=rating,
                 title=title,
                 body=body,
-            ))
+                status="Approved" if settings and settings.reviews_auto_publish else "Pending",
+                published_at=datetime.utcnow() if settings and settings.reviews_auto_publish else None,
+            )
+            db.session.add(review)
             db.session.commit()
-            flash("Thank you. Your review has been sent to Beamers Farm for approval.", "success")
+            flash("Thank you. Your review is now live." if review.status == "Approved" else "Thank you. Your review has been sent for approval.", "success")
             return redirect(url_for("reviews.testimonials"))
     return render_template("reviews.html")
 

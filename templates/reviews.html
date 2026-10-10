@@ -3,7 +3,7 @@
 {% block content %}
 <div class="page-shell"><div class="container review-page-grid">
   <section class="review-intro"><p class="eyebrow">Your experience matters</p><h1>Tell us how we did.</h1><p>Had an order delivered or picked up from Beamers Farm? Share a few words to help other families, restaurants, caterers, and neighbours shop with confidence.</p><div class="review-trust"><strong>Verified customer reviews</strong><span>We check the order reference and phone number before a review can be submitted.</span></div></section>
-  <section class="form-card review-form-card"><p class="eyebrow">Customer review</p><h2>Leave a review</h2><p class="form-note">Your review is checked by the owner before it appears on our testimonials page.</p><form method="post">
+  <section class="form-card review-form-card"><p class="eyebrow">Customer review</p><h2>Leave a review</h2><p class="form-note">Reviews are published automatically when they meet our verified-order rules; otherwise they enter the owner moderation queue.</p><form method="post">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
     <div class="field-grid"><label>Your name<input name="customer_name" maxlength="120" required autocomplete="name"></label><label>Phone used for the order<input name="phone" maxlength="40" required autocomplete="tel" placeholder="08012345678"></label></div>
     <label>Order reference<input name="order_ref" maxlength="64" required placeholder="Paste your public order UUID"><small class="field-help">Your order must be marked Delivered or Picked up.</small></label>

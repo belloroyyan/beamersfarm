@@ -10,7 +10,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import Complaint, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, PartnerListing, Product, Review, SalespersonAccount, ShopSettings, ShopUpdate, StaffPushSubscription, db, order_customer_push_subscriptions
+from models import AnalyticsEvent, Coupon, Complaint, PrivacyRule, Customer, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, PartnerListing, Product, Review, SalespersonAccount, ShopSettings, ShopUpdate, StaffPushSubscription, WholesaleOrder, WholesaleOrderItem, db, order_customer_push_subscriptions
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.product_images import save_product_image
 from utils.gallery import delete_gallery_image, save_gallery_image
@@ -19,7 +19,7 @@ from utils.partner_ads import delete_partner_image, normalize_http_url, parse_so
 from utils.updates import delete_update_image, save_update_image
 from utils.security import is_safe_redirect_url
 from utils.push_subscriptions import delete_staff_push_subscription, save_staff_push_subscription
-from utils.web_push import send_customer_order_confirmed_push, send_dispatch_assignment_push, web_push_is_configured
+from utils.web_push import send_customer_order_confirmed_push, send_dispatch_assignment_push, send_owner_low_stock_push, web_push_is_configured
 from utils.order_workflow import ORDER_STATUSES, update_order_status
 from utils.order_settlement import save_order_weights
 from utils.inventory_pdf import build_inventory_pdf
@@ -272,7 +272,7 @@ def dashboard():
         "open": Order.query.filter(Order.status.notin_(["Delivered", "Picked up", "Cancelled"])).count(),
         "today": Order.query.filter(db.func.date(Order.created_at) == db.func.current_date()).count(),
         "products": Product.query.filter_by(active=True).count(),
-        "low_stock": Product.query.filter(Product.active.is_(True), Product.stock <= 5).count(),
+        "low_stock": Product.query.filter(Product.active.is_(True), Product.stock <= Product.low_stock_threshold).count(),
         "complaints": Complaint.query.filter(Complaint.status.in_(["New", "Under Review"])).count(),
     }
     return render_template(
@@ -533,6 +533,51 @@ def toggle_delivery_zone(zone_id):
     return redirect(url_for("admin.delivery_zones"))
 
 
+@admin_bp.route("/customers", methods=["GET", "POST"])
+@admin_required
+def customers():
+    if request.method == "POST":
+        customer = db.session.get(Customer, int(request.form.get("customer_id", "0") or 0))
+        action = request.form.get("action")
+        if not customer:
+            flash("Customer account not found.", "error")
+        elif action in {"activate", "deactivate"}:
+            customer.active = action == "activate"
+            db.session.commit()
+            flash(f"{customer.name} account {'activated' if customer.active else 'deactivated'}.", "success")
+        elif action == "reset_password":
+            password = request.form.get("password", "")
+            if len(password) < 8:
+                flash("Customer passwords must be at least 8 characters.", "error")
+            else:
+                customer.password_hash = generate_password_hash(password)
+                db.session.commit()
+                flash("Customer password reset. Share it securely with the customer.", "success")
+        return redirect(url_for("admin.customers"))
+    search = request.args.get("q", "").strip()[:120]
+    query = Customer.query.order_by(Customer.active.desc(), Customer.created_at.desc())
+    if search:
+        query = query.filter(or_(Customer.name.ilike(f"%{search}%"), Customer.phone.ilike(f"%{search}%"), Customer.email.ilike(f"%{search}%")))
+    return render_template("admin/customers.html", customers=query.all(), search_query=search)
+
+
+@admin_bp.route("/wholesale-orders", methods=["GET", "POST"])
+@admin_required
+def wholesale_orders():
+    if request.method == "POST":
+        order = WholesaleOrder.query.get_or_404(int(request.form.get("order_id", "0") or 0))
+        status = request.form.get("status", "New")
+        if status not in {"New", "Contacted", "Quoted", "Approved", "Fulfilled", "Declined"}:
+            flash("Choose a valid wholesale status.", "error")
+        else:
+            order.status = status
+            order.owner_notes = request.form.get("owner_notes", "").strip()[:3000]
+            db.session.commit()
+            flash("Wholesale request updated.", "success")
+        return redirect(url_for("admin.wholesale_orders"))
+    return render_template("admin/wholesale_orders.html", wholesale_orders=WholesaleOrder.query.order_by(WholesaleOrder.created_at.desc()).all(), statuses=["New", "Contacted", "Quoted", "Approved", "Fulfilled", "Declined"])
+
+
 @admin_bp.route("/products", methods=["GET", "POST"])
 @admin_required
 def products():
@@ -560,6 +605,7 @@ def products():
                 stock=stock,
                 allow_fractional_quantity=request.form.get("allow_fractional_quantity") == "yes",
                 image=image_path or "chicken",
+                low_stock_threshold=Decimal(request.form.get("low_stock_threshold", "5") or "5"),
             ))
             db.session.commit()
             flash("Product added to the catalog.", "success")
@@ -612,6 +658,11 @@ def edit_product(product_id):
             return render_edit()
         product.price = price
         product.stock = stock
+        try:
+            product.low_stock_threshold = max(Decimal("0"), Decimal(request.form.get("low_stock_threshold", "5") or "5"))
+        except (ArithmeticError, ValueError):
+            flash("Enter a valid low-stock threshold.", "error")
+            return render_edit()
         product.allow_fractional_quantity = request.form.get("allow_fractional_quantity") == "yes"
         product.active = active
         product.featured = show_on_homepage
@@ -625,6 +676,8 @@ def edit_product(product_id):
         if image_path:
             product.image = image_path
         db.session.commit()
+        if product.active and product.stock <= product.low_stock_threshold:
+            send_owner_low_stock_push(product)
         flash("Product details saved.", "success")
         return redirect(url_for("admin.products"))
     return render_edit()
@@ -942,6 +995,16 @@ def complaints():
     )
 
 
+@admin_bp.post("/review-settings")
+@admin_required
+def review_settings():
+    settings = ShopSettings.query.get(1)
+    settings.reviews_auto_publish = request.form.get("reviews_auto_publish") == "yes"
+    db.session.commit()
+    flash("Review publication settings saved.", "success")
+    return redirect(url_for("admin.reviews"))
+
+
 @admin_bp.get("/reviews")
 @admin_required
 def reviews():
@@ -951,7 +1014,7 @@ def reviews():
         query = query.filter(Review.status == status)
     return render_template(
         "admin/reviews.html", reviews=query.all(), statuses=REVIEW_STATUSES,
-        selected_status=status,
+        selected_status=status, review_settings=ShopSettings.query.get(1),
     )
 
 
@@ -1028,6 +1091,74 @@ def delete_update(update_id):
     return redirect(url_for("admin.updates"))
 
 
+@admin_bp.route("/coupons", methods=["GET", "POST"])
+@admin_required
+def coupons():
+    if request.method == "POST":
+        code=request.form.get("code", "").strip().upper(); dtype=request.form.get("discount_type", "percent")
+        try: value=Decimal(request.form.get("value", "0")); minimum=Decimal(request.form.get("minimum_spend", "0"))
+        except Exception: flash("Enter valid coupon amounts.", "error"); return redirect(url_for("admin.coupons"))
+        if not code or value <= 0 or (dtype == "percent" and value > 100): flash("Enter a valid code and discount.", "error")
+        elif Coupon.query.filter_by(code=code).first(): flash("That coupon code already exists.", "error")
+        else:
+            max_uses=int(request.form.get("max_uses") or 0) or None
+            db.session.add(Coupon(code=code,discount_type=dtype,value=value,minimum_spend=max(Decimal("0"),minimum),max_uses=max_uses,excluded_product_ids=request.form.get("excluded_product_ids","").strip()))
+            db.session.commit(); flash("Coupon created.", "success")
+        return redirect(url_for("admin.coupons"))
+    return render_template("admin/coupons.html", coupons=Coupon.query.order_by(Coupon.created_at.desc()).all())
+
+@admin_bp.post("/coupons/<int:coupon_id>/toggle")
+@admin_required
+def toggle_coupon(coupon_id):
+    coupon=Coupon.query.get_or_404(coupon_id); coupon.active=not coupon.active; db.session.commit(); flash("Coupon status updated.", "success"); return redirect(url_for("admin.coupons"))
+
+@admin_bp.route("/privacy-rules", methods=["GET", "POST"])
+@admin_required
+def privacy_rules():
+    if request.method == "POST":
+        title=request.form.get("title","").strip(); body=request.form.get("body","").strip()
+        if title and body: db.session.add(PrivacyRule(title=title[:160],body=body[:5000],sort_order=int(request.form.get("sort_order") or 0))); db.session.commit(); flash("Privacy rule added.","success")
+        else: flash("Add a title and rule text.","error")
+        return redirect(url_for("admin.privacy_rules"))
+    return render_template("admin/privacy_rules.html", rules=PrivacyRule.query.order_by(PrivacyRule.sort_order.asc(),PrivacyRule.id.asc()).all())
+
+@admin_bp.post("/privacy-rules/<int:rule_id>/toggle")
+@admin_required
+def toggle_privacy_rule(rule_id):
+    rule=PrivacyRule.query.get_or_404(rule_id); rule.active=not rule.active; db.session.commit(); flash("Privacy rule visibility updated.","success"); return redirect(url_for("admin.privacy_rules"))
+
+
+@admin_bp.get("/analytics")
+@admin_required
+def analytics():
+    from datetime import timedelta
+    from sqlalchemy import func
+    days = request.args.get("days", "30")
+    try: days = min(max(int(days), 7), 365)
+    except ValueError: days = 30
+    since = datetime.utcnow() - timedelta(days=days)
+    events = AnalyticsEvent.query.filter(AnalyticsEvent.created_at >= since)
+    total_views = events.filter_by(event_type="page_view").count()
+    cart_adds = events.filter_by(event_type="cart_add").count()
+    checkout_starts = events.filter_by(event_type="checkout_start").count()
+    completed_orders = events.filter_by(event_type="order_complete").count()
+    sales_total = db.session.query(db.func.coalesce(db.func.sum(Order.total), 0)).filter(Order.created_at >= since, Order.status.notin_(["Cancelled", "Declined"])).scalar() or 0
+    abandonment_rate = round(max(0, (checkout_starts-completed_orders)/checkout_starts*100), 1) if checkout_starts else 0
+    unique_visitors = db.session.query(func.count(func.distinct(AnalyticsEvent.user_agent))).filter(AnalyticsEvent.created_at >= since, AnalyticsEvent.event_type == "page_view").scalar() or 0
+    popular = db.session.query(AnalyticsEvent.path, func.count(AnalyticsEvent.id).label("views")).filter(AnalyticsEvent.created_at >= since, AnalyticsEvent.event_type == "page_view").group_by(AnalyticsEvent.path).order_by(func.count(AnalyticsEvent.id).desc()).limit(12).all()
+    daily = db.session.query(func.date(AnalyticsEvent.created_at).label("day"), func.count(AnalyticsEvent.id).label("views")).filter(AnalyticsEvent.created_at >= since, AnalyticsEvent.event_type == "page_view").group_by(func.date(AnalyticsEvent.created_at)).order_by(func.date(AnalyticsEvent.created_at)).all()
+    return render_template("admin/analytics.html", days=days, total_views=total_views, unique_visitors=unique_visitors, popular=popular, daily=daily, cart_adds=cart_adds, checkout_starts=checkout_starts, completed_orders=completed_orders, sales_total=sales_total, abandonment_rate=abandonment_rate)
+
+
+@admin_bp.post("/analytics/clear")
+@admin_required
+def clear_analytics():
+    AnalyticsEvent.query.delete(synchronize_session=False)
+    db.session.commit()
+    flash("Site analytics data cleared.", "success")
+    return redirect(url_for("admin.analytics"))
+
+
 @admin_bp.post("/clear-database")
 @admin_required
 def clear_database():
@@ -1044,8 +1175,12 @@ def clear_database():
     clear_partner_ads = request.form.get("clear_partner_ads") == "yes"
     clear_gallery = request.form.get("clear_gallery") == "yes"
     clear_customer_push = request.form.get("clear_customer_push") == "yes"
+    clear_wholesale = request.form.get("clear_wholesale") == "yes"
+    clear_coupons = request.form.get("clear_coupons") == "yes"
+    clear_analytics = request.form.get("clear_analytics") == "yes"
+    clear_privacy_rules = request.form.get("clear_privacy_rules") == "yes"
     reset_pins = request.form.get("reset_pins") == "yes"
-    if not any((clear_orders, clear_complaints, clear_messages, clear_updates, clear_reviews, clear_partner_ads, clear_gallery, clear_customer_push, reset_pins)):
+    if not any((clear_orders, clear_complaints, clear_messages, clear_updates, clear_reviews, clear_partner_ads, clear_gallery, clear_customer_push, clear_wholesale, clear_coupons, clear_analytics, clear_privacy_rules, reset_pins)):
         flash("Choose at least one data category or homepage option to clear.", "error")
         return redirect(url_for("admin.dashboard"))
 
@@ -1099,6 +1234,19 @@ def clear_database():
         db.session.execute(order_customer_push_subscriptions.delete())
         CustomerPushSubscription.query.delete(synchronize_session=False)
         cleared.append("customer push-notification subscriptions")
+    if clear_wholesale:
+        WholesaleOrderItem.query.delete(synchronize_session=False)
+        WholesaleOrder.query.delete(synchronize_session=False)
+        cleared.append("wholesale requests")
+    if clear_coupons:
+        Coupon.query.delete(synchronize_session=False)
+        cleared.append("coupons and usage counts")
+    if clear_analytics:
+        AnalyticsEvent.query.delete(synchronize_session=False)
+        cleared.append("site analytics events")
+    if clear_privacy_rules:
+        PrivacyRule.query.delete(synchronize_session=False)
+        cleared.append("owner privacy rules")
 
     if reset_pins:
         Product.query.update({Product.featured: False}, synchronize_session=False)

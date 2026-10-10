@@ -112,7 +112,14 @@ def logout():
 def account():
     customer = current_customer()
     orders = Order.query.filter_by(customer_id=customer.id).order_by(Order.created_at.desc()).all()
-    return render_template("customer/account.html", customer=customer, orders=orders)
+    previous_product_ids = []
+    for order in orders:
+        for item in order.items:
+            if item.product_id and item.product_id not in previous_product_ids:
+                previous_product_ids.append(item.product_id)
+    previous_recommendations = Product.query.filter(Product.id.in_(previous_product_ids), Product.active.is_(True), Product.stock > 0).all() if previous_product_ids else []
+    previous_recommendations.sort(key=lambda item: previous_product_ids.index(item.id))
+    return render_template("customer/account.html", customer=customer, orders=orders, previous_recommendations=previous_recommendations[:4])
 
 
 @customer_bp.post("/settings")

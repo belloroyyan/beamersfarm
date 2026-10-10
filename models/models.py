@@ -35,6 +35,7 @@ class Product(db.Model):
     active = db.Column(db.Boolean, nullable=False, default=True)
     featured = db.Column(db.Boolean, nullable=False, default=False)
     recommended = db.Column(db.Boolean, nullable=False, default=False)
+    low_stock_threshold = db.Column(db.Numeric(12, 3), nullable=False, default=Decimal("5.000"), server_default="5.000")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     order_items = db.relationship("OrderItem", back_populates="product")
@@ -70,6 +71,44 @@ class ShopSettings(db.Model):
         default="We are currently closed for orders. You can still browse our products.",
     )
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    reviews_auto_publish = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+
+
+class Coupon(db.Model):
+    __tablename__ = "coupons"
+    id = db.Column(db.Integer, primary_key=True)
+    code = db.Column(db.String(40), unique=True, nullable=False, index=True)
+    discount_type = db.Column(db.String(12), nullable=False, default="percent")
+    value = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    minimum_spend = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    max_uses = db.Column(db.Integer, nullable=True)
+    uses = db.Column(db.Integer, nullable=False, default=0)
+    excluded_product_ids = db.Column(db.String(500), nullable=False, default="")
+    active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    starts_at = db.Column(db.DateTime, nullable=True)
+    ends_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class PrivacyRule(db.Model):
+    __tablename__ = "privacy_rules"
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(160), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class AnalyticsEvent(db.Model):
+    __tablename__ = "analytics_events"
+    id = db.Column(db.Integer, primary_key=True)
+    event_type = db.Column(db.String(40), nullable=False, default="page_view")
+    path = db.Column(db.String(255), nullable=False)
+    referrer = db.Column(db.String(500), nullable=False, default="")
+    user_agent = db.Column(db.String(500), nullable=False, default="")
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
 
 class Complaint(db.Model):
@@ -115,6 +154,38 @@ class Customer(db.Model):
     deleted_at = db.Column(db.DateTime, nullable=True)
 
     orders = db.relationship("Order", back_populates="customer")
+    wholesale_orders = db.relationship("WholesaleOrder", back_populates="customer")
+
+
+class WholesaleOrder(db.Model):
+    __tablename__ = "wholesale_orders"
+    id = db.Column(db.Integer, primary_key=True)
+    public_id = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
+    customer_name = db.Column(db.String(120), nullable=False)
+    business_name = db.Column(db.String(160), nullable=False)
+    phone = db.Column(db.String(40), nullable=False)
+    email = db.Column(db.String(160), nullable=True)
+    delivery_address = db.Column(db.Text, nullable=False)
+    requested_date = db.Column(db.Date, nullable=True)
+    notes = db.Column(db.Text, nullable=False, default="")
+    status = db.Column(db.String(30), nullable=False, default="New", server_default="New")
+    owner_notes = db.Column(db.Text, nullable=False, default="")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    customer = db.relationship("Customer", back_populates="wholesale_orders")
+    items = db.relationship("WholesaleOrderItem", back_populates="order", cascade="all, delete-orphan")
+
+
+class WholesaleOrderItem(db.Model):
+    __tablename__ = "wholesale_order_items"
+    id = db.Column(db.Integer, primary_key=True)
+    wholesale_order_id = db.Column(db.Integer, db.ForeignKey("wholesale_orders.id", ondelete="CASCADE"), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
+    product_name = db.Column(db.String(120), nullable=False)
+    quantity = db.Column(db.Numeric(12, 3), nullable=False)
+    unit = db.Column(db.String(80), nullable=False, default="per pack")
+    order = db.relationship("WholesaleOrder", back_populates="items")
+    product = db.relationship("Product")
 
 
 class Order(db.Model):
@@ -150,6 +221,8 @@ class Order(db.Model):
     subtotal = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     delivery_fee = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     total = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    coupon_code = db.Column(db.String(40), nullable=True)
+    discount_amount = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     items = db.relationship(

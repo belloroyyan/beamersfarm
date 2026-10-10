@@ -7,12 +7,12 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from flask import Blueprint, abort, current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 from sqlalchemy import or_
 
-from models import Customer, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, PartnerListing, Product, SalespersonAccount, ShopSettings, ShopUpdate, db
+from models import Coupon, Customer, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, PartnerListing, Product, SalespersonAccount, ShopSettings, ShopUpdate, WholesaleOrder, WholesaleOrderItem, db
 from utils.helpers import build_cart, format_quantity, parse_quantity, product_uses_requested_kg
 from utils.notifications import normalize_nigerian_phone
 from utils.push_subscriptions import valid_push_endpoint
 from utils.update_share import render_update_share_image
-from utils.web_push import send_customer_order_confirmed_push, send_customer_order_out_for_delivery_push, send_owner_new_order_push, send_salesperson_new_order_push, web_push_is_configured
+from utils.web_push import send_customer_order_confirmed_push, send_customer_order_out_for_delivery_push, send_owner_low_stock_push, send_owner_new_order_push, send_owner_wholesale_request_push, send_salesperson_new_order_push, web_push_is_configured
 
 shop_bp = Blueprint("shop", __name__)
 PICKUP_ADDRESS = (
@@ -40,6 +40,14 @@ def notify_customer_of_current_order_status(order, subscription_id):
     return None
 
 
+def record_event(event_type):
+    try:
+        from models import AnalyticsEvent
+        db.session.add(AnalyticsEvent(event_type=event_type, path=request.path[:255], referrer=request.referrer or "", user_agent=request.user_agent.string[:500], customer_id=session.get("customer_id")))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
 def current_cart():
     return session.setdefault("cart", {})
 
@@ -54,6 +62,31 @@ def cart_summary(products=None, delivery_fee=None):
     summary = build_cart(cart, product_map, fee)
     summary["delivery_fee_selected"] = delivery_fee is not None
     return summary
+
+
+def coupon_discount(coupon, summary):
+    if not coupon or not coupon.active:
+        return Decimal("0.00"), "Coupon is not available."
+    now = datetime.utcnow()
+    if coupon.starts_at and now < coupon.starts_at: return Decimal("0.00"), "Coupon is not active yet."
+    if coupon.ends_at and now > coupon.ends_at: return Decimal("0.00"), "Coupon has expired."
+    if coupon.max_uses is not None and coupon.uses >= coupon.max_uses: return Decimal("0.00"), "Coupon usage limit has been reached."
+    if summary["subtotal"] < coupon.minimum_spend: return Decimal("0.00"), f"This coupon requires a minimum spend of {coupon.minimum_spend}."
+    excluded={x.strip() for x in (coupon.excluded_product_ids or "").split(",") if x.strip()}
+    eligible=[line for line in summary["lines"] if str(line["product"].id) not in excluded]
+    eligible_total=sum((Decimal(str(line["line_subtotal"])) for line in eligible), Decimal("0.00"))
+    if not eligible: return Decimal("0.00"), "This coupon excludes every product in your cart."
+    discount=(eligible_total * coupon.value / Decimal("100")) if coupon.discount_type == "percent" else min(Decimal(str(coupon.value)), eligible_total)
+    return min(discount, summary["subtotal"]), ""
+
+def apply_coupon(summary, code):
+    summary["discount"] = Decimal("0.00"); summary["coupon"] = None
+    if not code: summary["total"] = summary["subtotal"] + summary["delivery_fee"]; return summary, ""
+    coupon=Coupon.query.filter_by(code=code.strip().upper()).first()
+    discount, error=coupon_discount(coupon, summary)
+    if error: return summary, error
+    summary["discount"]=discount; summary["coupon"]=coupon; summary["total"]=max(Decimal("0.00"), summary["subtotal"] + summary["delivery_fee"] - discount)
+    return summary, ""
 
 
 def locked_cart_summary(delivery_fee=None):
@@ -230,7 +263,11 @@ def partner_offer(listing_id):
 @shop_bp.get("/product/<int:product_id>")
 def product_detail(product_id):
     product = Product.query.get_or_404(product_id)
-    return render_template("product.html", product=product)
+    reorder_order = None
+    customer = db.session.get(Customer, session.get("customer_id")) if session.get("customer_id") else None
+    if customer and customer.active:
+        reorder_order = Order.query.filter_by(customer_id=customer.id).join(OrderItem).filter(OrderItem.product_id == product.id).order_by(Order.created_at.desc()).first()
+    return render_template("product.html", product=product, reorder_order=reorder_order)
 
 
 @shop_bp.get("/gallery")
@@ -241,13 +278,112 @@ def gallery():
     return render_template("gallery.html", images=images)
 
 
+@shop_bp.route("/wholesale", methods=["GET", "POST"])
+def wholesale():
+    customer = db.session.get(Customer, session.get("customer_id")) if session.get("customer_id") else None
+    products = available_products_query().order_by(Product.name.asc()).all()
+    if request.method == "POST":
+        name = request.form.get("customer_name", "").strip()
+        business = request.form.get("business_name", "").strip()
+        phone = request.form.get("phone", "").strip()
+        email = request.form.get("email", "").strip().lower() or None
+        address = request.form.get("delivery_address", "").strip()
+        notes = request.form.get("notes", "").strip()[:3000]
+        if not name or not business or not phone or not address:
+            flash("Add your name, business name, phone number, and delivery address.", "error")
+            return render_template("wholesale.html", products=products, customer=customer)
+        selected = []
+        for product in products:
+            raw = request.form.get(f"quantity_{product.id}", "").strip()
+            if not raw:
+                continue
+            try:
+                quantity = parse_quantity(raw, allow_fractional=bool(product.allow_fractional_quantity))
+            except ValueError:
+                flash(f"Enter a valid quantity for {product.name}.", "error")
+                return render_template("wholesale.html", products=products, customer=customer)
+            if quantity > 0:
+                selected.append((product, quantity))
+        if not selected:
+            flash("Choose at least one product quantity for your wholesale request.", "error")
+            return render_template("wholesale.html", products=products, customer=customer)
+        requested_date = None
+        if request.form.get("requested_date"):
+            try:
+                requested_date = datetime.strptime(request.form["requested_date"], "%Y-%m-%d").date()
+            except ValueError:
+                flash("Choose a valid preferred delivery date.", "error")
+                return render_template("wholesale.html", products=products, customer=customer)
+        order = WholesaleOrder(customer_id=customer.id if customer and customer.active else None, customer_name=name[:120], business_name=business[:160], phone=phone[:40], email=email, delivery_address=address[:2000], requested_date=requested_date, notes=notes)
+        db.session.add(order)
+        for product, quantity in selected:
+            order.items.append(WholesaleOrderItem(product=product, product_name=product.name, quantity=quantity, unit=product.unit))
+        db.session.commit()
+        send_owner_wholesale_request_push()
+        flash(f"Wholesale request {order.public_id} sent. The owner will contact you with pricing and availability.", "success")
+        return redirect(url_for("shop.wholesale"))
+    return render_template("wholesale.html", products=products, customer=customer)
+
+
+@shop_bp.get("/privacy")
+def privacy():
+    from models import PrivacyRule
+    return render_template("privacy.html", rules=PrivacyRule.query.filter_by(active=True).order_by(PrivacyRule.sort_order.asc(), PrivacyRule.id.asc()).all())
+
+
+@shop_bp.post("/coupon/validate")
+def validate_coupon_live():
+    code = request.form.get("coupon_code", "").strip().upper()
+    zone_id = request.form.get("delivery_zone_id", "")
+    zone = DeliveryZone.query.filter_by(id=int(zone_id), active=True).first() if zone_id.isdigit() else None
+    summary = cart_summary(delivery_fee=zone.fee if zone else None)
+    summary, error = apply_coupon(summary, code)
+    if code and not error:
+        session["coupon_code"] = code
+    elif error:
+        session.pop("coupon_code", None)
+    return jsonify({
+        "ok": not bool(error),
+        "code": code,
+        "message": error or f"{code} applied.",
+        "discount": float(summary.get("discount", Decimal("0.00"))),
+        "subtotal": float(summary["subtotal"]),
+        "delivery_fee": float(summary["delivery_fee"]),
+        "total": float(summary["total"]),
+        "delivery_selected": bool(zone),
+    })
+
+
+@shop_bp.get("/robots.txt")
+def robots():
+    response=make_response(f"User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /checkout\nSitemap: {url_for('shop.sitemap', _external=True)}\n", 200)
+    response.headers["Content-Type"]="text/plain"
+    return response
+
+
+@shop_bp.get("/sitemap.xml")
+def sitemap():
+    urls=[url_for("shop.index", _external=True),url_for("shop.products", _external=True),url_for("shop.gallery", _external=True),url_for("shop.privacy", _external=True),url_for("reviews.testimonials", _external=True)]
+    products=Product.query.filter_by(active=True).all()
+    urls += [url_for("shop.product_detail", product_id=p.id, _external=True) for p in products]
+    body='<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+''.join(f'<url><loc>{u}</loc></url>' for u in urls)+'</urlset>'
+    return make_response(body,200,{"Content-Type":"application/xml"})
+
+
 @shop_bp.get("/cart")
 def cart():
-    return render_template("cart.html", summary=cart_summary())
+    summary=cart_summary()
+    customer=db.session.get(Customer, session.get("customer_id")) if session.get("customer_id") else None
+    estimate_zone=DeliveryZone.query.filter_by(active=True, is_pickup=False).order_by(DeliveryZone.sort_order.asc()).first() if customer and customer.active else None
+    estimate=None
+    if customer and customer.active:
+        estimate=cart_summary(delivery_fee=estimate_zone.fee if estimate_zone else current_app.config.get("DELIVERY_FEE", 1500))
+    return render_template("cart.html", summary=summary, signed_in_customer=customer if customer and customer.active else None, delivery_estimate=estimate, estimate_zone=estimate_zone)
 
 
 @shop_bp.post("/cart/add/<int:product_id>")
 def add_to_cart(product_id):
+    record_event("cart_add")
     product = Product.query.get_or_404(product_id)
     if not product.is_available:
         flash("That product is currently unavailable.", "error")
@@ -363,6 +499,9 @@ def checkout():
     selected_zone_id = request.values.get("delivery_zone_id", "")
     selected_zone = next((zone for zone in zones if str(zone.id) == selected_zone_id), None)
     summary = cart_summary(delivery_fee=selected_zone.fee if selected_zone else None)
+    coupon_code = request.values.get("coupon_code", session.get("coupon_code", "")).strip().upper()
+    summary, coupon_error = apply_coupon(summary, coupon_code)
+    if coupon_code and not coupon_error: session["coupon_code"] = coupon_code
     signed_in_customer = db.session.get(Customer, session.get("customer_id")) if session.get("customer_id") else None
 
     def render_checkout():
@@ -370,9 +509,10 @@ def checkout():
             "checkout.html", summary=summary, delivery_zones=zones,
             selected_zone_id=selected_zone_id, selected_zone=selected_zone,
             customer=signed_in_customer if signed_in_customer and signed_in_customer.active else None,
-            paystack_enabled=current_app.config.get("PAYSTACK_ENABLED", False),
+            paystack_enabled=current_app.config.get("PAYSTACK_ENABLED", False), coupon_code=coupon_code, coupon_error=coupon_error,
         )
 
+    if request.method == "GET": record_event("checkout_start")
     if not summary["lines"]:
         flash("Add at least one product before checking out.", "error")
         return redirect(url_for("shop.index"))
@@ -425,6 +565,10 @@ def checkout():
         db.session.rollback()
         try:
             summary = locked_cart_summary(delivery_fee=selected_zone.fee)
+            summary, coupon_error = apply_coupon(summary, request.form.get("coupon_code", session.get("coupon_code", "")).strip().upper())
+            if coupon_error:
+                flash(coupon_error, "error")
+                return render_checkout()
             if not summary["lines"]:
                 flash("Your cart is empty. Please add a product first.", "error")
                 return redirect(url_for("shop.index"))
@@ -451,6 +595,8 @@ def checkout():
                 subtotal=summary["subtotal"],
                 delivery_fee=summary["delivery_fee"],
                 total=summary["total"],
+                coupon_code=summary["coupon"].code if summary.get("coupon") else None,
+                discount_amount=summary.get("discount", Decimal("0.00")),
             )
             if signed_in_customer and signed_in_customer.active:
                 signed_in_customer.name = customer_name
@@ -459,6 +605,7 @@ def checkout():
                 if not selected_zone.is_pickup:
                     signed_in_customer.address = address
             db.session.add(order)
+            if summary.get("coupon"): summary["coupon"].uses += 1
             if summary["total"] > 0:
                 db.session.add(
                     OrderFinancialRecord(
@@ -486,11 +633,14 @@ def checkout():
                     )
                 )
                 product.stock -= line["quantity"]
+            low_stock_products = [line["product"] for line in summary["lines"] if line["product"].stock <= line["product"].low_stock_threshold]
             db.session.commit()
         except Exception:
             db.session.rollback()
             raise
         send_owner_new_order_push()
+        for low_stock_product in low_stock_products:
+            send_owner_low_stock_push(low_stock_product)
         if shop_is_open() and SalespersonAccount.query.filter_by(active=True).count():
             send_salesperson_new_order_push()
         session["cart"] = {}

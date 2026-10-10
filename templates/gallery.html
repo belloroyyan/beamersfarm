@@ -4,7 +4,7 @@
 <section class="container page-shell public-gallery-page">
   <div class="page-heading gallery-heading"><div><p class="eyebrow">A closer look</p><h1>Life at Beamers Farm.</h1><p class="section-intro">Farm moments, product preparation, and updates from our team in Osogbo.</p></div></div>
   {% if images %}<div class="public-gallery-grid">
-    {% for image in images %}{% set image_src = gallery_image_url(image.image) %}{% if image_src %}<figure class="public-gallery-card"><a href="{{ image_src }}" target="_blank" rel="noopener" aria-label="Open full-size photo: {{ image.title }}"><img src="{{ image_src }}" alt="{{ image.title }}" loading="lazy"></a><figcaption><strong>{{ image.title }}</strong>{% if image.description %}<p>{{ image.description }}</p>{% endif %}</figcaption></figure>{% endif %}{% endfor %}
+    {% for image in images %}{% set image_src = gallery_image_url(image.image) %}{% if image_src %}<figure class="public-gallery-card"><a href="{{ image_src }}" target="_blank" rel="noopener" aria-label="Open full-size photo: {{ image.title }}"><img src="{{ image_src }}" alt="{{ image.title }}" loading="lazy"></a><figcaption><strong>{{ image.title }}</strong><small class="gallery-time">Posted {{ image.created_at.strftime("%d %b %Y · %H:%M") }}</small>{% if image.description %}<p>{{ image.description }}</p>{% endif %}</figcaption></figure>{% endif %}{% endfor %}
   </div>{% else %}<div class="empty-state"><h2>Gallery coming soon.</h2><p>We are preparing photos from Beamers Farm. Check back soon.</p><a class="button button-dark" href="{{ url_for('shop.products') }}">Browse products</a></div>{% endif %}
 </section>
 {% endblock %}

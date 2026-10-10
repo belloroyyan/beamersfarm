@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Privacy, security & rules · Beamers Farm{% endblock %}
+{% block content %}
+<div class="container page-shell">
+  <div class="page-heading"><div><p class="eyebrow">Trust centre</p><h1>Privacy & security.</h1><p class="form-note">Clear information about how Beamers Farm protects your visit and handles customer data.</p></div></div>
+  <div class="privacy-grid">
+    <section class="form-card"><p class="eyebrow">Constant security information</p><h2>Protected shopping</h2><div class="security-badges"><div class="security-badge"><strong>SSL certificate / TLS</strong><span>HTTPS encryption protects data in transit.</span></div><div class="security-badge"><strong>Secure headers</strong><span>Browser security policies reduce common web risks.</span></div><div class="security-badge"><strong>CSRF protection</strong><span>Account and order actions include request protection.</span></div><div class="security-badge"><strong>Data minimisation</strong><span>We collect information needed to serve your order.</span></div></div></section>
+    <section class="form-card"><p class="eyebrow">Privacy policy</p><h2>How we use information</h2><p>We use contact and delivery details to process orders, coordinate delivery, provide customer support, and send opted-in order updates. We do not sell customer information. Account holders can request corrections or account deletion through Customer care.</p><p>Payment details are handled through the selected payment channel; Beamers Farm does not store full card details.</p></section>
+  </div>
+  <section class="form-card privacy-rules"><p class="eyebrow">Beamers Farm rules</p><h2>Customer rules</h2>{% if rules %}{% for rule in rules %}<article><h3>{{ rule.title }}</h3><p>{{ rule.body }}</p></article>{% endfor %}{% else %}<p class="form-note">No additional rules have been published.</p>{% endif %}</section>
+</div>
+{% endblock %}

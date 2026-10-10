@@ -1,0 +1,1 @@
+document.addEventListener("DOMContentLoaded",()=>{const p=document.querySelector("[data-reorder-popover]");if(!p)return;const key="bf_reorder_prompt_seen";if(localStorage.getItem(key)){p.hidden=true;return}localStorage.setItem(key,"1");const close=p.querySelector("[data-reorder-close]");if(close)close.addEventListener("click",()=>p.remove())})

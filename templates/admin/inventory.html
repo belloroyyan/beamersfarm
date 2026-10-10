@@ -23,7 +23,7 @@
 
   <div class="metric-grid inventory-metrics">
     <div class="metric-card"><span>Active stock units</span><strong>{{ format_quantity(report.metrics.active_stock_units) }}</strong><small>Current on-hand count</small></div>
-    <div class="metric-card {% if report.metrics.low_stock_products %}metric-alert{% endif %}"><span>Low-stock products</span><strong>{{ report.metrics.low_stock_products }}</strong><small>Active products with 5 units or fewer</small></div>
+    <div class="metric-card {% if report.metrics.low_stock_products %}metric-alert{% endif %}"><span>Low-stock products</span><strong>{{ report.metrics.low_stock_products }}</strong><small>Active products at or below their configured alert threshold</small></div>
     <div class="metric-card"><span>Verified orders</span><strong>{{ report.metrics.verified_orders }}</strong><small>Non-cancelled · {{ report.period_label }}</small></div>
     <div class="metric-card"><span>Gross verified item sales</span><strong>{{ format_currency(report.metrics.verified_item_sales) }}</strong><small>Before refunds · excludes delivery fees</small></div>
     <div class="metric-card"><span>Money received</span><strong>{{ format_currency(report.metrics.money_received) }}</strong><small>Settled initial and balance payments</small></div>

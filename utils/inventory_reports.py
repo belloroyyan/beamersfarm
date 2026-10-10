@@ -174,7 +174,7 @@ def build_inventory_report(period="30d", search="", start_raw="", end_raw="", no
         "orders": orders,
         "metrics": {
             "active_stock_units": sum((Decimal(str(product.stock or 0)) for product in products if product.active), Decimal("0.000")),
-            "low_stock_products": sum(1 for product in products if product.active and product.stock <= 5),
+            "low_stock_products": sum(1 for product in products if product.active and product.stock <= product.low_stock_threshold),
             "verified_orders": len(verified_order_ids),
             "pending_orders": len(pending_order_ids),
             "cancelled_orders": len(cancelled_order_ids),
