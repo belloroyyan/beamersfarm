@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Order-success recommendations · Owner desk{% endblock %}
+{% block content %}
+<div class="admin-shell"><div class="container">
+  <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / merchandising</p><h1>Post-order recommendations.</h1><p class="form-note">Choose what customers see after checkout. Beamers products and third-party supplier offers appear together, with independent listings clearly marked.</p></div><a class="button button-outline light-outline" href="{{ url_for('admin.partner_ads') }}">Manage partner ads</a></div>
+  <form method="post" class="recommendation-manager-form">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <div class="recommendation-manager-grid">
+      <section class="admin-panel recommendation-select-panel"><div class="panel-heading"><div><p class="eyebrow">Beamers Farm products</p><h2>Choose products</h2><p class="form-note">Active products with available stock are eligible. Choose up to six.</p></div><span class="section-note">{{ products|length }} products</span></div>
+        <div class="recommendation-select-list">
+          {% for product in products %}<label class="recommendation-select-row{% if not product.active %} is-disabled{% endif %}"><input type="checkbox" name="products" value="{{ product.id }}" {% if product.recommended %}checked{% endif %} {% if not product.active %}disabled{% endif %}><span class="recommendation-select-copy"><strong>{{ product.name }}</strong><small>Product #{{ product.id }} · {{ format_currency(product.price) }} / {{ product.unit }} · stock {{ format_quantity(product.stock) }} · {{ 'Active' if product.active else 'Archived' }}</small></span></label>{% else %}<p class="form-note">No catalog products yet.</p>{% endfor %}
+        </div>
+      </section>
+      <section class="admin-panel recommendation-select-panel"><div class="panel-heading"><div><p class="eyebrow">Independent offers</p><h2>Choose partner listings</h2><p class="form-note">Only active listings appear publicly. Choose up to six; supplier identity remains explicit.</p></div><span class="section-note">{{ listings|length }} listings</span></div>
+        <div class="recommendation-select-list">
+          {% for listing in listings %}<label class="recommendation-select-row{% if not listing.active %} is-disabled{% endif %}"><input type="checkbox" name="partner_listings" value="{{ listing.id }}" {% if listing.recommended %}checked{% endif %} {% if not listing.active %}disabled{% endif %}><span class="recommendation-select-copy"><strong>{{ listing.name }} <em>Independent offer</em></strong><small>Listing #{{ listing.id }} · supplied by {{ listing.supplier_name }} · {{ 'Active' if listing.active else 'Paused' }}</small></span></label>{% else %}<p class="form-note">No partner advertisements yet. Add listings first.</p>{% endfor %}
+        </div>
+      </section>
+    </div>
+    <div class="recommendation-manager-footer"><p class="form-note">Out-of-stock Beamers products are not shown to customers until stock is available. Paused products/listings cannot be selected.</p><div class="form-actions"><button class="button button-dark" type="submit">Save “You may also like”</button><a class="button button-outline" href="{{ url_for('admin.dashboard') }}">Cancel</a></div></div>
+  </form>
+</div></div>
+{% endblock %}

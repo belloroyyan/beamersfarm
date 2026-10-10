@@ -9,12 +9,13 @@
       <p class="eyebrow">Frozen cut · listed price per {{ product.unit }}</p>
       <h1>{{ product.name }}</h1>
       <p class="detail-description">{{ product.description }}</p>
-      <div class="detail-price"><strong>{{ format_currency(product.price) }} <small>per {{ product.unit }}</small></strong><span>{{ product.stock }} physical sale unit{{ '' if product.stock == 1 else 's' }} available</span></div>
+      <div class="detail-price"><strong>{{ format_currency(product.price) }} <small>per {{ product.unit }}</small></strong><span>{{ format_quantity(product.stock) }} {{ product.unit }} available</span></div>
       {% if product.is_available %}
       <form class="quantity-form" action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
         <label for="quantity">Quantity ({{ product.unit }})</label>
-        <div class="quantity-row"><input id="quantity" name="quantity" type="number" min="1" max="{{ product.stock }}" value="1" required><button class="button button-dark" type="submit">Add to cart <span>+</span></button></div>
+        <div class="quantity-row"><input id="quantity" name="quantity" type="number" min="{{ '0.001' if product.allow_fractional_quantity else '1' }}" max="{{ format_quantity(product.stock) }}" step="{{ '0.001' if product.allow_fractional_quantity else '1' }}" value="{{ '1' if product.stock >= 1 else format_quantity(product.stock) }}" required><button class="button button-dark" type="submit">Add to cart <span>+</span></button></div>
+        {% if product.allow_fractional_quantity %}<small class="field-help">Partial quantities are accepted up to three decimal places.</small>{% endif %}
       </form>
       {% else %}<div class="out-of-stock">Currently unavailable</div>{% endif %}
     </div>

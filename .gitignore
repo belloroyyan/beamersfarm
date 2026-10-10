@@ -11,3 +11,5 @@ static/uploads/products/*
 !static/uploads/products/.gitkeep
 static/uploads/partners/*
 !static/uploads/partners/.gitkeep
+static/uploads/gallery/*
+!static/uploads/gallery/.gitkeep

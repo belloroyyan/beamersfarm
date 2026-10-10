@@ -115,8 +115,13 @@ def order_detail(account, order_ref):
             flash(message, "success" if ok else "error")
             return redirect(url_for("salesperson.order_detail", order_ref=order.public_id))
 
-        verify_only = request.form.get("verify_payment_only") == "yes"
-        verify_and_confirm = request.form.get("verify_and_confirm") == "yes"
+        # Old browser tabs using the retired verify-only control also confirm;
+        # payment verification no longer leaves the order in Received.
+        verify_only = False
+        verify_and_confirm = (
+            request.form.get("verify_and_confirm") == "yes"
+            or request.form.get("verify_payment_only") == "yes"
+        )
         verify_payment = verify_only or verify_and_confirm
         if verify_payment and not permissions["verify_payments"]:
             abort(403)

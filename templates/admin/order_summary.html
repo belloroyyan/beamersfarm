@@ -37,7 +37,7 @@
                   <tr>
                     <td><strong class="summary-order-id">#{{ order.public_id }}</strong><small>{{ order.created_at.strftime('%d %b %Y · %H:%M') }}</small></td>
                     <td><strong>{{ order.customer_name }}</strong><small>{{ order.phone }} · {% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}{{ order.delivery_zone_name }}{% endif %}</small></td>
-                    <td class="order-summary-items-compact">{% for item in order.items %}<span class="summary-item">{{ item.quantity }} × {{ item.product_name }}</span>{% endfor %}<small>{{ order.items|length }} line item{{ '' if order.items|length == 1 else 's' }}</small></td>
+                    <td class="order-summary-items-compact">{% for item in order.items %}<span class="summary-item">{{ format_quantity(item.quantity) }} × {{ item.product_name }}</span>{% endfor %}<small>{{ order.items|length }} line item{{ '' if order.items|length == 1 else 's' }}</small></td>
                     <td><strong class="summary-total">{{ format_currency(order.total) }}</strong><small>{{ 'Pickup' if order.fulfillment_type == 'pickup' else 'Delivery' }} · {{ format_currency(order.delivery_fee) }}</small></td>
                     <td><span class="status-pill {% if order.payment_status == 'Verified' %}status-confirmed{% else %}status-received{% endif %}">{{ order.payment_status or 'Unverified' }}</span>{% if order.payment_verified_by_name %}<small>By {{ order.payment_verified_by_name }}</small>{% endif %}</td>
                     <td><span class="status-pill status-{{ (order.status or 'received')|lower|replace(' ', '-') }}">{{ order.status }}</span><a class="table-link summary-view-link" href="{{ url_for('admin.order_detail', order_ref=order.public_id) }}">View →</a></td>

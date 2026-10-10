@@ -1,7 +1,17 @@
 {% extends "base.html" %}
-{% block title %}Edit gallery image · Beamers Farm{% endblock %}
+{% block title %}Edit gallery image · Owner desk{% endblock %}
 {% block content %}
-<div class="admin-shell"><div class="container"><div class="admin-topbar compact-topbar"><div><a class="back-link" href="{{ url_for('admin.gallery') }}">← Back to Gallery</a><p class="eyebrow">Owner desk / content</p><h1>Edit gallery image.</h1></div></div>
-<section class="admin-panel gallery-edit-panel"><div class="gallery-edit-preview"><img src="{{ gallery_image_url(image.image) }}" alt="{{ image.title }}"></div><form method="post" enctype="multipart/form-data"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><label>Title<input name="title" maxlength="120" value="{{ image.title }}" required></label><label>Description<textarea name="description" maxlength="2000" rows="6">{{ image.description }}</textarea></label><label>Replace image <span class="form-note">Optional</span><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label><label>Display order<input type="number" name="sort_order" value="{{ image.sort_order }}" min="0" step="1"></label><div class="form-actions"><button class="button button-dark" type="submit">Save changes</button><a class="button button-outline" href="{{ url_for('admin.gallery') }}">Cancel</a></div></form></section>
+<div class="admin-shell"><div class="container">
+  <div class="page-heading admin-heading"><div><a class="back-link" href="{{ url_for('admin.gallery_manager') }}">← Back to gallery manager</a><p class="eyebrow">Gallery image #{{ image.id }}</p><h1>Edit photo.</h1></div></div>
+  <form class="form-card edit-product-card gallery-edit-card" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    {% set image_src = gallery_image_url(image.image) %}{% if image_src %}<figure class="gallery-edit-preview"><img src="{{ image_src }}" alt="{{ image.title }}"><figcaption>Current image</figcaption></figure>{% endif %}
+    <label>Title<input type="text" name="title" maxlength="120" value="{{ image.title }}" required></label>
+    <label>Caption / description<textarea name="description" rows="5" maxlength="4000">{{ image.description }}</textarea></label>
+    <label>Replace image <small class="field-help">Optional · JPG, PNG or WEBP · maximum 8 MB</small><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
+    <label>Display order<input type="number" name="sort_order" step="1" value="{{ image.sort_order }}"><small class="field-help">Lower numbers appear first.</small></label>
+    <label class="catalog-setting-toggle"><input type="checkbox" name="active" value="yes" {% if image.active %}checked{% endif %}><span><strong>Visible on public gallery</strong><small>Uncheck to hide this image without deleting it.</small></span></label>
+    <div class="form-actions"><button class="button button-dark" type="submit">Save gallery image</button><a class="button button-outline" href="{{ url_for('admin.gallery_manager') }}">Cancel</a></div>
+  </form>
 </div></div>
 {% endblock %}

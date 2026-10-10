@@ -127,7 +127,8 @@ class Config:
     SESSION_COOKIE_SECURE = IS_PRODUCTION
     SESSION_COOKIE_SAMESITE = "Lax"
     PERMANENT_SESSION_LIFETIME = 60 * 60 * 8
-    MAX_CONTENT_LENGTH = 1 * 1024 * 1024
+    # The request may include an image capped at 8 MB plus multipart headers/form fields.
+    MAX_CONTENT_LENGTH = 9 * 1024 * 1024
 
     @classmethod
     def validate(cls):

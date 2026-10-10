@@ -11,7 +11,7 @@
         <div class="cart-line">
           <div class="mini-art product-photo art-{{ line.product.image }}"><img src="{{ product_image_url(line.product.image) }}" alt="{{ line.product.name }}" loading="lazy"></div>
           <div class="cart-line-main"><h3>{{ line.product.name }}</h3><span>{{ format_currency(line.product.price) }} per {{ line.product.unit }}</span></div>
-          <label class="quantity-control">Qty<input type="number" name="quantity_{{ line.product.id }}" min="0" max="{{ line.product.stock }}" value="{{ line.quantity }}"></label>
+          <label class="quantity-control">Qty<input type="number" name="quantity_{{ line.product.id }}" min="0" max="{{ format_quantity(line.product.stock) }}" step="{{ '0.001' if line.product.allow_fractional_quantity else '1' }}" value="{{ format_quantity(line.quantity) }}"></label>
           <strong class="line-price">{{ format_currency(line.line_subtotal) }}</strong>
           <button class="remove-button" type="submit" formaction="{{ url_for('shop.remove_from_cart', product_id=line.product.id) }}" aria-label="Remove {{ line.product.name }}">×</button>
         </div>

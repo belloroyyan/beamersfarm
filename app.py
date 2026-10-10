@@ -17,10 +17,11 @@ from routes.dispatch import dispatch_bp
 from routes.salesperson import salesperson_bp
 from routes.payments import payments_bp
 from routes.reviews import reviews_bp
-from utils.helpers import cart_count, format_currency
+from utils.helpers import cart_count, format_currency, format_quantity
 from utils.greetings import time_of_day_greeting
 from utils.updates import linkify, update_image_url
 from utils.partner_ads import partner_image_url
+from utils.gallery import gallery_image_url
 from utils.product_images import product_image_url
 from utils.security import csrf_token, validate_csrf
 
@@ -123,7 +124,9 @@ def create_app():
             "product_image_url": product_image_url,
             "update_image_url": update_image_url,
             "partner_image_url": partner_image_url,
+            "gallery_image_url": gallery_image_url,
             "format_currency": format_currency,
+            "format_quantity": format_quantity,
             "cart_count": cart_count(session.get("cart", {})),
             "csrf_token": csrf_token,
             "payment_bank": app.config["PAYMENT_BANK"],

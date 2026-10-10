@@ -1,12 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Gallery · Beamers Farm{% endblock %}
+{% block title %}Farm gallery · Beamers Farm{% endblock %}
 {% block content %}
-<section class="gallery-hero container">
-  <div><p class="eyebrow">Inside Beamers Farm</p><h1>A closer look at our farm, products, and local service.</h1><p class="gallery-lede">Welcome to the Beamers Farm gallery. We share simple moments from our cold room, carefully prepared portions, packaging, and the people we serve across Osogbo.</p></div>
-  <div class="gallery-hero-note"><strong>Fresh. Clean. Local.</strong><span>Every image tells a small part of our promise: hygienically packaged frozen chicken, prepared with care for homes, restaurants, caterers, resellers, and students.</span></div>
-</section>
-<section class="container section gallery-section">
-  <div class="section-heading"><div><p class="eyebrow">Beamers Farm gallery</p><h2>From our place to your table.</h2></div><span class="section-note">{{ images|length }} image{{ '' if images|length == 1 else 's' }}</span></div>
-  {% if images %}<div class="gallery-grid">{% for image in images %}<article class="gallery-card"><div class="gallery-image-wrap"><img src="{{ gallery_image_url(image.image) }}" alt="{{ image.title }}" loading="lazy"></div><div class="gallery-card-copy"><h3>{{ image.title }}</h3>{% if image.description %}<p>{{ image.description }}</p>{% endif %}</div></article>{% endfor %}</div>{% else %}<div class="empty-state"><span class="empty-icon">+</span><h2>Our gallery is coming together.</h2><p>We are preparing a few scenes from Beamers Farm. Please check back soon.</p><a class="button button-dark" href="{{ url_for('shop.products') }}">Browse products</a></div>{% endif %}
+<section class="container page-shell public-gallery-page">
+  <div class="page-heading gallery-heading"><div><p class="eyebrow">A closer look</p><h1>Life at Beamers Farm.</h1><p class="section-intro">Farm moments, product preparation, and updates from our team in Osogbo.</p></div></div>
+  {% if images %}<div class="public-gallery-grid">
+    {% for image in images %}{% set image_src = gallery_image_url(image.image) %}{% if image_src %}<figure class="public-gallery-card"><a href="{{ image_src }}" target="_blank" rel="noopener" aria-label="Open full-size photo: {{ image.title }}"><img src="{{ image_src }}" alt="{{ image.title }}" loading="lazy"></a><figcaption><strong>{{ image.title }}</strong>{% if image.description %}<p>{{ image.description }}</p>{% endif %}</figcaption></figure>{% endif %}{% endfor %}
+  </div>{% else %}<div class="empty-state"><h2>Gallery coming soon.</h2><p>We are preparing photos from Beamers Farm. Check back soon.</p><a class="button button-dark" href="{{ url_for('shop.products') }}">Browse products</a></div>{% endif %}
 </section>
 {% endblock %}

@@ -48,6 +48,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 5000);
   });
 
+  document.querySelectorAll('[data-fractional-quantity-toggle]').forEach((toggle) => {
+    const form = toggle.closest('form');
+    const stockInput = form && form.querySelector('[data-stock-quantity]');
+    if (!stockInput) return;
+    const syncStep = () => { stockInput.step = toggle.checked ? '0.001' : '1'; };
+    syncStep();
+    toggle.addEventListener('change', syncStep);
+  });
+
   document.querySelectorAll('input[type="number"]').forEach((input) => {
     input.addEventListener('change', () => {
       const min = Number(input.min || 0);

@@ -94,9 +94,9 @@ def build_inventory_report(period="30d", search="", start_raw="", end_raw="", no
             "unit": product.unit,
             "stock": product.stock,
             "active": product.active,
-            "verified_units": 0,
-            "pending_units": 0,
-            "cancelled_units": 0,
+            "verified_units": Decimal("0.000"),
+            "pending_units": Decimal("0.000"),
+            "cancelled_units": Decimal("0.000"),
             "verified_requested_kg": Decimal("0.000"),
             "pending_requested_kg": Decimal("0.000"),
             "verified_sales": Decimal("0.00"),
@@ -117,16 +117,16 @@ def build_inventory_report(period="30d", search="", start_raw="", end_raw="", no
                     "unit": item.unit or "unit",
                     "stock": 0,
                     "active": False,
-                    "verified_units": 0,
-                    "pending_units": 0,
-                    "cancelled_units": 0,
+                    "verified_units": Decimal("0.000"),
+                    "pending_units": Decimal("0.000"),
+                    "cancelled_units": Decimal("0.000"),
                     "verified_requested_kg": Decimal("0.000"),
                     "pending_requested_kg": Decimal("0.000"),
                     "verified_sales": Decimal("0.00"),
                 }
                 rows_by_key[key] = row
 
-            quantity = int(item.quantity or 0)
+            quantity = Decimal(str(item.quantity or 0))
             requested_kg = item.requested_weight_kg
             if requested_kg is None:
                 requested_kg = item.actual_weight_kg
@@ -173,14 +173,14 @@ def build_inventory_report(period="30d", search="", start_raw="", end_raw="", no
         "rows": visible_rows,
         "orders": orders,
         "metrics": {
-            "active_stock_units": sum(product.stock for product in products if product.active),
+            "active_stock_units": sum((Decimal(str(product.stock or 0)) for product in products if product.active), Decimal("0.000")),
             "low_stock_products": sum(1 for product in products if product.active and product.stock <= 5),
             "verified_orders": len(verified_order_ids),
             "pending_orders": len(pending_order_ids),
             "cancelled_orders": len(cancelled_order_ids),
-            "verified_units": sum(row["verified_units"] for row in all_rows),
-            "pending_units": sum(row["pending_units"] for row in all_rows),
-            "cancelled_units": sum(row["cancelled_units"] for row in all_rows),
+            "verified_units": sum((row["verified_units"] for row in all_rows), Decimal("0.000")),
+            "pending_units": sum((row["pending_units"] for row in all_rows), Decimal("0.000")),
+            "cancelled_units": sum((row["cancelled_units"] for row in all_rows), Decimal("0.000")),
             "verified_item_sales": sum((row["verified_sales"] for row in all_rows), Decimal("0.00")),
             "money_received": money_received,
             "money_refunded": money_refunded,

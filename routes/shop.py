@@ -5,9 +5,10 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from flask import Blueprint, abort, current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
+from sqlalchemy import or_
 
-from models import CustomerPushSubscription, DeliveryZone, Order, OrderFinancialRecord, OrderItem, PartnerListing, Product, SalespersonAccount, ShopSettings, ShopUpdate, db
-from utils.helpers import build_cart, product_uses_requested_kg
+from models import CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, PartnerListing, Product, SalespersonAccount, ShopSettings, ShopUpdate, db
+from utils.helpers import build_cart, format_quantity, parse_quantity, product_uses_requested_kg
 from utils.notifications import normalize_nigerian_phone
 from utils.push_subscriptions import valid_push_endpoint
 from utils.update_share import render_update_share_image
@@ -205,10 +206,18 @@ def dismiss_update():
 
 @shop_bp.get("/products")
 def products():
-    products = available_products_query().order_by(Product.created_at.asc()).all()
+    search_query = request.args.get("q", "").strip()[:120]
+    products_query = available_products_query()
+    if search_query:
+        filters = [Product.name.ilike(f"%{search_query}%"), Product.description.ilike(f"%{search_query}%")]
+        if search_query.isdigit():
+            filters.append(Product.id == int(search_query))
+        products_query = products_query.filter(or_(*filters))
+    products = products_query.order_by(Product.created_at.asc()).all()
     return render_template(
         "products.html", products=products,
         partner_ads=partner_advertisements_query().all(),
+        search_query=search_query,
     )
 
 
@@ -224,6 +233,14 @@ def product_detail(product_id):
     return render_template("product.html", product=product)
 
 
+@shop_bp.get("/gallery")
+def gallery():
+    images = GalleryImage.query.filter_by(active=True).order_by(
+        GalleryImage.sort_order.asc(), GalleryImage.created_at.desc(), GalleryImage.id.desc()
+    ).all()
+    return render_template("gallery.html", images=images)
+
+
 @shop_bp.get("/cart")
 def cart():
     return render_template("cart.html", summary=cart_summary())
@@ -236,21 +253,28 @@ def add_to_cart(product_id):
         flash("That product is currently unavailable.", "error")
         return redirect(url_for("shop.index"))
     try:
-        quantity = int(request.form.get("quantity", 1))
-    except (TypeError, ValueError):
-        quantity = 1
-    quantity = max(1, quantity)
+        quantity = parse_quantity(
+            request.form.get("quantity", "1"),
+            allow_fractional=bool(product.allow_fractional_quantity),
+        )
+    except ValueError as error:
+        flash(str(error), "error")
+        return redirect(request.referrer or url_for("shop.product_detail", product_id=product.id))
     if quantity > product.stock:
-        flash(f"Only {product.stock} {product.name} unit(s) are available.", "error")
+        flash(f"Only {format_quantity(product.stock)} {product.name} unit(s) are available.", "error")
         return redirect(request.referrer or url_for("shop.product_detail", product_id=product.id))
     cart = current_cart()
     key = str(product.id)
     existing = cart.get(key, 0)
     existing_value = existing.get("quantity", 0) if isinstance(existing, dict) else existing
     try:
-        existing_quantity = max(0, int(existing_value or 0))
-    except (TypeError, ValueError, OverflowError):
-        existing_quantity = 0
+        existing_quantity = parse_quantity(
+            existing_value or "0",
+            allow_fractional=bool(product.allow_fractional_quantity),
+            allow_zero=True,
+        )
+    except ValueError:
+        existing_quantity = Decimal("0.000")
     new_quantity = existing_quantity + quantity
     if new_quantity > product.stock:
         flash(f"Your cart would exceed the available stock of {product.name}.", "error")
@@ -268,9 +292,9 @@ def add_to_cart(product_id):
         except (InvalidOperation, TypeError, ValueError):
             flash("Enter the combined requested weight for this product in kg (0.001–500 kg).", "error")
             return redirect(request.referrer or url_for("shop.product_detail", product_id=product.id))
-        cart[key] = {"quantity": new_quantity, "requested_weight_kg": str(combined_kg)}
+        cart[key] = {"quantity": format_quantity(new_quantity), "requested_weight_kg": str(combined_kg)}
     else:
-        cart[key] = new_quantity
+        cart[key] = format_quantity(new_quantity)
     session.modified = True
     flash(f"{product.name} added to your cart.", "success")
     return redirect(request.referrer or url_for("shop.index"))
@@ -281,14 +305,23 @@ def update_cart():
     cart = current_cart()
     updated_cart = {}
     for key in list(cart):
-        try:
-            quantity = int(request.form.get(f"quantity_{key}", 0))
-        except (TypeError, ValueError):
-            quantity = 0
         product = db.session.get(Product, int(key)) if str(key).isdigit() else None
-        if not product or quantity <= 0:
+        if not product:
             continue
-        quantity = min(quantity, product.stock)
+        try:
+            quantity = parse_quantity(
+                request.form.get(f"quantity_{key}", "0"),
+                allow_fractional=bool(product.allow_fractional_quantity),
+                allow_zero=True,
+            )
+        except ValueError as error:
+            flash(f"{product.name}: {error} No cart changes were saved.", "error")
+            return redirect(url_for("shop.cart"))
+        if quantity <= 0:
+            continue
+        if quantity > product.stock:
+            flash(f"Only {format_quantity(product.stock)} {product.name} unit(s) are available. No cart changes were saved.", "error")
+            return redirect(url_for("shop.cart"))
         if product_uses_requested_kg(product):
             try:
                 requested_kg = Decimal(request.form.get(f"requested_weight_kg_{key}", ""))
@@ -298,9 +331,9 @@ def update_cart():
             except (InvalidOperation, TypeError, ValueError):
                 flash("Enter a valid total requested weight in kg (0.001–500 kg). No cart changes were saved.", "error")
                 return redirect(url_for("shop.cart"))
-            updated_cart[key] = {"quantity": quantity, "requested_weight_kg": str(requested_kg)}
+            updated_cart[key] = {"quantity": format_quantity(quantity), "requested_weight_kg": str(requested_kg)}
         else:
-            updated_cart[key] = quantity
+            updated_cart[key] = format_quantity(quantity)
     cart.clear()
     cart.update(updated_cart)
     session.modified = True
@@ -455,8 +488,16 @@ def order_success(order_ref, token):
     if order is None:
         from flask import abort
         abort(404)
+    recommended_products = available_products_query().filter(
+        Product.recommended.is_(True)
+    ).order_by(Product.created_at.asc()).limit(6).all()
+    recommended_partner_listings = PartnerListing.query.filter_by(
+        active=True, recommended=True
+    ).order_by(PartnerListing.sort_order.asc(), PartnerListing.updated_at.desc()).limit(6).all()
     return render_template(
-        "order_success.html", order=order, partner_ads=partner_advertisements_query().all(),
+        "order_success.html", order=order,
+        recommended_products=recommended_products,
+        recommended_partner_listings=recommended_partner_listings,
         push_configured=web_push_is_configured(),
         vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""),
     )

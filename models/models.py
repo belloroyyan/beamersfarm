@@ -29,7 +29,8 @@ class Product(db.Model):
     description = db.Column(db.Text, nullable=False, default="")
     price = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     unit = db.Column(db.String(80), nullable=False, default="per pack")
-    stock = db.Column(db.Integer, nullable=False, default=0)
+    stock = db.Column(db.Numeric(12, 3), nullable=False, default=Decimal("0.000"))
+    allow_fractional_quantity = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     image = db.Column(db.String(80), nullable=False, default="chicken")
     active = db.Column(db.Boolean, nullable=False, default=True)
     featured = db.Column(db.Boolean, nullable=False, default=False)
@@ -275,7 +276,7 @@ class OrderItem(db.Model):
     order_id = db.Column(db.Integer, db.ForeignKey("orders.id"), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id"), nullable=True)
     product_name = db.Column(db.String(120), nullable=False)
-    quantity = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Numeric(12, 3), nullable=False)
     unit_price = db.Column(db.Numeric(12, 2), nullable=False)
     unit = db.Column(db.String(80), nullable=False, default="per pack", server_default="per pack")
     pricing_type = db.Column(db.String(30), nullable=False, default="fixed", server_default="fixed")
@@ -306,6 +307,18 @@ class ShopUpdate(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
+class GalleryImage(db.Model):
+    __tablename__ = "gallery_images"
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text, nullable=False, default="")
+    image = db.Column(db.String(160), nullable=False)
+    active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    sort_order = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
 class PartnerListing(db.Model):
     """An independent supplier advertisement, not a Beamers Farm product."""
     __tablename__ = "partner_listings"
@@ -327,6 +340,7 @@ class PartnerListing(db.Model):
     social_links_json = db.Column(db.Text, nullable=False, default="[]")
     image = db.Column(db.String(160), nullable=True)
     active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    recommended = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     sort_order = db.Column(db.Integer, nullable=False, default=0, server_default="0")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

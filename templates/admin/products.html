@@ -13,7 +13,7 @@
           <div class="mini-art product-photo art-{{ product.image }}"><img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy"></div>
           <div class="admin-product-main"><strong>{{ product.name }}</strong><small>Product ID #{{ product.id }} · {{ product.unit }} · {% if product.active %}Visible{% else %}Archived{% endif %}</small></div>
           <div class="admin-product-number"><span>PRICE PER {{ product.unit|upper }}</span><strong>{{ format_currency(product.price) }}</strong></div>
-          <div class="admin-product-number"><span>STOCK UNITS</span><strong class="{% if product.stock <= 5 %}number-alert{% endif %}">{{ product.stock }}</strong></div>
+          <div class="admin-product-number"><span>STOCK UNITS</span><strong class="{% if product.stock <= 5 %}number-alert{% endif %}">{{ format_quantity(product.stock) }}</strong></div>
         </a>
         {% endfor %}
       </div>
@@ -25,7 +25,8 @@
         <label>Product name<input type="text" name="name" placeholder="e.g. Chicken Wings" required></label>
         <label>Description<textarea name="description" rows="3" placeholder="Short description for customers"></textarea></label>
         <div class="field-grid"><label>Price per unit (₦)<input type="number" name="price" min="0" step="0.01" placeholder="4500" required><small class="field-help">The ordinary listed price multiplied by quantity.</small></label><label>Price unit<input type="text" name="unit" value="per pack" maxlength="80" required><small class="field-help">Use a clear label such as bird, bag, or pack. Stock remains a count of physical units.</small></label></div>
-        <label>Stock count<input type="number" name="stock" min="0" step="1" placeholder="12" required><small class="field-help">Whole sale units available.</small></label>
+        <label>Stock on hand<input id="new-product-stock" data-stock-quantity type="number" name="stock" min="0" step="1" placeholder="12" required><small class="field-help">Available sale quantity.</small></label>
+        <label class="catalog-setting-toggle"><input type="checkbox" name="allow_fractional_quantity" value="yes" data-fractional-quantity-toggle><span><strong>Allow fractional quantities</strong><small>Enable partial orders (for example, 0.5 or 1.25), up to three decimal places.</small></span></label>
         <label>Product image <small class="field-help">Optional · JPG, PNG, or WEBP · max 8 MB</small><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
         <button class="button button-lime button-full" type="submit">Add product <span>+</span></button>
       </form>

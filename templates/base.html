@@ -35,7 +35,7 @@
         <img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="" class="brand-mark">
         <span><strong>BEAMERS FARM</strong><small>Fresh, clean, hygienically packaged.</small></span>
       </a>
-      <a class="header-cart" href="{{ url_for('shop.cart') }}" aria-label="Open your cart">Cart <span class="cart-count">{{ cart_count }}</span></a>
+      <a class="header-cart" href="{{ url_for('shop.cart') }}" aria-label="Open your cart">Cart <span class="cart-count">{{ format_quantity(cart_count) }}</span></a>
       <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-menu" aria-label="Open menu"><span></span><span></span><span></span></button>
       <nav class="main-nav" id="main-menu" aria-label="Main navigation">
         <a href="{{ url_for('shop.index') }}">Shop</a>
@@ -46,7 +46,8 @@
           <summary>More</summary>
           <div class="nav-more-menu">
             <a href="{{ url_for('reviews.testimonials') }}">Testimonials</a>
-            <a href="{{ url_for('reviews.submit_review') }}">Reviews</a>
+            <a href="{{ url_for('reviews.submit_review') }}">Leave a Review</a>
+            <a href="{{ url_for('shop.gallery') }}">Gallery</a>
             <a href="{{ url_for('shop.help_page') }}">Help</a>
             <a href="{{ url_for('complaints.create_complaint') }}">Customer care</a>
             {% if session.get('staff_role') == 'owner' or session.get('admin_logged_in') %}
@@ -60,7 +61,7 @@
             {% endif %}
           </div>
         </details>
-        <span class="shop-status {{ 'shop-open' if shop_is_open else 'shop-closed' }}">{{ 'Open' if shop_is_open else 'Closed' }}</span>
+          <span class="shop-status {{ 'shop-open' if shop_is_open else 'shop-closed' }}">{{ 'Open' if shop_is_open else 'Closed' }}</span>
       </nav>
     </div>
   </header>

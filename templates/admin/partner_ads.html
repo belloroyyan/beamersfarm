@@ -2,7 +2,7 @@
 {% block title %}Partner advertisements · Owner desk{% endblock %}
 {% block content %}
 <div class="admin-shell"><div class="container">
-  <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / independent offers</p><h1>Partner advertisements</h1><p class="form-note">These are third-party listings only. They are not Beamers Farm products, stock, or checkout items.</p></div><a class="button button-outline light-outline" href="{{ url_for('shop.index') }}#partner-offers">View public offers ↗</a></div>
+  <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / independent offers</p><h1>Partner advertisements</h1><p class="form-note">These are third-party listings only. They are not Beamers Farm products, stock, or checkout items.</p></div><div class="receipt-toolbar-inline"><a class="button button-outline light-outline" href="{{ url_for('admin.order_success_recommendations') }}">Manage “You may also like”</a><a class="button button-outline light-outline" href="{{ url_for('shop.index') }}#partner-offers">View public offers ↗</a></div></div>
   <div class="partner-admin-grid">
     <section class="admin-panel">
       <div class="panel-heading"><div><p class="eyebrow">Supplier listings</p><h2>Offers and availability</h2></div><span class="section-note">{{ listings|length }} shown</span></div>
@@ -30,6 +30,7 @@
         <label>Social / profile links <small class="field-help">One per line, optionally formatted as Label | https://… (up to 10 links).</small><textarea name="social_links" rows="3" placeholder="Instagram | https://instagram.com/example&#10;Facebook | https://facebook.com/example"></textarea></label>
         <div class="field-grid"><label>Supplier location<input type="text" name="supplier_location" maxlength="180" placeholder="Area or town (optional)"></label><label>Display order<input type="number" name="sort_order" value="0" step="1"><small class="field-help">Lower numbers appear first.</small></label></div>
         <label class="catalog-setting-toggle"><input type="checkbox" name="active" value="yes" checked><span><strong>Publish immediately</strong><small>Uncheck to save this listing as paused.</small></span></label>
+        <label class="catalog-setting-toggle"><input type="checkbox" name="recommended" value="yes"><span><strong>Include in post-order recommendations</strong><small>Only active listings can appear after a customer completes an order.</small></span></label>
         <button class="button button-lime button-full" type="submit">Add partner offer <span>+</span></button>
       </form>
     </section>

@@ -10,9 +10,11 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import Complaint, CustomerPushSubscription, DeliveryZone, Order, OrderFinancialRecord, OrderItem, OrderNotification, PartnerListing, Product, Review, SalespersonAccount, ShopSettings, ShopUpdate, StaffPushSubscription, db, order_customer_push_subscriptions
+from models import Complaint, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, PartnerListing, Product, Review, SalespersonAccount, ShopSettings, ShopUpdate, StaffPushSubscription, db, order_customer_push_subscriptions
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.product_images import save_product_image
+from utils.gallery import delete_gallery_image, save_gallery_image
+from utils.helpers import parse_quantity
 from utils.partner_ads import delete_partner_image, normalize_http_url, parse_social_links, save_partner_image, social_links_text
 from utils.updates import delete_update_image, save_update_image
 from utils.security import is_safe_redirect_url
@@ -50,13 +52,16 @@ def _inventory_report_from_request():
 def parse_product_price_stock(form):
     try:
         price = Decimal(form.get("price", "0"))
-        stock = int(form.get("stock", "0"))
-        if price < 0 or price > MAX_PRODUCT_PRICE or stock < 0:
+        allow_fractional = form.get("allow_fractional_quantity") == "yes"
+        stock = parse_quantity(
+            form.get("stock", "0"), allow_fractional=allow_fractional, allow_zero=True
+        )
+        if not price.is_finite() or price < 0 or price > MAX_PRODUCT_PRICE:
             raise ValueError("Enter a valid non-negative price and stock amount.")
     except (ArithmeticError, TypeError, ValueError) as error:
         if isinstance(error, ValueError) and str(error):
             raise
-        raise ValueError("Enter a valid price and whole-number stock amount.") from error
+        raise ValueError("Enter a valid price and stock quantity.") from error
     return price, stock
 
 
@@ -358,11 +363,18 @@ def order_detail(order_ref):
         from flask import abort
         abort(404)
     if request.method == "POST":
-        verify_only = request.form.get("verify_payment_only") == "yes"
+        verify_and_confirm = request.form.get("verify_and_confirm") == "yes" or request.form.get("verify_payment_only") == "yes"
+        verify_payment = verify_and_confirm or request.form.get("verify_payment") == "yes"
+        if verify_payment and order.total > 0 and order.payment_status != "Verified" and request.form.get("verify_payment") != "yes":
+            flash("Check the POS/bank attestation before verifying the payment.", "error")
+            return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+        selected_status = request.form.get("status", "")
+        if verify_and_confirm or (verify_payment and selected_status == "Received"):
+            selected_status = "Confirmed"
         ok, message = update_order_status(
             order,
-            order.status if verify_only else request.form.get("status", ""),
-            verify_payment=verify_only or request.form.get("verify_payment") == "yes",
+            selected_status,
+            verify_payment=verify_payment,
             actor="owner",
             actor_name="Owner",
         )
@@ -546,6 +558,7 @@ def products():
                 price=price,
                 unit=unit[:80],
                 stock=stock,
+                allow_fractional_quantity=request.form.get("allow_fractional_quantity") == "yes",
                 image=image_path or "chicken",
             ))
             db.session.commit()
@@ -599,6 +612,7 @@ def edit_product(product_id):
             return render_edit()
         product.price = price
         product.stock = stock
+        product.allow_fractional_quantity = request.form.get("allow_fractional_quantity") == "yes"
         product.active = active
         product.featured = show_on_homepage
         product.name = request.form.get("name", "").strip()[:120] or product.name
@@ -676,7 +690,137 @@ def parse_partner_listing_form(form):
         "social_links_json": links,
         "sort_order": sort_order,
         "active": form.get("active") == "yes",
+        "recommended": form.get("recommended") == "yes",
     }
+
+
+@admin_bp.route("/recommendations", methods=["GET", "POST"])
+@admin_required
+def order_success_recommendations():
+    """Select the mixed Beamers/independent-offer section shown after checkout."""
+    if request.method == "POST":
+        product_ids = {int(value) for value in request.form.getlist("products") if value.isdigit()}
+        partner_ids = {int(value) for value in request.form.getlist("partner_listings") if value.isdigit()}
+        if len(product_ids) > 6 or len(partner_ids) > 6:
+            flash("Choose no more than six Beamers products and six independent offers.", "error")
+            return redirect(url_for("admin.order_success_recommendations"))
+        products = Product.query.all()
+        listings = PartnerListing.query.all()
+        for product in products:
+            product.recommended = product.active and product.id in product_ids
+        for listing in listings:
+            listing.recommended = listing.active and listing.id in partner_ids
+        db.session.commit()
+        flash("The post-order “You may also like” section has been updated.", "success")
+        return redirect(url_for("admin.order_success_recommendations"))
+    products = Product.query.order_by(Product.active.desc(), Product.name.asc()).all()
+    listings = PartnerListing.query.order_by(
+        PartnerListing.active.desc(), PartnerListing.sort_order.asc(), PartnerListing.name.asc()
+    ).all()
+    return render_template(
+        "admin/recommendations.html", products=products, listings=listings
+    )
+
+
+@admin_bp.route("/gallery", methods=["GET", "POST"])
+@admin_required
+def gallery_manager():
+    if request.method == "POST":
+        title = request.form.get("title", "").strip()
+        description = request.form.get("description", "").strip()
+        try:
+            sort_order = int(request.form.get("sort_order", "0") or 0)
+        except (TypeError, ValueError):
+            flash("Enter a whole-number display order.", "error")
+            return redirect(url_for("admin.gallery_manager"))
+        if not title or len(title) > 120 or len(description) > 4000:
+            flash("Enter a title up to 120 characters and a description up to 4,000 characters.", "error")
+            return redirect(url_for("admin.gallery_manager"))
+        if not -100_000 <= sort_order <= 100_000:
+            flash("Display order must be between -100,000 and 100,000.", "error")
+            return redirect(url_for("admin.gallery_manager"))
+        image_key, image_error = save_gallery_image(request.files.get("image"))
+        if image_error:
+            flash(image_error, "error")
+            return redirect(url_for("admin.gallery_manager"))
+        if not image_key:
+            flash("Choose a gallery image to upload.", "error")
+            return redirect(url_for("admin.gallery_manager"))
+        db.session.add(GalleryImage(
+            title=title, description=description, image=image_key,
+            active=request.form.get("active") == "yes", sort_order=sort_order,
+        ))
+        db.session.commit()
+        flash("Gallery image added.", "success")
+        return redirect(url_for("admin.gallery_manager"))
+
+    search_query = request.args.get("q", "").strip()[:120]
+    images_query = GalleryImage.query.order_by(
+        GalleryImage.active.desc(), GalleryImage.sort_order.asc(), GalleryImage.created_at.desc()
+    )
+    if search_query:
+        filters = [GalleryImage.title.ilike(f"%{search_query}%"), GalleryImage.description.ilike(f"%{search_query}%")]
+        if search_query.isdigit():
+            filters.append(GalleryImage.id == int(search_query))
+        images_query = images_query.filter(or_(*filters))
+    return render_template(
+        "admin/gallery.html", images=images_query.all(), search_query=search_query
+    )
+
+
+@admin_bp.route("/gallery/<int:image_id>/edit", methods=["GET", "POST"])
+@admin_required
+def edit_gallery_image(image_id):
+    image = GalleryImage.query.get_or_404(image_id)
+    if request.method == "POST":
+        title = request.form.get("title", "").strip()
+        description = request.form.get("description", "").strip()
+        try:
+            sort_order = int(request.form.get("sort_order", "0") or 0)
+        except (TypeError, ValueError):
+            flash("Enter a whole-number display order.", "error")
+            return render_template("admin/gallery_edit.html", image=image)
+        if not title or len(title) > 120 or len(description) > 4000 or not -100_000 <= sort_order <= 100_000:
+            flash("Check the title, description, and display-order limits.", "error")
+            return render_template("admin/gallery_edit.html", image=image)
+        replacement, image_error = save_gallery_image(request.files.get("image"))
+        if image_error:
+            flash(image_error, "error")
+            return render_template("admin/gallery_edit.html", image=image)
+        old_key = image.image
+        image.title = title
+        image.description = description
+        image.sort_order = sort_order
+        image.active = request.form.get("active") == "yes"
+        if replacement:
+            image.image = replacement
+        db.session.commit()
+        if replacement and old_key != image.image:
+            delete_gallery_image(old_key)
+        flash("Gallery image updated.", "success")
+        return redirect(url_for("admin.gallery_manager"))
+    return render_template("admin/gallery_edit.html", image=image)
+
+
+@admin_bp.post("/gallery/<int:image_id>/toggle")
+@admin_required
+def toggle_gallery_image(image_id):
+    image = GalleryImage.query.get_or_404(image_id)
+    image.active = not image.active
+    db.session.commit()
+    flash(f"{image.title} is now {'visible' if image.active else 'hidden'} on the public gallery.", "success")
+    return redirect(url_for("admin.gallery_manager"))
+
+
+@admin_bp.post("/gallery/<int:image_id>/delete")
+@admin_required
+def delete_gallery_entry(image_id):
+    image = GalleryImage.query.get_or_404(image_id)
+    delete_gallery_image(image.image)
+    db.session.delete(image)
+    db.session.commit()
+    flash("Gallery image and uploaded file deleted.", "success")
+    return redirect(url_for("admin.gallery_manager"))
 
 
 @admin_bp.route("/partner-advertisements", methods=["GET", "POST"])
@@ -898,9 +1042,10 @@ def clear_database():
     clear_updates = request.form.get("clear_updates") == "yes"
     clear_reviews = request.form.get("clear_reviews") == "yes"
     clear_partner_ads = request.form.get("clear_partner_ads") == "yes"
+    clear_gallery = request.form.get("clear_gallery") == "yes"
     clear_customer_push = request.form.get("clear_customer_push") == "yes"
     reset_pins = request.form.get("reset_pins") == "yes"
-    if not any((clear_orders, clear_complaints, clear_messages, clear_updates, clear_reviews, clear_partner_ads, clear_customer_push, reset_pins)):
+    if not any((clear_orders, clear_complaints, clear_messages, clear_updates, clear_reviews, clear_partner_ads, clear_gallery, clear_customer_push, reset_pins)):
         flash("Choose at least one data category or homepage option to clear.", "error")
         return redirect(url_for("admin.dashboard"))
 
@@ -943,6 +1088,12 @@ def clear_database():
             delete_partner_image(listing.image)
         PartnerListing.query.delete(synchronize_session=False)
         cleared.append("independent partner advertisements and supplier contact details")
+
+    if clear_gallery:
+        for image in GalleryImage.query.all():
+            delete_gallery_image(image.image)
+        GalleryImage.query.delete(synchronize_session=False)
+        cleared.append("gallery images and captions")
 
     if clear_customer_push and not clear_orders:
         db.session.execute(order_customer_push_subscriptions.delete())

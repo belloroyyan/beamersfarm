@@ -1,12 +1,31 @@
 {% extends "base.html" %}
-{% block title %}Gallery · Owner desk · Beamers Farm{% endblock %}
+{% block title %}Manage gallery · Owner desk{% endblock %}
 {% block content %}
 <div class="admin-shell"><div class="container">
-  <div class="admin-topbar compact-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / content</p><h1>Gallery.</h1><p class="form-note">Share selected moments from Beamers Farm. Use a short title, a simple description, and the display order to keep the page tidy.</p></div></div>
-  <div class="gallery-admin-grid"><section class="admin-panel"><div class="panel-heading"><div><p class="eyebrow">Published and hidden</p><h2>Gallery images</h2></div><span class="section-note">{{ images|length }} saved</span></div>
-    {% if images %}<div class="gallery-admin-list">{% for image in images %}<article class="gallery-admin-row {% if not image.active %}gallery-admin-hidden{% endif %}"><img src="{{ gallery_image_url(image.image) }}" alt="{{ image.title }}"><div><strong>{{ image.title }}</strong><small>{{ image.description or 'No description added.' }}</small><small>Order {{ image.sort_order }} · {{ 'Visible' if image.active else 'Hidden' }}</small></div><div class="row-actions"><a class="table-link" href="{{ url_for('admin.edit_gallery_image', image_id=image.id) }}">Edit</a><form method="post" action="{{ url_for('admin.toggle_gallery_image', image_id=image.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="text-button" type="submit">{{ 'Hide' if image.active else 'Show' }}</button></form><form method="post" action="{{ url_for('admin.delete_gallery_image', image_id=image.id) }}" onsubmit="return confirm('Delete this gallery image?');"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="text-button danger-text" type="submit">Delete</button></form></div></article>{% endfor %}</div>{% else %}<div class="empty-state compact"><h3>No gallery images yet.</h3><p>Add the first image using the form.</p></div>{% endif %}
-  </section>
-  <aside class="admin-panel gallery-add-panel"><p class="eyebrow">Add an image</p><h2>New gallery image</h2><form method="post" enctype="multipart/form-data"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><label>Title<input name="title" maxlength="120" placeholder="e.g. Ready for your kitchen" required></label><label>Description<textarea name="description" maxlength="2000" rows="5" placeholder="A short, warm description for customers."></textarea></label><label>Image<input type="file" name="image" accept="image/jpeg,image/png,image/webp" required><small class="field-help">JPG, PNG, or WEBP. Maximum upload size follows the application limit.</small></label><label>Display order<input type="number" name="sort_order" value="0" min="0" step="1"><small class="field-help">Lower numbers appear first.</small></label><button class="button button-dark button-full" type="submit">Add to gallery</button></form></aside>
+  <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / farm gallery</p><h1>Manage gallery.</h1><p class="form-note">Add farm and product photos for the public gallery. You control captions, display order, and visibility.</p></div><a class="button button-outline light-outline" href="{{ url_for('shop.gallery') }}">View public gallery ↗</a></div>
+  <div class="gallery-admin-grid">
+    <section class="admin-panel gallery-list-panel">
+      <div class="panel-heading"><div><p class="eyebrow">Gallery library</p><h2>Photos and captions</h2></div><span class="section-note">{{ images|length }} shown</span></div>
+      <form method="get" class="record-search" role="search"><label>Search images<input type="search" name="q" maxlength="120" value="{{ search_query }}" placeholder="Title, caption, or image ID"></label><button class="button button-dark" type="submit">Search</button>{% if search_query %}<a class="table-link" href="{{ url_for('admin.gallery_manager') }}">Clear</a>{% endif %}</form>
+      {% if images %}<div class="gallery-admin-list">
+        {% for image in images %}<article class="gallery-admin-row">
+          {% set image_src = gallery_image_url(image.image) %}{% if image_src %}<img class="gallery-admin-thumb" src="{{ image_src }}" alt="" loading="lazy">{% else %}<div class="gallery-admin-thumb gallery-placeholder">Missing file</div>{% endif %}
+          <div class="gallery-admin-copy"><div class="gallery-admin-title"><strong>{{ image.title }}</strong><span class="status-pill {{ 'status-delivered' if image.active else 'status-cancelled' }}">{{ 'Published' if image.active else 'Hidden' }}</span></div><small>Gallery image #{{ image.id }} · Order {{ image.sort_order }} · Added {{ image.created_at.strftime('%d %b %Y') }}</small><p>{{ image.description|truncate(140) if image.description else 'No caption.' }}</p></div>
+          <div class="gallery-admin-actions"><a class="table-link" href="{{ url_for('admin.edit_gallery_image', image_id=image.id) }}">Edit</a><form method="post" action="{{ url_for('admin.toggle_gallery_image', image_id=image.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="text-button" type="submit">{{ 'Hide' if image.active else 'Publish' }}</button></form><form method="post" action="{{ url_for('admin.delete_gallery_entry', image_id=image.id) }}" onsubmit="return confirm('Permanently delete this gallery photo and its file?')"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="text-button danger-text" type="submit">Delete</button></form></div>
+        </article>{% endfor %}
+      </div>{% else %}<div class="empty-state compact"><h3>{{ 'No matching gallery images.' if search_query else 'Your gallery is empty.' }}</h3><p>{{ 'Try a different title or ID.' if search_query else 'Add a photo with the form to begin.' }}</p></div>{% endif %}
+    </section>
+    <section class="admin-panel add-product-panel gallery-add-panel"><p class="eyebrow">New gallery photo</p><h2>Add an image</h2><p class="form-note">Use a photo you have permission to publish. Accepted: JPG, PNG, WEBP · max 8 MB.</p>
+      <form method="post" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        <label>Title<input type="text" name="title" maxlength="120" required placeholder="e.g. Fresh stock at the farm"></label>
+        <label>Caption / description<textarea name="description" rows="4" maxlength="4000" placeholder="Optional context for customers"></textarea></label>
+        <label>Photo<input type="file" name="image" accept="image/jpeg,image/png,image/webp" required></label>
+        <label>Display order<input type="number" name="sort_order" step="1" value="0"><small class="field-help">Lower numbers appear first.</small></label>
+        <label class="catalog-setting-toggle"><input type="checkbox" name="active" value="yes" checked><span><strong>Publish on the public gallery</strong><small>Uncheck to save the photo as hidden.</small></span></label>
+        <button class="button button-lime button-full" type="submit">Add gallery image <span>+</span></button>
+      </form>
+    </section>
   </div>
 </div></div>
 {% endblock %}

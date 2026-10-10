@@ -10,7 +10,7 @@
     <div class="detail-admin-grid">
       <section class="admin-panel">
         <div class="panel-heading"><div><p class="eyebrow">Order contents</p><h2>Items to deliver</h2></div></div>
-        {% for item in order.items %}<div class="admin-line"><div><strong>{{ item.quantity }} × {{ item.product_name }}</strong>{% if item.requested_weight_kg is not none %}<small>Customer requested {{ '%.3f'|format(item.requested_weight_kg) }} kg total across this line.</small>{% endif %}</div><strong>{{ format_currency(item.subtotal) }}</strong></div>{% endfor %}
+        {% for item in order.items %}<div class="admin-line"><div><strong>{{ format_quantity(item.quantity) }} × {{ item.product_name }}</strong>{% if item.requested_weight_kg is not none %}<small>Customer requested {{ '%.3f'|format(item.requested_weight_kg) }} kg total across this line.</small>{% endif %}</div><strong>{{ format_currency(item.subtotal) }}</strong></div>{% endfor %}
         <div class="dispatch-total"><span>Full order total</span><strong>{{ format_currency(order.total) }}</strong><small>{% if order.payment_status == 'Verified' %}Payment was verified before this order entered dispatch.{% else %}Check with the Sales desk before handover; payment has not yet been verified.{% endif %}</small></div>
         {% if order.has_weight_priced_items %}
           {% if order.payment_status == 'Verified' and order.weights_complete and order.weighing_completed_at %}

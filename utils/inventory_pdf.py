@@ -9,6 +9,7 @@ from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from utils.helpers import format_quantity
 
 INK = colors.HexColor("#23382f")
 LIME = colors.HexColor("#d4e88f")
@@ -17,6 +18,14 @@ MUTED = colors.HexColor("#68776f")
 
 def _amount(value):
     return f"NGN {Decimal(str(value or 0)):,.2f}"
+
+
+def _quantity(value):
+    amount = Decimal(str(value or 0))
+    normalized = format_quantity(amount)
+    whole, dot, fraction = normalized.partition(".")
+    whole = f"{int(whole):,}"
+    return whole + (dot + fraction if dot else "")
 
 
 def build_inventory_pdf(report, brand_mark_path=None):
@@ -93,7 +102,7 @@ def build_inventory_pdf(report, brand_mark_path=None):
     metrics = report["metrics"]
     metric_cells = []
     for label, value in [
-        ("ACTIVE STOCK UNITS", f"{metrics['active_stock_units']:,}"),
+        ("ACTIVE STOCK UNITS", _quantity(metrics["active_stock_units"])),
         ("LOW-STOCK PRODUCTS", f"{metrics['low_stock_products']:,}"),
         ("VERIFIED ORDERS", f"{metrics['verified_orders']:,}"),
         ("GROSS ITEM SALES", _amount(metrics["verified_item_sales"])),
@@ -125,10 +134,10 @@ def build_inventory_pdf(report, brand_mark_path=None):
             Paragraph(escape(product_id), styles["Cell"]),
             Paragraph(escape(row["name"]), styles["Cell"]),
             Paragraph(catalog_status, styles["Cell"]),
-            Paragraph(f"{row['stock']:,}", styles["CellRight"]),
-            Paragraph(f"{row['verified_units']:,}", styles["CellRight"]),
-            Paragraph(f"{row['pending_units']:,}", styles["CellRight"]),
-            Paragraph(f"{row['cancelled_units']:,}", styles["CellRight"]),
+            Paragraph(_quantity(row["stock"]), styles["CellRight"]),
+            Paragraph(_quantity(row["verified_units"]), styles["CellRight"]),
+            Paragraph(_quantity(row["pending_units"]), styles["CellRight"]),
+            Paragraph(_quantity(row["cancelled_units"]), styles["CellRight"]),
             Paragraph(f"{row['verified_requested_kg']:,.3f}", styles["CellRight"]),
             Paragraph(_amount(row["verified_sales"]), styles["CellRight"]),
         ])
@@ -154,8 +163,8 @@ def build_inventory_pdf(report, brand_mark_path=None):
     story.append(Spacer(1, 4 * mm))
     note = (
         f"Also in this period: {metrics['pending_orders']:,} unverified order(s) reserve "
-        f"{metrics['pending_units']:,} unit(s); {metrics['cancelled_orders']:,} cancelled "
-        f"order(s) returned {metrics['cancelled_units']:,} unit(s) to stock. "
+        f"{_quantity(metrics['pending_units'])} unit(s); {metrics['cancelled_orders']:,} cancelled "
+        f"order(s) returned {_quantity(metrics['cancelled_units'])} unit(s) to stock. "
         f"Gross item values are before recorded refunds and exclude delivery fees. Actual settled refunds: {_amount(metrics['money_refunded'])}; net cash inflow after refunds: {_amount(metrics['net_cash_inflow'])}. Stock is counted in physical sale units (birds, packs, etc.); kg values are customer-requested totals on verified lines."
     )
     story.append(Paragraph(escape(note), styles["FarmSubtitle"]))

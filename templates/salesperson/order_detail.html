@@ -10,7 +10,7 @@
     <section class="admin-panel">
       <div class="panel-heading"><div><p class="eyebrow">Customer order</p><h2>{% if permissions.view_customer_details %}{{ order.customer_name }}{% else %}Order contents{% endif %}</h2></div></div>
       {% for item in order.items %}
-      <div class="admin-line"><div><strong>{{ item.quantity }} × {{ item.product_name }}</strong><small>{% if item.requested_weight_kg is not none %}Requested combined total: {{ '%.3f'|format(item.requested_weight_kg) }} kg · rate {{ format_currency(item.unit_price) }}/kg{% elif item.pricing_type == 'weight_deposit' %}Legacy order · deposit {{ format_currency(item.unit_price) }} per {{ item.unit }} · final rate {{ format_currency(item.weight_price_per_kg) }}/kg{% else %}{{ format_currency(item.unit_price) }} per {{ item.unit }}{% endif %}</small></div><strong>{{ format_currency(item.subtotal) }}</strong></div>
+      <div class="admin-line"><div><strong>{{ format_quantity(item.quantity) }} × {{ item.product_name }}</strong><small>{% if item.requested_weight_kg is not none %}Requested combined total: {{ '%.3f'|format(item.requested_weight_kg) }} kg · rate {{ format_currency(item.unit_price) }}/kg{% elif item.pricing_type == 'weight_deposit' %}Legacy order · deposit {{ format_currency(item.unit_price) }} per {{ item.unit }} · final rate {{ format_currency(item.weight_price_per_kg) }}/kg{% else %}{{ format_currency(item.unit_price) }} per {{ item.unit }}{% endif %}</small></div><strong>{{ format_currency(item.subtotal) }}</strong></div>
       {% endfor %}
       <div class="summary-row"><span>Items subtotal</span><strong>{{ format_currency(order.subtotal) }}</strong></div>
       <div class="summary-row"><span>{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}{{ order.delivery_zone_name }}{% endif %}</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div>
@@ -24,7 +24,7 @@
         <p class="form-note">This control is retained only for historical records. Current catalog orders use ordinary listed-price × quantity pricing.</p>
         <form method="post" class="weight-entry-form">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="save_weights" value="yes">
-          {% for item in order.weight_priced_items %}<label>{{ item.quantity }} × {{ item.product_name }} · combined kg<input type="number" name="weight_{{ item.id }}" min="0.001" max="500" step="0.001" value="{{ '%.3f'|format(item.actual_weight_kg) if item.actual_weight_kg is not none else '' }}" placeholder="e.g. 4.250"></label>{% endfor %}
+          {% for item in order.weight_priced_items %}<label>{{ format_quantity(item.quantity) }} × {{ item.product_name }} · combined kg<input type="number" name="weight_{{ item.id }}" min="0.001" max="500" step="0.001" value="{{ '%.3f'|format(item.actual_weight_kg) if item.actual_weight_kg is not none else '' }}" placeholder="e.g. 4.250"></label>{% endfor %}
           <button class="button button-dark" type="submit">Save legacy weigh-in</button>
         </form>
         {% if permissions.view_customer_settlement and permissions.view_customer_details and order.final_total is not none and order.weighing_completed_at %}
@@ -51,7 +51,7 @@
             <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
             <label class="payment-verification-check"><input type="checkbox" name="payment_received" value="yes" required><span>I can see the completed incoming transfer for <strong>{{ format_currency(order.total) }}</strong> on the POS/bank account.</span></label>
             <label>POS / bank reference (optional)<input name="verification_reference" maxlength="160" placeholder="Transfer reference or trace ID"></label>
-            <div class="form-actions"><button class="button button-outline button-full" type="submit" name="verify_payment_only" value="yes">Verify transfer · leave Received</button><button class="button button-dark button-full" type="submit" name="verify_and_confirm" value="yes">Verify transfer and confirm</button></div>
+            <div class="form-actions"><button class="button button-lime button-full" type="submit" name="verify_and_confirm" value="yes">Verify payment, confirm order</button></div>
           </form>
           {% else %}<p class="form-note">Payment cannot be verified after fulfillment has started.</p>{% endif %}
         {% endif %}

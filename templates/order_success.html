@@ -2,7 +2,8 @@
 {% from "macros/partner_ad_card.html" import partner_ad_card with context %}
 {% block title %}Order received · Beamers Farm{% endblock %}
 {% block content %}
-<div class="container success-shell">
+{% set has_recommendations = recommended_products or recommended_partner_listings %}
+<div class="container success-shell{% if has_recommendations %} success-shell-with-recommendations{% endif %}">
   <div class="success-mark">✓</div>
   <p class="eyebrow">Order received</p>
   <h1>Thank you, {{ order.customer_name }}.</h1>
@@ -25,18 +26,14 @@
     <div class="payment-detail"><span>Bank</span><strong>{{ payment_bank }}</strong></div>
     <div class="payment-detail"><span>Account number</span><strong>{{ payment_account_number }}</strong></div>
     <div class="payment-detail"><span>Account name</span><strong>{{ payment_account_name }}</strong></div>
-    <div class="payment-reference">
-      <div><span>Reference</span><strong id="order-reference">Order #{{ order.public_id }}</strong></div>
-      <button class="copy-reference-button" type="button" data-copy-reference="{{ order.public_id }}" aria-label="Copy order reference {{ order.public_id }}">Copy reference</button>
-      <span class="copy-reference-status" role="status" aria-live="polite"></span>
-    </div>
+    <div class="payment-reference"><div><span>Reference</span><strong id="order-reference">Order #{{ order.public_id }}</strong></div><button class="copy-reference-button" type="button" data-copy-reference="{{ order.public_id }}" aria-label="Copy order reference {{ order.public_id }}">Copy reference</button><span class="copy-reference-status" role="status" aria-live="polite"></span></div>
     {% if order.payment_status == 'Verified' %}<p class="payment-confirmed-note">Payment was verified in the business bank account on {{ order.payment_verified_at.strftime('%d %b %Y · %H:%M') if order.payment_verified_at else 'file' }}.</p>{% endif %}
   </div>
 
   <div class="receipt-card">
     <div class="receipt-head"><span>ORDER #{{ order.public_id }}</span><span class="status-pill {% if order.payment_status == 'Verified' %}status-confirmed{% else %}status-received{% endif %}">{% if order.payment_status == 'Verified' %}Payment verified{% else %}Awaiting payment{% endif %}</span></div>
     {% for item in order.items %}
-    <div class="receipt-line"><span>{{ item.quantity }} × {{ item.product_name }}<small class="pricing-line-note">{{ format_currency(item.unit_price) }} per {{ item.unit }} × {{ item.quantity }}</small></span><strong>{{ format_currency(item.subtotal) }}</strong></div>
+    <div class="receipt-line"><span>{{ format_quantity(item.quantity) }} × {{ item.product_name }}<small class="pricing-line-note">{{ format_currency(item.unit_price) }} per {{ item.unit }} × {{ format_quantity(item.quantity) }}</small></span><strong>{{ format_currency(item.subtotal) }}</strong></div>
     {% endfor %}
     <div class="summary-row"><span>Items subtotal</span><strong>{{ format_currency(order.subtotal) }}</strong></div>
     <div class="summary-row"><span>{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}Delivery · {{ order.delivery_zone_name }}{% endif %}</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div>
@@ -44,13 +41,23 @@
     {% if order.has_weight_priced_items %}<p class="weight-pricing-disclaimer">This is a legacy order placed under the retired deposit-and-final-weighing workflow. See the customer receipt for its recorded settlement.</p>{% endif %}
     <div class="receipt-address"><span>{% if order.fulfillment_type == 'pickup' %}PICKUP LOCATION{% else %}DELIVER TO · {{ order.delivery_zone_name }}{% endif %}</span><strong>{{ order.address }}</strong></div>
   </div>
-  {% if partner_ads %}
-  <section class="success-recommendations partner-success-offers" aria-labelledby="success-recommendations-heading">
-    <p class="eyebrow">Independent supplier advertisements</p><h2 id="success-recommendations-heading">Partner offers</h2><p class="recommendation-copy">These are separate third-party listings. Beamers Farm does not stock, sell, fulfil, or take payment for them.</p>
-    <div class="partner-ad-grid">{% for listing in partner_ads %}{{ partner_ad_card(listing, true) }}{% endfor %}</div>
+
+  {% if has_recommendations %}
+  <section class="success-recommendations" aria-labelledby="success-recommendations-heading">
+    <p class="eyebrow">Selected by Beamers Farm</p><h2 id="success-recommendations-heading">You may also like</h2>
+    <p class="recommendation-copy">A mix of Beamers Farm products and independent supplier offers. Third-party offers are clearly labeled and handled directly by their listed suppliers.</p>
+    <div class="recommendation-grid">
+      {% for product in recommended_products %}
+      <article class="product-card recommendation-product-card">
+        <a class="product-art product-photo art-{{ product.image }}" href="{{ url_for('shop.product_detail', product_id=product.id) }}" aria-label="View {{ product.name }}"><img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy"><span class="photo-shade"></span></a>
+        <div class="product-info"><div class="product-heading"><h3>{{ product.name }}</h3><span class="stock-badge">{{ format_quantity(product.stock) }} left</span></div><p>{{ product.description|truncate(120) }}</p><div class="product-buy"><div><strong>{{ format_currency(product.price) }}</strong><small>per {{ product.unit }}</small></div><a class="button button-lime" href="{{ url_for('shop.product_detail', product_id=product.id) }}">View product <span>→</span></a></div></div>
+      </article>
+      {% endfor %}
+      {% for listing in recommended_partner_listings %}{{ partner_ad_card(listing, true) }}{% endfor %}
+    </div>
   </section>
   {% endif %}
-  <a class="button button-dark" href="{{ url_for('shop.index') }}">Back to Beamers Farm</a>
+  <a class="button button-dark success-back-home" href="{{ url_for('shop.index') }}">Back to Beamers Farm</a>
 </div>
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='js/copy-reference.js') }}" defer></script>{% if push_configured %}<script src="{{ url_for('static', filename='js/customer-push.js') }}" defer></script>{% endif %}{% endblock %}

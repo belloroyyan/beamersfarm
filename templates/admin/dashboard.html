@@ -6,11 +6,13 @@
     <div><p class="eyebrow">Owner desk / overview</p><h1>{{ greeting }}. Here’s the run sheet.</h1></div>
     <div class="admin-actions">
       <details class="owner-actions-menu">
-        <summary><span>Actions</span><span class="owner-actions-caret" aria-hidden="true">⌄</span></summary>
+        <summary><span>Actions</span><span class="owner-actions-caret" aria-hidden="true"></span></summary>
         <nav class="owner-actions-panel" aria-label="Owner actions">
           <p class="owner-actions-title">Management shortcuts</p>
           <a href="{{ url_for('admin.products') }}"><span>Manage products</span><span aria-hidden="true">→</span></a>
           <a href="{{ url_for('admin.partner_ads') }}"><span>Partner advertisements</span><span aria-hidden="true">→</span></a>
+          <a href="{{ url_for('admin.order_success_recommendations') }}"><span>Order-success recommendations</span><span aria-hidden="true">→</span></a>
+          <a href="{{ url_for('admin.gallery_manager') }}"><span>Manage gallery</span><span aria-hidden="true">→</span></a>
           <a href="{{ url_for('admin.reviews') }}"><span>Manage reviews</span><span aria-hidden="true">→</span></a>
           <a href="{{ url_for('admin.inventory_summary') }}"><span>Inventory summary</span><span aria-hidden="true">→</span></a>
           <a href="{{ url_for('admin.order_summary') }}"><span>Order Summary</span><span aria-hidden="true">→</span></a>
@@ -38,7 +40,7 @@
     </tbody></table></div>{% else %}<div class="empty-state compact"><h3>{{ 'No matching orders.' if search_query else 'No orders yet.' }}</h3><p>{{ 'Try a different public/numeric ID, name, or phone number.' if search_query else 'New customer orders will appear here.' }}</p></div>{% endif %}
   </section>
   <section class="admin-panel danger-zone">
-    <div><p class="eyebrow">Danger zone</p><h2>Clear selected data</h2><p>Select only the categories you want removed. Products, stock, delivery zones, staff accounts, and shop settings are never included. Clearing orders also removes linked reviews, line items, payment/refund history, WhatsApp logs, and customer push subscriptions. Complaints are retained with order links detached unless you select complaints too. This cannot be undone.</p></div>
+    <div><p class="eyebrow">Danger zone</p><h2>Clear selected data</h2><p>Select only the categories you want removed. Products, stock, delivery zones, staff accounts, and shop settings are never included. Clearing orders also removes linked reviews, line items, payment/refund history, WhatsApp logs, and customer push subscriptions. Complaints are retained with order links detached unless you select complaints too. Gallery cleanup also deletes its uploaded image files. This cannot be undone.</p></div>
     <form method="post" action="{{ url_for('admin.clear_database') }}" class="danger-form">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <fieldset class="clear-data-options"><legend>Data categories</legend>
@@ -48,6 +50,7 @@
         <label class="clear-choice"><input type="checkbox" name="clear_updates" value="yes"><span><strong>Shop updates</strong><small>Also removes images attached to those updates.</small></span></label>
         <label class="clear-choice"><input type="checkbox" name="clear_reviews" value="yes"><span><strong>Customer reviews &amp; testimonials</strong><small>Reviews and Owner responses; reviews linked to deleted orders are removed with those orders.</small></span></label>
         <label class="clear-choice"><input type="checkbox" name="clear_partner_ads" value="yes"><span><strong>Partner advertisements &amp; supplier details</strong><small>Independent offers, supplier contacts, social links, and their uploaded images.</small></span></label>
+        <label class="clear-choice"><input type="checkbox" name="clear_gallery" value="yes"><span><strong>Gallery images &amp; captions</strong><small>Removes managed gallery entries and their uploaded image files.</small></span></label>
         <label class="clear-choice"><input type="checkbox" name="clear_customer_push" value="yes"><span><strong>Customer push-notification subscriptions</strong><small>Remove saved customer devices without clearing orders. Already included if orders are selected.</small></span></label>
       </fieldset>
       <label class="consent-row clear-choice"><input type="checkbox" name="reset_pins" value="yes"><span><strong>Also unpin homepage products</strong><small>Products, prices and stock remain unchanged.</small></span></label>
