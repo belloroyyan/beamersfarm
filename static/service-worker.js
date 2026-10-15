@@ -1,10 +1,15 @@
-const CACHE_NAME = "beamers-farm-pwa-v16";
+const CACHE_NAME = "beamers-farm-pwa-v18";
 const OFFLINE_URL = "/static/offline.html";
 const PRECACHE_URLS = [
   OFFLINE_URL,
   "/manifest.webmanifest",
   "/static/css/style.css",
+  "/static/css/refinement.css",
+  "/static/css/community-release.css",
   "/static/js/cart.js",
+  "/static/js/site-overlays.js",
+  "/static/js/community.js",
+  "/static/js/checkout-wizard.js",
   "/static/js/copy-reference.js",
   "/static/js/pwa-register.js",
   "/static/js/dispatch-push.js",

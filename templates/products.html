@@ -11,7 +11,7 @@
     <div class="product-grid">
       {% for product in products %}
         <article class="product-card">
-          <a class="product-art product-photo art-{{ product.image }}" href="{{ url_for('shop.product_detail', product_id=product.id) }}" aria-label="View {{ product.name }}">
+          <a class="product-art product-photo art-{{ product.image }}" style="view-transition-name: product-image-{{ product.id }};" href="{{ url_for('shop.product_detail', product_id=product.id) }}" aria-label="View {{ product.name }}">
             <img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy" decoding="async"><span class="photo-shade"></span>
           </a>
           <div class="product-info">

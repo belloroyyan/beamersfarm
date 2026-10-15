@@ -5,7 +5,7 @@
 <div class="container detail-shell">
   <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{{ url_for('shop.index') }}">Shop</a><span aria-hidden="true">/</span><span>{{ product.name }}</span></nav>
   <div class="detail-grid">
-    <div class="product-art product-photo detail-art art-{{ product.image }}"><img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy" decoding="async"><span class="photo-shade"></span></div>
+    <div class="product-art product-photo detail-art art-{{ product.image }}" style="view-transition-name: product-image-{{ product.id }};"><img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy" decoding="async"><span class="photo-shade"></span></div>
     <div class="detail-copy">
       <p class="eyebrow">Frozen cut · listed price per {{ product.unit }}</p>
       <h1>{{ product.name }}</h1>

@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config, INSTANCE_DIR
-from models import AnalyticsEvent, Customer, DeliveryZone, Product, ShopSettings, db
+from models import AnalyticsEvent, Coupon, Customer, CustomerNotice, DeliveryZone, Product, ShopSettings, db
 from routes.admin import admin_bp
 from routes.shop import shop_bp
 from routes.whatsapp import whatsapp_bp
@@ -18,9 +18,11 @@ from routes.salesperson import salesperson_bp
 from routes.payments import payments_bp
 from routes.reviews import reviews_bp
 from routes.customer import current_customer, customer_bp
+from routes.community import community_bp
 from utils.helpers import cart_count, format_currency, format_quantity, local_time
 from utils.greetings import time_of_day_greeting
 from utils.updates import linkify, update_image_url
+from utils.community_text import community_linkify
 from utils.partner_ads import partner_image_url
 from utils.gallery import gallery_image_url
 from utils.product_images import product_image_url
@@ -115,19 +117,36 @@ def create_app():
     app.register_blueprint(payments_bp)
     app.register_blueprint(reviews_bp)
     app.register_blueprint(customer_bp)
+    app.register_blueprint(community_bp)
 
     app.jinja_env.filters["linkify"] = linkify
+    app.jinja_env.filters["community_linkify"] = community_linkify
     app.jinja_env.filters["local_time"] = local_time
 
     @app.context_processor
     def inject_helpers():
         shop_settings = ShopSettings.query.get(1)
+        signed_customer = current_customer()
+        customer_notice = (
+            CustomerNotice.query.filter_by(customer_id=signed_customer.id, dismissed_at=None)
+            .order_by(CustomerNotice.created_at.desc(), CustomerNotice.id.desc())
+            .first()
+            if signed_customer else None
+        )
+        gifted_coupon = (
+            Coupon.query.filter_by(customer_id=signed_customer.id, active=True)
+            .filter(Coupon.gift_message != "")
+            .order_by(Coupon.gifted_at.desc(), Coupon.id.desc())
+            .first()
+            if signed_customer else None
+        )
         return {
             "greeting": time_of_day_greeting(),
             "product_image_url": product_image_url,
             "update_image_url": update_image_url,
             "partner_image_url": partner_image_url,
             "gallery_image_url": gallery_image_url,
+            "community_url": lambda key: __import__("utils.community_media", fromlist=["community_image_url"]).community_image_url(key),
             "format_currency": format_currency,
             "format_quantity": format_quantity,
             "cart_count": cart_count(session.get("cart", {})),
@@ -139,7 +158,11 @@ def create_app():
             "paystack_public_key": app.config["PAYSTACK_PUBLIC_KEY"],
             "shop_is_open": shop_settings.is_open if shop_settings else app.config["SHOP_OPEN_DEFAULT"],
             "shop_closed_message": shop_settings.closed_message if shop_settings else app.config["SHOP_CLOSED_MESSAGE"],
-            "current_customer": current_customer(),
+            "current_customer": signed_customer,
+            "community_open": shop_settings.community_open if shop_settings else True,
+            "community_closed_message": shop_settings.community_closed_message if shop_settings else "The community is currently closed.",
+            "gifted_coupon": gifted_coupon,
+            "customer_notice": customer_notice,
         }
 
     @app.before_request

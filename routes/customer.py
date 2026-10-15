@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import Customer, Order, Product, db
+from models import Coupon, Customer, CustomerNotice, Order, Product, db
 from utils.helpers import format_quantity, parse_quantity, product_uses_requested_kg
 from utils.notifications import normalize_nigerian_phone
 from utils.recommendations import personalized_products
@@ -121,7 +121,8 @@ def account():
     previous_recommendations = Product.query.filter(Product.id.in_(previous_product_ids), Product.active.is_(True), Product.stock > 0).all() if previous_product_ids else []
     previous_recommendations.sort(key=lambda item: previous_product_ids.index(item.id))
     personalized_recommendations = personalized_products(customer, limit=4)
-    return render_template("customer/account.html", customer=customer, orders=orders, previous_recommendations=previous_recommendations[:4], personalized_recommendations=personalized_recommendations)
+    gifted_coupons = Coupon.query.filter_by(customer_id=customer.id, active=True).order_by(Coupon.gifted_at.desc(), Coupon.created_at.desc()).all()
+    return render_template("customer/account.html", customer=customer, orders=orders, previous_recommendations=previous_recommendations[:4], personalized_recommendations=personalized_recommendations, gifted_coupons=gifted_coupons)
 
 
 @customer_bp.post("/settings")
@@ -145,9 +146,23 @@ def save_settings():
     customer.name, customer.phone, customer.email, customer.address = name, phone, email, address
     customer.push_notifications_enabled = request.form.get("push_notifications") == "yes"
     customer.whatsapp_notifications_enabled = request.form.get("whatsapp_notifications") == "yes"
+    customer.community_profile_public = request.form.get("community_profile_public") == "yes"
     db.session.commit()
-    flash("Your account details and notification preferences were saved.", "success")
+    flash("Your account details, notification preferences, and community privacy were saved.", "success")
     return redirect(url_for("customer.account"))
+
+
+@customer_bp.post("/notices/<int:notice_id>/dismiss")
+@account_required
+def dismiss_notice(notice_id):
+    customer = current_customer()
+    notice = CustomerNotice.query.filter_by(
+        id=notice_id, customer_id=customer.id, dismissed_at=None
+    ).first()
+    if notice:
+        notice.dismissed_at = datetime.utcnow()
+        db.session.commit()
+    return redirect(safe_next(request.form.get("next", "")))
 
 
 @customer_bp.post("/password")

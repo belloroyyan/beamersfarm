@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const moreMenu = menu && menu.querySelector('.nav-more');
   const ownerActionsMenus = document.querySelectorAll('.owner-actions-menu');
   if (menuButton && menu) {
-    const mobileNavQuery = window.matchMedia('(max-width: 700px)');
+    const mobileNavQuery = window.matchMedia('(max-width: 1040px)');
     const syncMoreMenu = () => {
       // On mobile, More is not a second menu: its links are part of the
       // hamburger list. Keep the native details element open so its children

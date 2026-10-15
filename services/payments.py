@@ -7,6 +7,7 @@ import secrets
 import urllib.error
 import urllib.parse
 import urllib.request
+import logging
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -15,14 +16,17 @@ from flask import current_app
 from models import Order, OrderFinancialRecord, db
 
 PAYSTACK_API = "https://api.paystack.co"
+logger = logging.getLogger(__name__)
 
 
 def paystack_is_configured():
-    return bool(
+    configured = bool(
         current_app.config.get("PAYSTACK_ENABLED")
         and current_app.config.get("PAYSTACK_SECRET_KEY")
         and current_app.config.get("PAYSTACK_PUBLIC_KEY")
     )
+    logger.info("Paystack configuration check: enabled=%s configured=%s", bool(current_app.config.get("PAYSTACK_ENABLED")), configured)
+    return configured
 
 
 def _api_request(method, path, payload=None):
@@ -43,6 +47,7 @@ def initialize_paystack_transaction(order, callback_url):
     if not paystack_is_configured():
         raise RuntimeError("Online payment is not enabled yet. Please choose bank transfer.")
     reference = f"BF-{order.public_id}-{secrets.token_hex(5)}"
+    logger.info("Paystack initialize started: order=%s currency=NGN", order.public_id)
     amount_kobo = int(
         (Decimal(str(order.total)) * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
     )
@@ -59,6 +64,7 @@ def initialize_paystack_transaction(order, callback_url):
             "metadata": json.dumps({"order_public_id": order.public_id}),
         },
     )
+    logger.info("Paystack initialize response: order=%s status=%s", order.public_id, bool(response.get("status")))
     if not response.get("status") or not response.get("data", {}).get("authorization_url"):
         raise RuntimeError(response.get("message") or "Paystack did not create a checkout session.")
     data = response["data"]
@@ -72,6 +78,7 @@ def initialize_paystack_transaction(order, callback_url):
 
 
 def verify_paystack_transaction(reference):
+    logger.info("Paystack verification requested: reference_suffix=%s", reference[-8:])
     if not paystack_is_configured():
         raise RuntimeError("Online payment is not enabled.")
     return _api_request("GET", f"/transaction/verify/{urllib.parse.quote(reference, safe='')}")
@@ -85,6 +92,7 @@ def valid_webhook_signature(raw_body, signature):
 
 def mark_successful_paystack_payment(order, transaction):
     """Mark a matching successful transaction paid; return (ok, message)."""
+    logger.info("Paystack payment validation started: order=%s", order.public_id if order else "unknown")
     if not order or order.payment_method != "paystack":
         return False, "This transaction is not a Paystack order."
     reference = str(transaction.get("reference") or "")
@@ -98,12 +106,15 @@ def mark_successful_paystack_payment(order, transaction):
         (Decimal(str(order.total)) * Decimal("100")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
     )
     if reference != expected_reference:
+        logger.warning("Paystack reference mismatch: order=%s", order.public_id)
         return False, "The Paystack reference does not match this order."
     if str(transaction.get("status", "")).lower() != "success":
+        logger.warning("Paystack transaction not successful: order=%s status=%s", order.public_id, transaction.get("status"))
         order.payment_status = "Failed"
         db.session.commit()
         return False, "Paystack has not reported a successful payment."
     if amount != expected_amount or currency != "NGN":
+        logger.warning("Paystack amount/currency mismatch: order=%s amount_ok=%s currency=%s", order.public_id, amount == expected_amount, currency)
         return False, "The Paystack amount or currency does not match this order."
     if order.payment_status == "Verified":
         return True, "Payment was already verified."
@@ -135,4 +146,5 @@ def mark_successful_paystack_payment(order, transaction):
         initial_record.notes = "Payment verified automatically by Paystack."
         initial_record.settled_at = now
     db.session.commit()
+    logger.info("Paystack payment verified: order=%s reference_suffix=%s", order.public_id, reference[-8:])
     return True, "Payment verified automatically by Paystack. The order is ready for owner confirmation."

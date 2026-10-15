@@ -1,7 +1,9 @@
 from decimal import Decimal
 from functools import wraps
 
-from datetime import datetime
+from datetime import datetime, timedelta
+import hashlib
+import secrets
 import re
 from zoneinfo import ZoneInfo
 
@@ -10,10 +12,10 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import AbandonedCart, AnalyticsEvent, Coupon, Complaint, PrivacyRule, Customer, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, PartnerListing, Product, Review, SalespersonAccount, ShopSettings, ShopUpdate, StaffPushSubscription, WholesaleOrder, WholesaleOrderItem, db, order_customer_push_subscriptions
+from models import AbandonedCart, AnalyticsEvent, Coupon, Complaint, PrivacyRule, Customer, CustomerNotice, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, PartnerListing, Product, Review, SalespersonAccount, ShopSettings, ShopUpdate, StaffPushSubscription, WholesaleOrder, WholesaleOrderItem, PartnerAdInvite, CommunityPost, CommunityComment, CommunityReaction, CommunityReport, CommunityBlock, CommunityNotification, db, order_customer_push_subscriptions
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.product_images import save_product_image
-from utils.gallery import delete_gallery_image, save_gallery_image
+from utils.gallery import delete_gallery_image, save_gallery_image, save_gallery_media, gallery_media_type
 from utils.helpers import parse_quantity
 from utils.partner_ads import delete_partner_image, normalize_http_url, parse_social_links, save_partner_image, social_links_text
 from utils.updates import delete_update_image, save_update_image
@@ -113,6 +115,16 @@ def authenticate_salesperson(username, password):
     if account and check_password_hash(account.password_hash, password):
         return account
     return None
+
+
+def add_customer_notice(customer_id, title, message, kind="account"):
+    db.session.add(CustomerNotice(
+        customer_id=customer_id,
+        title=title[:140],
+        message=message[:700],
+        kind=kind[:32],
+        created_by="Beamers Farm Owner",
+    ))
 
 
 @admin_bp.route("/login", methods=["GET", "POST"])
@@ -378,6 +390,7 @@ def order_detail(order_ref):
         from flask import abort
         abort(404)
     if request.method == "POST":
+        old_status = order.status
         verify_and_confirm = request.form.get("verify_and_confirm") == "yes" or request.form.get("verify_payment_only") == "yes"
         verify_payment = verify_and_confirm or request.form.get("verify_payment") == "yes"
         if verify_payment and order.total > 0 and order.payment_status != "Verified" and request.form.get("verify_payment") != "yes":
@@ -393,6 +406,9 @@ def order_detail(order_ref):
             actor="owner",
             actor_name="Owner",
         )
+        if ok and order.customer_id and old_status != order.status:
+            add_customer_notice(order.customer_id, "Order status updated", f"Your order {order.public_id} is now {order.status}.", kind="order")
+            db.session.commit()
         flash(message, "success" if ok else "error")
         return redirect(url_for("admin.order_detail", order_ref=order.public_id))
     return render_template("admin/order_detail.html", order=order, statuses=ORDER_STATUSES)
@@ -558,14 +574,27 @@ def customers():
             flash("Customer account not found.", "error")
         elif action in {"activate", "deactivate"}:
             customer.active = action == "activate"
+            add_customer_notice(customer.id, "Customer account updated", "Your Beamers Farm customer account has been reactivated." if customer.active else "Your Beamers Farm customer account has been paused. Contact the farm if you need help accessing it.")
             db.session.commit()
             flash(f"{customer.name} account {'activated' if customer.active else 'deactivated'}.", "success")
+        elif action in {"block_community", "unblock_community"}:
+            customer.community_posting_blocked = action == "block_community"
+            message = "Your ability to post, reply, and react in the community has been paused. You can still read public conversations." if customer.community_posting_blocked else "Your ability to post, reply, and react in the community has been restored."
+            add_customer_notice(customer.id, "Community access updated", message, kind="community")
+            db.session.commit()
+            flash(f"Community posting access {'paused' if customer.community_posting_blocked else 'restored'} for {customer.name}.", "success")
+        elif action == "gift_coupon":
+            coupon = db.session.get(Coupon, int(request.form.get("coupon_id", "0") or 0))
+            if not coupon or not coupon.active or coupon.customer_id: flash("Choose an active, unassigned coupon to gift.", "error")
+            else:
+                coupon.customer_id = customer.id; coupon.gift_message = request.form.get("gift_message", "").strip()[:500]; coupon.gifted_at = datetime.utcnow(); add_customer_notice(customer.id, "A coupon gift from Beamers Farm", coupon.gift_message or f"Coupon {coupon.code} has been added to your account.", kind="coupon"); db.session.commit(); flash(f"Coupon {coupon.code} gifted to {customer.name}.", "success")
         elif action == "reset_password":
             password = request.form.get("password", "")
             if len(password) < 8:
                 flash("Customer passwords must be at least 8 characters.", "error")
             else:
                 customer.password_hash = generate_password_hash(password)
+                add_customer_notice(customer.id, "Account security updated", "The Beamers Farm team updated your account password. If you did not expect this, contact the farm.")
                 db.session.commit()
                 flash("Customer password reset. Share it securely with the customer.", "success")
         return redirect(url_for("admin.customers"))
@@ -578,7 +607,24 @@ def customers():
     segments = {customer.id: customer_segment(customer) for customer in customers}
     if segment_filter:
         customers = [customer for customer in customers if segments[customer.id]["name"] == segment_filter]
-    return render_template("admin/customers.html", customers=customers, search_query=search, segments=segments, segment_filter=segment_filter, segment_options=["New", "Repeat", "High value", "At risk"])
+    return render_template("admin/customers.html", customers=customers, search_query=search, segments=segments, segment_filter=segment_filter, segment_options=["New", "Repeat", "High value", "At risk"], gift_coupons=Coupon.query.filter_by(active=True, customer_id=None).order_by(Coupon.code.asc()).all())
+
+
+@admin_bp.get("/forms")
+@admin_required
+def customer_forms():
+    settings = ShopSettings.query.get(1)
+    active_invites = PartnerAdInvite.query.filter(PartnerAdInvite.used_at.is_(None), PartnerAdInvite.expires_at > datetime.utcnow()).count()
+    forms = [
+        {"name": "Shop order checkout", "description": "Customers can submit a standard shop order.", "url": url_for("admin.dashboard"), "status": "Open" if settings and settings.is_open else "Closed", "active": bool(settings and settings.is_open), "volume": Order.query.filter(Order.status != "Cancelled").count()},
+        {"name": "Wholesale request", "description": "Businesses can request wholesale availability and pricing.", "url": url_for("admin.wholesale_orders"), "status": "Open", "active": True, "volume": WholesaleOrder.query.filter(WholesaleOrder.status.in_(["New", "Under Review", "Approved"])).count()},
+        {"name": "Community posts and replies", "description": "Signed-in customers can start conversations, reply, and react.", "url": url_for("community.support"), "status": "Open" if settings and settings.community_open else "Closed", "active": bool(settings and settings.community_open), "volume": CommunityPost.query.filter_by(status="published").count()},
+        {"name": "Customer care / complaint", "description": "Customers can submit a private support request.", "url": url_for("admin.complaints"), "status": "Open", "active": True, "volume": Complaint.query.filter(Complaint.status.in_(["New", "Under Review"])).count()},
+        {"name": "Leave a review", "description": "Verified customers can submit a review for Owner moderation.", "url": url_for("admin.reviews"), "status": "Open", "active": True, "volume": Review.query.filter_by(status="Pending").count()},
+        {"name": "Customer account registration", "description": "Customers can register and manage saved details and orders.", "url": url_for("admin.customers"), "status": "Open", "active": True, "volume": Customer.query.filter_by(active=True).count()},
+        {"name": "Partner advertisement submission", "description": "Supplier submissions require a valid one-time Owner invite.", "url": url_for("admin.partner_ad_invites"), "status": f"{active_invites} active invite(s)", "active": active_invites > 0, "volume": active_invites},
+    ]
+    return render_template("admin/customer_forms.html", forms=forms)
 
 
 @admin_bp.route("/wholesale-orders", methods=["GET", "POST"])
@@ -819,7 +865,7 @@ def gallery_manager():
         if not -100_000 <= sort_order <= 100_000:
             flash("Display order must be between -100,000 and 100,000.", "error")
             return redirect(url_for("admin.gallery_manager"))
-        image_key, image_error = save_gallery_image(request.files.get("image"))
+        image_key, media_type, image_error = save_gallery_media(request.files.get("image"))
         if image_error:
             flash(image_error, "error")
             return redirect(url_for("admin.gallery_manager"))
@@ -827,8 +873,8 @@ def gallery_manager():
             flash("Choose a gallery image to upload.", "error")
             return redirect(url_for("admin.gallery_manager"))
         db.session.add(GalleryImage(
-            title=title, description=description, image=image_key,
-            active=request.form.get("active") == "yes", sort_order=sort_order,
+            title=title, description=description, image=image_key, media_type=media_type or "image",
+            active=request.form.get("active") == "yes", pinned=request.form.get("pinned") == "yes", sort_order=sort_order,
         ))
         db.session.commit()
         flash("Gallery image added.", "success")
@@ -863,7 +909,7 @@ def edit_gallery_image(image_id):
         if not title or len(title) > 120 or len(description) > 4000 or not -100_000 <= sort_order <= 100_000:
             flash("Check the title, description, and display-order limits.", "error")
             return render_template("admin/gallery_edit.html", image=image)
-        replacement, image_error = save_gallery_image(request.files.get("image"))
+        replacement, replacement_type, image_error = save_gallery_media(request.files.get("image"))
         if image_error:
             flash(image_error, "error")
             return render_template("admin/gallery_edit.html", image=image)
@@ -872,8 +918,10 @@ def edit_gallery_image(image_id):
         image.description = description
         image.sort_order = sort_order
         image.active = request.form.get("active") == "yes"
+        image.pinned = request.form.get("pinned") == "yes"
         if replacement:
             image.image = replacement
+            image.media_type = replacement_type or gallery_media_type(replacement)
         db.session.commit()
         if replacement and old_key != image.image:
             delete_gallery_image(old_key)
@@ -892,6 +940,18 @@ def toggle_gallery_image(image_id):
     return redirect(url_for("admin.gallery_manager"))
 
 
+@admin_bp.post("/gallery/<int:image_id>/pin")
+@admin_required
+def toggle_gallery_pin(image_id):
+    image = GalleryImage.query.get_or_404(image_id)
+    if not image.pinned:
+        GalleryImage.query.filter_by(pinned=True).update({"pinned": False})
+    image.pinned = not image.pinned
+    db.session.commit()
+    flash(f"{image.title} is now {'pinned to the homepage' if image.pinned else 'unpinned'}.", "success")
+    return redirect(url_for("admin.gallery_manager"))
+
+
 @admin_bp.post("/gallery/<int:image_id>/delete")
 @admin_required
 def delete_gallery_entry(image_id):
@@ -902,6 +962,19 @@ def delete_gallery_entry(image_id):
     flash("Gallery image and uploaded file deleted.", "success")
     return redirect(url_for("admin.gallery_manager"))
 
+
+@admin_bp.route("/partner-advertisements/invites", methods=["GET", "POST"])
+@admin_required
+def partner_ad_invites():
+    if request.method == "POST":
+        token = secrets.token_urlsafe(32)
+        invite = PartnerAdInvite(token_hash=hashlib.sha256(token.encode()).hexdigest(), expires_at=datetime.utcnow()+timedelta(hours=24), created_by="Owner")
+        db.session.add(invite)
+        db.session.commit()
+        flash(url_for("shop.partner_advertisement_form", token=token, _external=True), "partner-form-link")
+        return redirect(url_for("admin.partner_ad_invites"))
+    active_invites = PartnerAdInvite.query.filter(PartnerAdInvite.used_at.is_(None), PartnerAdInvite.expires_at > datetime.utcnow()).order_by(PartnerAdInvite.expires_at.asc()).all()
+    return render_template("admin/partner_ad_invites.html", invites=active_invites)
 
 @admin_bp.route("/partner-advertisements", methods=["GET", "POST"])
 @admin_required
@@ -937,7 +1010,7 @@ def partner_ads():
             filters.append(PartnerListing.id == int(search_query))
         listings_query = listings_query.filter(or_(*filters))
     return render_template(
-        "admin/partner_ads.html", listings=listings_query.all(), search_query=search_query,
+        "admin/partner_ads.html", listings=listings_query.all(), search_query=search_query, invites=PartnerAdInvite.query.filter(PartnerAdInvite.used_at.is_(None), PartnerAdInvite.expires_at >= datetime.utcnow()).all(),
     )
 
 
@@ -1054,9 +1127,17 @@ def review_detail(review_id):
     if status not in REVIEW_STATUSES:
         flash("Choose a valid review status.", "error")
     else:
+        previous_state = (review.status, review.owner_response)
         review.status = status
         review.owner_response = request.form.get("owner_response", "").strip()[:3000]
         review.published_at = datetime.utcnow() if status == "Approved" else None
+        if previous_state != (review.status, review.owner_response):
+            customer = review.order.customer if review.order else None
+            if customer:
+                message = f"The status of your review has been updated to {review.status}."
+                if review.owner_response:
+                    message += " The farm has also responded to your review."
+                add_customer_notice(customer.id, "Your review was updated", message, "review")
         db.session.commit()
         flash("Review moderation saved.", "success")
     return redirect(url_for("admin.reviews"))
@@ -1071,9 +1152,20 @@ def complaint_detail(complaint_id):
         if status not in COMPLAINT_STATUSES:
             flash("Choose a valid complaint status.", "error")
         else:
+            previous_state = (complaint.status, complaint.owner_notes)
             complaint.status = status
             complaint.owner_notes = request.form.get("owner_notes", "").strip()[:5000]
             complaint.resolved_at = datetime.utcnow() if status in {"Resolved", "Closed"} else None
+            if previous_state != (complaint.status, complaint.owner_notes):
+                customer = complaint.order.customer if complaint.order else None
+                if customer:
+                    public_id = complaint.order.public_id or str(complaint.order.id)
+                    add_customer_notice(
+                        customer.id,
+                        "Your complaint was updated",
+                        f"Your complaint about order {public_id} has been updated to {complaint.status}.",
+                        "complaint",
+                    )
             db.session.commit()
             flash("Complaint updated.", "success")
         return redirect(url_for("admin.complaint_detail", complaint_id=complaint.id))
@@ -1123,6 +1215,35 @@ def delete_update(update_id):
 @admin_required
 def coupons():
     if request.method == "POST":
+        if request.form.get("action") == "mass_gift":
+            base_coupon = db.session.get(Coupon, int(request.form.get("coupon_id", "0") or 0))
+            if not base_coupon or not base_coupon.active or base_coupon.customer_id is not None:
+                flash("Choose an active, shared coupon template to gift.", "error")
+                return redirect(url_for("admin.coupons"))
+            recipients = Customer.query.filter(Customer.deleted_at.is_(None)).order_by(Customer.id.asc()).all()
+            if not recipients:
+                flash("There are no customer accounts to receive the gift.", "error")
+                return redirect(url_for("admin.coupons"))
+            gift_message = request.form.get("gift_message", "").strip()[:500]
+            for recipient in recipients:
+                suffix = f"-G{recipient.id}-{secrets.token_hex(3).upper()}"
+                prefix = base_coupon.code[:max(1, 39 - len(suffix))].rstrip("-")
+                code = f"{prefix}{suffix}"[:40]
+                while Coupon.query.filter_by(code=code).first():
+                    suffix = f"-G{recipient.id}-{secrets.token_hex(4).upper()}"
+                    prefix = base_coupon.code[:max(1, 39 - len(suffix))].rstrip("-")
+                    code = f"{prefix}{suffix}"[:40]
+                db.session.add(Coupon(
+                    code=code, discount_type=base_coupon.discount_type, value=base_coupon.value,
+                    minimum_spend=base_coupon.minimum_spend, max_uses=1, uses=0,
+                    excluded_product_ids=base_coupon.excluded_product_ids, active=True,
+                    starts_at=base_coupon.starts_at, ends_at=base_coupon.ends_at,
+                    customer_id=recipient.id, gift_message=gift_message, gifted_at=datetime.utcnow(),
+                ))
+                add_customer_notice(recipient.id, "A coupon gift from Beamers Farm", gift_message or "A personal coupon has been added to your account.", kind="coupon")
+            db.session.commit()
+            flash(f"Personal coupon gifts sent to {len(recipients)} customer account(s).", "success")
+            return redirect(url_for("admin.coupons"))
         code=request.form.get("code", "").strip().upper(); dtype=request.form.get("discount_type", "percent")
         try: value=Decimal(request.form.get("value", "0")); minimum=Decimal(request.form.get("minimum_spend", "0"))
         except Exception: flash("Enter valid coupon amounts.", "error"); return redirect(url_for("admin.coupons"))
@@ -1133,7 +1254,7 @@ def coupons():
             db.session.add(Coupon(code=code,discount_type=dtype,value=value,minimum_spend=max(Decimal("0"),minimum),max_uses=max_uses,excluded_product_ids=request.form.get("excluded_product_ids","").strip()))
             db.session.commit(); flash("Coupon created.", "success")
         return redirect(url_for("admin.coupons"))
-    return render_template("admin/coupons.html", coupons=Coupon.query.order_by(Coupon.created_at.desc()).all())
+    return render_template("admin/coupons.html", coupons=Coupon.query.order_by(Coupon.created_at.desc()).all(), gift_templates=Coupon.query.filter_by(active=True, customer_id=None).order_by(Coupon.code.asc()).all(), customer_count=Customer.query.filter(Customer.deleted_at.is_(None)).count())
 
 @admin_bp.post("/coupons/<int:coupon_id>/toggle")
 @admin_required
@@ -1236,8 +1357,9 @@ def clear_database():
     clear_coupons = request.form.get("clear_coupons") == "yes"
     clear_analytics = request.form.get("clear_analytics") == "yes"
     clear_privacy_rules = request.form.get("clear_privacy_rules") == "yes"
+    clear_community = request.form.get("clear_community") == "yes"
     reset_pins = request.form.get("reset_pins") == "yes"
-    if not any((clear_orders, clear_complaints, clear_messages, clear_updates, clear_reviews, clear_partner_ads, clear_gallery, clear_customer_push, clear_abandoned_carts, clear_wholesale, clear_coupons, clear_analytics, clear_privacy_rules, reset_pins)):
+    if not any((clear_orders, clear_complaints, clear_messages, clear_updates, clear_reviews, clear_partner_ads, clear_gallery, clear_customer_push, clear_abandoned_carts, clear_wholesale, clear_coupons, clear_analytics, clear_privacy_rules, clear_community, reset_pins)):
         flash("Choose at least one data category or homepage option to clear.", "error")
         return redirect(url_for("admin.dashboard"))
 
@@ -1308,6 +1430,14 @@ def clear_database():
     if clear_privacy_rules:
         PrivacyRule.query.delete(synchronize_session=False)
         cleared.append("owner privacy rules")
+    if clear_community:
+        CommunityNotification.query.delete(synchronize_session=False)
+        CommunityReport.query.delete(synchronize_session=False)
+        CommunityReaction.query.delete(synchronize_session=False)
+        CommunityBlock.query.delete(synchronize_session=False)
+        CommunityComment.query.delete(synchronize_session=False)
+        CommunityPost.query.delete(synchronize_session=False)
+        cleared.append("community posts, replies, reactions, reports, blocks, and notifications")
 
     if reset_pins:
         Product.query.update({Product.featured: False}, synchronize_session=False)

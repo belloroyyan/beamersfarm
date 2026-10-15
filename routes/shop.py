@@ -2,13 +2,14 @@ import hashlib
 import hmac
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
+import logging
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from flask import Blueprint, abort, current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 from sqlalchemy import or_
 
-from models import AbandonedCart, Coupon, Customer, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, PartnerListing, Product, SalespersonAccount, ShopSettings, ShopUpdate, WholesaleOrder, WholesaleOrderItem, db
+from models import AbandonedCart, Coupon, Customer, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, PartnerAdInvite, PartnerListing, Product, SalespersonAccount, ShopSettings, ShopUpdate, WholesaleOrder, WholesaleOrderItem, db
 from utils.helpers import build_cart, format_quantity, parse_quantity, product_uses_requested_kg
 from utils.notifications import normalize_nigerian_phone
 from utils.product_images import product_image_url
@@ -18,6 +19,10 @@ from utils.web_push import send_customer_order_confirmed_push, send_customer_ord
 from utils.recommendations import personalized_products
 
 shop_bp = Blueprint("shop", __name__)
+logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 PICKUP_ADDRESS = (
     "Beamers Farm, Elapop Estate, Coker Omu Community, along UNIOSUN Main Campus Road, "
     "Oke Baale, Osogbo, Osun State"
@@ -97,6 +102,8 @@ def cart_summary(products=None, delivery_fee=None):
 
 
 def coupon_discount(coupon, summary):
+    if coupon and coupon.customer_id and coupon.customer_id != session.get("customer_id"):
+        return Decimal("0.00"), "This gift coupon belongs to another customer account."
     if not coupon or not coupon.active:
         return Decimal("0.00"), "Coupon is not available."
     now = datetime.utcnow()
@@ -198,6 +205,7 @@ def index():
         **seo_meta("Fresh Frozen Chicken Delivery in Osogbo | Beamers Farm", "Buy fresh, hygienically packaged frozen chicken, whole birds and chicken parts with delivery across Osogbo or farm pickup.", "shop.index", keywords="frozen chicken Osogbo, chicken delivery Osogbo, fresh chicken Nigeria, Beamers Farm"),
         latest_update=latest_update if show_update else None,
         partner_ads=partner_advertisements_query().all(),
+        pinned_gallery=GalleryImage.query.filter_by(active=True, pinned=True).order_by(GalleryImage.created_at.desc()).first(),
     )
 
 
@@ -309,6 +317,27 @@ def products():
     )
 
 
+@shop_bp.route("/partner-advertisements/apply/<string:token>", methods=["GET", "POST"])
+def partner_advertisement_form(token):
+    digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    invite = PartnerAdInvite.query.filter_by(token_hash=digest).first()
+    if not invite or invite.used_at or invite.expires_at < datetime.utcnow():
+        abort(404)
+    if request.method == "POST":
+        from routes.admin import parse_partner_listing_form
+        try:
+            values = parse_partner_listing_form(request.form)
+        except ValueError as error:
+            flash(str(error), "error")
+            return render_template("partner_ad_submit.html", invite=invite, token=token)
+        values.update(active=False, recommended=False, submitted_via_invite=True)
+        db.session.add(PartnerListing(**values))
+        invite.used_at = datetime.utcnow()
+        db.session.commit()
+        flash("Your partner advertisement was submitted for owner review.", "success")
+        return redirect(url_for("shop.partner_advertisement_form", token=token))
+    return render_template("partner_ad_submit.html", invite=invite, token=token)
+
 @shop_bp.get("/partner-offers/<int:listing_id>")
 def partner_offer(listing_id):
     listing = PartnerListing.query.filter_by(id=listing_id, active=True).first_or_404()
@@ -331,7 +360,7 @@ def gallery():
     images = GalleryImage.query.filter_by(active=True).order_by(
         GalleryImage.sort_order.asc(), GalleryImage.created_at.desc(), GalleryImage.id.desc()
     ).all()
-    return render_template("gallery.html", images=images, **seo_meta("Beamers Farm Gallery | Farm & Chicken Preparation in Osogbo", "See Beamers Farm farm moments, chicken preparation, packaging, and local updates from Osogbo.", "shop.gallery", keywords="Beamers Farm gallery, chicken farm Osogbo, chicken preparation Nigeria"))
+    return render_template("gallery.html", images=images, gallery_media_type=lambda key: __import__("utils.gallery", fromlist=["gallery_media_type"]).gallery_media_type(key), **seo_meta("Beamers Farm Gallery | Farm & Chicken Preparation in Osogbo", "See Beamers Farm farm moments, chicken preparation, packaging, and local updates from Osogbo.", "shop.gallery", keywords="Beamers Farm gallery, chicken farm Osogbo, chicken preparation Nigeria"))
 
 
 @shop_bp.route("/wholesale", methods=["GET", "POST"])
@@ -589,17 +618,33 @@ def checkout():
     selected_zone_id = request.values.get("delivery_zone_id", "")
     selected_zone = next((zone for zone in zones if str(zone.id) == selected_zone_id), None)
     summary = cart_summary(delivery_fee=selected_zone.fee if selected_zone else None)
-    coupon_code = request.values.get("coupon_code", session.get("coupon_code", "")).strip().upper()
-    summary, coupon_error = apply_coupon(summary, coupon_code)
-    if coupon_code and not coupon_error: session["coupon_code"] = coupon_code
     signed_in_customer = db.session.get(Customer, session.get("customer_id")) if session.get("customer_id") else None
+    signed_in_customer = signed_in_customer if signed_in_customer and signed_in_customer.active else None
+    explicit_coupon_code = request.values.get("coupon_code")
+    coupon_code = (explicit_coupon_code if explicit_coupon_code is not None else session.get("coupon_code", "")).strip().upper()
+    summary, coupon_error = apply_coupon(summary, coupon_code)
+    coupon_autofilled = False
+    if signed_in_customer and explicit_coupon_code is None and (not coupon_code or coupon_error):
+        personal_coupons = Coupon.query.filter_by(customer_id=signed_in_customer.id, active=True).filter(
+            Coupon.gift_message != ""
+        ).order_by(Coupon.gifted_at.desc(), Coupon.id.desc()).all()
+        for personal_coupon in personal_coupons:
+            candidate_summary, candidate_error = apply_coupon(summary, personal_coupon.code)
+            if not candidate_error and candidate_summary.get("coupon"):
+                coupon_code = personal_coupon.code
+                summary, coupon_error = candidate_summary, ""
+                coupon_autofilled = True
+                session["coupon_code"] = coupon_code
+                break
+    if coupon_code and not coupon_error:
+        session["coupon_code"] = coupon_code
 
     def render_checkout():
         return render_template(
             "checkout.html", summary=summary, delivery_zones=zones,
             selected_zone_id=selected_zone_id, selected_zone=selected_zone,
             customer=signed_in_customer if signed_in_customer and signed_in_customer.active else None,
-            paystack_enabled=current_app.config.get("PAYSTACK_ENABLED", False), coupon_code=coupon_code, coupon_error=coupon_error, **seo_meta("Choose Delivery or Pickup | Beamers Farm", "Choose delivery or free farm pickup for your Beamers Farm order.", "shop.checkout", robots="noindex,follow"),
+            paystack_enabled=current_app.config.get("PAYSTACK_ENABLED", False), coupon_code=coupon_code, coupon_error=coupon_error, coupon_autofilled=coupon_autofilled, **seo_meta("Choose Delivery or Pickup | Beamers Farm", "Choose delivery or free farm pickup for your Beamers Farm order.", "shop.checkout", robots="noindex,follow"),
         )
 
     if request.method == "GET": record_event("checkout_start")

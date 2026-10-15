@@ -34,6 +34,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/refinement.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/community-release.css') }}">
   {% block head %}{% endblock %}
   {% block structured_data %}{% endblock %}
 </head>
@@ -47,23 +48,23 @@
       <a class="header-cart" href="{{ url_for('shop.cart') }}" aria-label="Open your cart">Cart <span class="cart-count">{{ format_quantity(cart_count) }}</span></a>
       <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-menu" aria-label="Open menu"><span></span><span></span><span></span></button>
       <nav class="main-nav" id="main-menu" aria-label="Main navigation">
-        <a href="{{ url_for('shop.index') }}">Shop</a>
-        <a href="{{ url_for('shop.products') }}">Products</a>
-        <a href="{{ url_for('shop.updates') }}">Updates</a>
-        <a href="{{ url_for('customer.account') if current_customer else url_for('customer.login') }}">{{ "My account" if current_customer else "Customer account" }}</a>
+        <a href="{{ url_for('shop.index') }}"><span>Shop</span></a>
+        <a href="{{ url_for('shop.products') }}"><span>Products</span></a>
+        <a href="{{ url_for('shop.updates') }}"><span>Updates</span></a>
+        <a class="customer-account-link" href="{{ url_for('customer.account') if current_customer else url_for('customer.login') }}"><span>{{ "My account" if current_customer else "Customer account" }}</span></a>
         <details class="nav-more">
-          <summary>More</summary>
+          <summary>Menu<span class="nav-chevron" aria-hidden="true"></span></summary>
           <div class="nav-more-menu">
             <a href="{{ url_for('reviews.testimonials') }}">Testimonials</a>
             <a href="{{ url_for('reviews.submit_review') }}">Leave a Review</a>
-            <a href="{{ url_for('shop.gallery') }}">Gallery</a><a href="{{ url_for('shop.track_order') }}">Track order</a><a href="{{ url_for('shop.wholesale') }}">Wholesale orders</a>
+            <a href="{{ url_for('shop.gallery') }}">Gallery</a>
+            <a href="{{ url_for('community.feed') }}">Community</a>
+            <a href="{{ url_for('shop.track_order') }}">Track order</a>
+            <a href="{{ url_for('shop.wholesale') }}">Wholesale orders</a>
             <a href="{{ url_for('shop.help_page') }}">Help</a>
             <a href="{{ url_for('shop.privacy') }}">Privacy & security</a>
             <a href="{{ url_for('complaints.create_complaint') }}">Customer care</a>
-            {% if current_customer %}
-            {% else %}
-              <a href="{{ url_for('customer.login') }}">Customer sign in</a>
-            {% endif %}
+            {% if not current_customer %}<a href="{{ url_for('customer.login') }}">Customer sign in</a>{% endif %}
             {% if session.get('staff_role') == 'owner' or session.get('admin_logged_in') %}
               <a href="{{ url_for('admin.dashboard') }}">Owner desk</a>
             {% elif session.get('staff_role') == 'dispatch_rider' %}
@@ -75,10 +76,23 @@
             {% endif %}
           </div>
         </details>
-          <span class="shop-status {{ 'shop-open' if shop_is_open else 'shop-closed' }}">{{ 'Open' if shop_is_open else 'Closed' }}</span>
+        <span class="shop-status {{ 'shop-open' if shop_is_open else 'shop-closed' }}">{{ 'Open' if shop_is_open else 'Closed' }}</span>
       </nav>
     </div>
   </header>
+
+  {% if customer_notice %}
+    <aside class="customer-notice-popup" role="status" aria-labelledby="customer-notice-title">
+      <div class="customer-notice-copy"><p class="eyebrow">{{ customer_notice.created_by or 'Beamers Farm' }}</p><strong id="customer-notice-title">{{ customer_notice.title }}</strong><p>{{ customer_notice.message }}</p></div>
+      <form method="post" action="{{ url_for('customer.dismiss_notice', notice_id=customer_notice.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ request.full_path }}"><button type="submit" aria-label="Dismiss update">×</button></form>
+    </aside>
+  {% elif gifted_coupon %}
+    <aside class="coupon-gift-popup" data-coupon-gift-popup data-coupon-id="{{ gifted_coupon.id }}" role="status" aria-labelledby="coupon-gift-title">
+      <button type="button" class="coupon-gift-close" data-coupon-gift-close aria-label="Dismiss coupon gift">×</button>
+      <span class="coupon-gift-icon" aria-hidden="true">Gift</span>
+      <div><p class="eyebrow">A gift from Beamers Farm</p><strong id="coupon-gift-title">Your coupon {{ gifted_coupon.code }} is ready.</strong><p>{{ gifted_coupon.gift_message or "A little something to make your next order better." }}</p><a class="button button-lime" href="{{ url_for('customer.account') }}#gifted-coupons">View in my dashboard</a></div>
+    </aside>
+  {% endif %}
 
   <main>
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -92,7 +106,11 @@
                 <div class="cart-confirmation-actions"><a class="button button-lime" href="{{ url_for('shop.cart') }}">View cart <span>→</span></a>{% if shop_is_open %}<a class="cart-confirmation-link" href="{{ url_for('shop.checkout') }}">Checkout</a>{% endif %}<button class="cart-confirmation-close" type="button" data-cart-confirmation-close aria-label="Close cart confirmation">×</button></div>
               </aside>
             {% else %}
-              <div class="flash {{ category }}">{{ message }}</div>
+              {% if category == 'partner-form-link' %}
+              <div class="partner-link-modal-backdrop" data-partner-link-modal role="dialog" aria-modal="true" aria-labelledby="partner-link-modal-title">
+                <section class="partner-link-modal"><button class="partner-link-close" type="button" data-partner-link-close aria-label="Close">×</button><p class="eyebrow">Partner advertisements</p><h2 id="partner-link-modal-title">Supplier form link created</h2><p>This secure link expires in 24 hours and can be used once. Copy it and send it directly to the supplier.</p><label for="partner-form-link-value">Temporary form link</label><input id="partner-form-link-value" data-partner-form-link readonly value="{{ message }}"><button class="button button-dark" type="button" data-copy-partner-link>Copy link</button><p class="partner-link-copy-status" data-partner-link-copy-status aria-live="polite"></p></section>
+              </div>
+            {% else %}<div class="flash {{ category }}">{{ message }}</div>{% endif %}
             {% endif %}
           {% endfor %}
         </div>
@@ -102,12 +120,15 @@
   </main>
 
   <footer class="site-footer">
-    <div class="container footer-inner">
-      <span>Beamers Farm · Elapop Estate, Oke Baale, Osogbo, Nigeria</span>
-          <span><a href="https://wa.me/2348062074302?text={{ 'Hello Beamers Farm, I would like to make an enquiry about frozen chicken.'|urlencode }}" target="_blank" rel="noopener">WhatsApp 0806 207 4302</a> · <a href="{{ url_for('reviews.testimonials') }}">Testimonials</a> · <a href="{{ url_for('reviews.submit_review') }}">Leave a review</a> · <a href="{{ url_for('shop.help_page') }}">Help</a> · <a href="{{ url_for('shop.privacy') }}">Privacy & security</a> · <a href="{{ url_for('complaints.create_complaint') }}">Customer care</a> · Bank transfer</span>
+    <div class="container footer-columns">
+      <div><strong class="footer-brand">BEAMERS FARM</strong><p>Fresh, clean, hygienically packaged chicken for Osogbo kitchens.</p><small>Elapop Estate, Oke Baale, Osogbo, Nigeria</small></div>
+      <div><h3>Shop</h3><a href="{{ url_for('shop.products') }}">Products</a><a href="{{ url_for('shop.gallery') }}">Gallery</a><a href="{{ url_for('shop.track_order') }}">Track order</a></div>
+      <div><h3>Community</h3><a href="{{ url_for('community.feed') }}">Community</a><a href="{{ url_for('reviews.testimonials') }}">Testimonials</a><a href="{{ url_for('reviews.submit_review') }}">Leave a review</a></div>
+      <div><h3>Help & contact</h3><a href="https://wa.me/2348062074302" target="_blank" rel="noopener">WhatsApp 0806 207 4302</a><a href="{{ url_for('shop.help_page') }}">Help centre</a><a href="{{ url_for('shop.privacy') }}">Privacy & security</a><a href="{{ url_for('complaints.create_complaint') }}">Customer care</a></div>
     </div>
   </footer>
   <script src="{{ url_for('static', filename='js/cart.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/site-overlays.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/pwa-register.js') }}" defer></script>
   {% block scripts %}{% endblock %}
 </body>

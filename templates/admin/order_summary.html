@@ -5,7 +5,7 @@
   <div class="container">
     <div class="admin-topbar compact-topbar inventory-topbar">
       <div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / records</p><h1>Order Summary.</h1><p class="form-note">A compact view of orders placed in the selected period. Open an order for the full record.</p></div>
-      <div class="receipt-toolbar-inline"><a class="button button-outline" href="{{ url_for('admin.inventory_summary', period=period, start_date=start_date, end_date=end_date) }}">Inventory summary</a><button class="button button-dark" type="button" data-print>Print / Save as PDF</button></div>
+      <div class="receipt-toolbar-inline"><a class="button button-outline" href="{{ url_for('admin.inventory_summary', period=period, start_date=start_date, end_date=end_date) }}">Inventory summary</a><button class="button button-outline" type="button" data-share>Share</button><button class="button button-dark" type="button" data-print>Print / Save as PDF</button></div>
     </div>
 
     <section class="admin-panel inventory-filter-panel">

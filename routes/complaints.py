@@ -3,6 +3,7 @@ from datetime import datetime
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from models import Complaint, Order, db
+from utils.web_push import send_owner_complaint_push
 
 complaints_bp = Blueprint("complaints", __name__)
 COMPLAINT_CATEGORIES = [
@@ -39,16 +40,12 @@ def create_complaint():
         ):
             flash("Please complete the form with a short subject and at least 10 characters describing the issue.", "error")
             return render_template("complaints/new.html", categories=COMPLAINT_CATEGORIES)
-        db.session.add(
-            Complaint(
-                order=order,
-                customer_name=name,
-                phone=phone,
-                category=category,
-                subject=subject,
-                description=description,
-            )
+        complaint = Complaint(
+            order=order, customer_name=name, phone=phone, category=category,
+            subject=subject, description=description,
         )
+        db.session.add(complaint)
         db.session.commit()
+        send_owner_complaint_push(complaint)
         return render_template("complaints/received.html", name=name)
     return render_template("complaints/new.html", categories=COMPLAINT_CATEGORIES)

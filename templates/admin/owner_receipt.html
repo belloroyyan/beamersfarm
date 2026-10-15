@@ -2,7 +2,7 @@
 {% block title %}Owner receipt · Order #{{ order.public_id }}{% endblock %}
 {% block content %}
 <div class="container page-shell printable-page">
-  <div class="receipt-toolbar"><a class="back-link" href="{{ url_for('admin.order_detail', order_ref=order.public_id) }}">← Back to order desk</a><button class="button button-dark" type="button" data-print>Print owner receipt</button></div>
+  <div class="receipt-toolbar"><a class="back-link" href="{{ url_for('admin.order_detail', order_ref=order.public_id) }}">← Back to order desk</a><button class="button button-outline" type="button" data-share>Share</button><button class="button button-dark" type="button" data-print>Print owner receipt</button></div>
   <article class="print-receipt owner-print-receipt">
     <header class="print-receipt-header"><img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farm" loading="lazy" decoding="async"><div><p class="eyebrow">Private · Owner copy</p><h1>Financial order receipt</h1><p>Order #{{ order.public_id }}</p></div><span class="status-pill {% if order.payment_status == 'Verified' %}status-confirmed{% else %}status-received{% endif %}">{{ order.payment_status }}</span></header>
     <div class="print-receipt-meta"><div><span>Customer</span><strong>{{ order.customer_name }}</strong></div><div><span>Phone</span><strong>{{ order.phone }}</strong></div><div><span>Placed</span><strong>{{ order.created_at|local_time("%d %b %Y · %H:%M") }}</strong></div><div><span>Fulfillment</span><strong>{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}Delivery · {{ order.delivery_zone_name }}{% endif %}</strong></div></div>

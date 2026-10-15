@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Customer forms · Owner desk{% endblock %}
+{% block content %}
+<div class="admin-shell"><div class="container">
+  <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">Back to order desk</a><p class="eyebrow">Owner desk / customer channels</p><h1>Active customer forms.</h1><p class="form-note">A live overview of the forms customers can submit and the queue to review each one.</p></div></div>
+  <section class="customer-forms-grid">
+    {% for form in forms %}
+      <article class="admin-panel customer-form-card"><div class="customer-form-card-head"><div><p class="eyebrow">Customer entry point</p><h2>{{ form.name }}</h2></div><span class="status-pill {{ 'status-open' if form.active else 'status-closed' }}">{{ form.status }}</span></div><p>{{ form.description }}</p><div class="customer-form-card-foot"><span><strong>{{ form.volume }}</strong><small>{{ 'open item(s)' if form.name in ['Wholesale request', 'Customer care / complaint', 'Leave a review'] else 'available records' }}</small></span><a class="table-link" href="{{ form.url }}">Manage →</a></div></article>
+    {% endfor %}
+  </section>
+  <p class="form-note">Customer-facing forms are read-only from this overview. Use the linked Owner page to manage submissions or the relevant shop/community controls to change availability.</p>
+</div></div>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Community | Beamers Farm{% endblock %}
+{% block content %}
+<section class="community-shell">
+  <div class="container">
+    <header class="community-hero">
+      <p class="eyebrow">The farm table</p>
+      <h1>A helpful community, at your pace.</h1>
+      <p>Browse popular conversations, answered questions, product requests, and suggestions the farm is considering. You can read without an account. Contact details only appear in member search when a customer has chosen a public profile.</p>
+      <div class="community-hero-actions">
+        {% if customer %}
+          <a class="community-notification-link" href="{{ url_for('community.notifications') }}">Community notifications{% if unread_notifications %} · {{ unread_notifications }} new{% endif %}</a>
+          <a class="community-notification-link" href="{{ url_for('customer.account') }}#community-privacy">Profile privacy settings</a>
+          {% if community_open and not community_blocked %}<button class="button button-dark" type="button" data-open-community-post>New Post</button>{% endif %}
+        {% else %}
+          <a class="button button-dark" href="{{ url_for('customer.login', next=url_for('community.feed', new=1)) }}">Join community</a>
+          <span class="community-privacy-note">Public reading; an account is needed to post or reply.</span>
+        {% endif %}
+      </div>
+      {% if not community_open %}<div class="notice-panel community-closed-notice">{{ community_closed_message }} You can continue to read public conversations.</div>{% endif %}
+      {% if community_blocked %}<div class="notice-panel community-closed-notice">Your posting access is paused. You can still read public conversations and manage your profile privacy.</div>{% endif %}
+    </header>
+
+    <section class="community-activity" aria-labelledby="community-activity-heading">
+      <div class="community-section-heading"><div><p class="eyebrow">Public activity</p><h2 id="community-activity-heading">What people are talking about</h2></div><small>Based only on published community conversations.</small></div>
+      <div class="community-insights-grid">
+        <article class="community-insight-card"><h3>Popular conversations</h3>{% for post in popular_posts %}<a href="#post-{{ post.id }}"><strong>{{ post.body|truncate(96) }}</strong><small>{{ reactions[post.id] }} reactions · {{ comments[post.id]|length }} replies</small></a>{% else %}<p>Public conversations will appear here as customers join in.</p>{% endfor %}</article>
+        <article class="community-insight-card"><h3>Recently answered</h3>{% for post, reply in recently_answered %}<a href="#post-{{ post.id }}"><strong>{{ post.body|truncate(82) }}</strong><small>Answered {{ reply.created_at|local_time("%d %b") }}</small></a>{% else %}<p>Farm responses to customer questions will appear here.</p>{% endfor %}</article>
+        <article class="community-insight-card"><h3>Product requests</h3>{% for product, count in product_mentions %}<a href="{{ url_for('shop.product_detail', product_id=product.id) }}"><strong>{{ product.name }}</strong><small>Mentioned in {{ count }} public post{{ '' if count == 1 else 's' }}</small></a>{% else %}<p>No product requests have been mentioned yet.</p>{% endfor %}</article>
+        <article class="community-insight-card"><h3>Suggestions being considered</h3>{% for post in considered_suggestions %}<a href="#post-{{ post.id }}"><strong>{{ post.body|truncate(82) }}</strong><small>Shared by {{ considered_names[post.id] }}</small></a>{% else %}<p>When the farm marks a suggestion for review, it will appear here.</p>{% endfor %}</article>
+      </div>
+    </section>
+
+    <form method="get" class="community-search" role="search">
+      <label for="community-search-input">Search conversations or public profiles</label>
+      <div><input id="community-search-input" type="search" name="q" maxlength="120" value="{{ search_query }}" placeholder="Search posts and replies, or start with @ to search public members"><button class="button button-dark" type="submit">Search</button>{% if search_query %}<a class="table-link" href="{{ url_for('community.feed') }}">Clear</a>{% endif %}</div>
+      <small>Use <strong>@name</strong>, <strong>@phone</strong>, or <strong>@email</strong> to find only customers who have opted into a public contact profile.</small>
+    </form>
+
+    {% if is_profile_search %}
+      <section class="community-search-results" aria-live="polite"><h2>Public member profiles</h2>
+        {% for person in public_profiles %}<article class="community-profile-result"><div><strong>{{ person.name }}</strong><small>Public community profile</small></div><div class="community-contact-links"><a href="tel:{{ person.phone }}">{{ person.phone }}</a>{% if person.email %}<a href="mailto:{{ person.email }}">{{ person.email }}</a>{% endif %}</div></article>{% else %}<div class="empty-state compact"><h3>No matching public profiles.</h3><p>Private profiles are never returned in this search.</p></div>{% endfor %}
+      </section>
+    {% else %}
+      <nav class="community-tabs" aria-label="Community categories">
+        {% for category in categories %}<a class="{{ 'active' if selected_category == category else '' }}" href="{{ url_for('community.feed', category=category, q=search_query or none) }}">{{ category }}</a>{% endfor %}
+      </nav>
+      <div class="community-feed">
+        {% for post in posts %}
+          <article class="community-post" id="post-{{ post.id }}">
+            <header><div class="community-avatar" aria-hidden="true">{{ post_authors[post.id][:1]|upper }}</div><div><strong>{{ post_authors[post.id] }}</strong><small>{{ post.category or 'Open conversation' }} · {{ post.created_at|local_time("%d %b · %H:%M") }}</small></div>{% if post.considering %}<span class="community-considering-badge">Suggestion under consideration</span>{% endif %}{% if customer and post.customer_id == customer.id %}<form method="post" action="{{ url_for('community.delete_post', post_id=post.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="icon-button" title="Delete your post" aria-label="Delete your post">×</button></form>{% endif %}</header>
+            <p class="community-post-body">{{ post.body|community_linkify }}</p>
+            {% if post.image and community_image_url(post.image) %}<img class="community-post-image" src="{{ community_image_url(post.image) }}" alt="Image attached to a community post" loading="lazy">{% endif %}
+            <div class="community-actions">
+              {% if customer and community_open and not community_blocked %}<form method="post" action="{{ url_for('community.react', post_id=post.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button type="submit">Like · {{ reactions[post.id] }}</button></form>{% else %}<span>{{ reactions[post.id] }} likes</span>{% endif %}
+              <span>{{ comments[post.id]|length }} replies</span>
+              {% if customer and post.customer_id and post.customer_id != customer.id %}<form method="post" action="{{ url_for('community.block_customer', customer_id=post.customer_id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button type="submit">Hide member</button></form>{% endif %}
+              {% if customer %}<form method="post" action="{{ url_for('community.report_post', post_id=post.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="reason" value="Something else"><button type="submit">Report</button></form>{% endif %}
+            </div>
+            <div class="community-replies">{% for comment in comments[post.id] %}<div class="community-reply {{ 'staff-reply' if comment.is_staff else '' }}"><strong>{{ comment_authors[comment.id] }}</strong>{% if comment.is_staff %}<span class="community-staff-badge">Beamers Farm team</span>{% endif %}<p>{{ comment.body|community_linkify }}</p><small>{{ comment.created_at|local_time("%d %b · %H:%M") }}</small></div>{% endfor %}
+              {% if customer and community_open and not community_blocked %}<form method="post" action="{{ url_for('community.add_comment', post_id=post.id) }}" class="community-reply-form"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input name="body" maxlength="2000" required placeholder="Reply to this conversation..."><button class="button button-outline" type="submit">Reply</button></form>{% elif not customer %}<p class="form-note"><a class="text-link" href="{{ url_for('customer.login', next=url_for('community.feed')) }}">Sign in to reply.</a></p>{% endif %}
+            </div>
+          </article>
+        {% else %}<div class="empty-state"><h2>{% if search_query %}No matching conversations.{% else %}No conversations here yet.{% endif %}</h2><p>{% if search_query %}Try another search term or category.{% else %}Public activity will appear here as the community grows.{% endif %}</p></div>{% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+{% if customer and community_open and not community_blocked %}
+  <button class="community-fab" type="button" data-open-community-post aria-label="Create a community post">+</button>
+  <dialog class="community-post-dialog" data-community-post-dialog aria-labelledby="community-post-title">
+    <div class="community-dialog-head"><div><p class="eyebrow">Your community</p><h2 id="community-post-title">New Post</h2></div><button type="button" class="community-dialog-close" data-close-community-post aria-label="Close new post">×</button></div>
+    <p class="community-dialog-note">Posts are visible to the public. Your profile contact details stay private unless you enable a public profile in your account settings. Avoid including sensitive personal information in a post.</p>
+    <form method="post" action="{{ url_for('community.create_post') }}" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <label for="community-body">What would you like to share?</label>
+      <textarea id="community-body" name="body" maxlength="4000" required placeholder="Ask a question, share a suggestion, or leave a useful note..."></textarea>
+      <label for="community-category">Category <span class="field-help">Optional</span></label>
+      <select id="community-category" name="category"><option value="">No category</option>{% for category in categories[1:] %}<option value="{{ category }}">{{ category }}</option>{% endfor %}</select>
+      <label class="community-file">Attach an image <span class="field-help">Optional · JPG, PNG, WEBP</span><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
+      <div class="community-dialog-actions"><button class="button button-outline" type="button" data-close-community-post>Cancel</button><button class="button button-lime" type="submit">Publish post</button></div>
+    </form>
+  </dialog>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/community.js') }}" defer></script>{% endblock %}

@@ -26,10 +26,9 @@
     <p class="hero-lede">Your trusted local source for fresh, clean, and hygienically packaged frozen chicken, whole birds, and delicious parts. Choose a delivery zone across Osogbo or collect your order from our farm.</p>
     <a class="button button-dark" href="#products">Shop Beamers Farm <span>↓</span></a>
   </div>
-  <div class="hero-card">
-    <div class="hero-card-top"><span>PACKED WITH CARE</span><span class="status-dot"></span></div>
-    <div class="hero-glyph">BF</div>
-    <div class="hero-card-bottom"><strong>Clean portions. Fair prices.</strong><span>Prices in ₦</span></div>
+  <div class="hero-card hero-image-card">
+    <img src="{{ url_for('static', filename='images/full-dressed-chicken-hero.jpg') }}" alt="A fully dressed chicken prepared by Beamers Farm" fetchpriority="high">
+    <div class="hero-card-overlay"><span>PACKED WITH CARE</span><strong>Clean portions. Fair prices.</strong></div>
   </div>
 </section>
 <section class="trust-strip">
@@ -39,13 +38,14 @@
     <div><span class="trust-number">03</span><strong>Pay by transfer</strong><small>We confirm every order</small></div>
   </div>
 </section>
+{% if pinned_gallery %}<section class="container pinned-gallery-summary" aria-labelledby="pinned-gallery-heading"><div class="pinned-gallery-media">{% if pinned_gallery.media_type == "video" %}<video controls preload="metadata" src="{{ gallery_image_url(pinned_gallery.image) }}"></video>{% else %}<img src="{{ gallery_image_url(pinned_gallery.image) }}" alt="{{ pinned_gallery.title }}" loading="lazy">{% endif %}</div><div><p class="eyebrow">Pinned from the farm gallery</p><h2 id="pinned-gallery-heading">{{ pinned_gallery.title }}</h2><p>{{ pinned_gallery.description }}</p><a class="button button-outline" href="{{ url_for('shop.gallery') }}">Explore the gallery ▧</a></div></section>{% endif %}
 <section class="container section" id="products">
   <div class="section-heading"><div><p class="eyebrow">Beamers Farm quick menu</p><h2>Popular picks</h2></div><span class="section-note">Handpicked by the shop</span></div>
   {% if products %}
     <div class="product-grid">
       {% for product in products %}
         <article class="product-card">
-          <a class="product-art product-photo art-{{ product.image }}" href="{{ url_for('shop.product_detail', product_id=product.id) }}" aria-label="View {{ product.name }}">
+          <a class="product-art product-photo art-{{ product.image }}" style="view-transition-name: product-image-{{ product.id }};" href="{{ url_for('shop.product_detail', product_id=product.id) }}" aria-label="View {{ product.name }}">
             <img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy" decoding="async">
             <span class="photo-shade"></span>
           </a>

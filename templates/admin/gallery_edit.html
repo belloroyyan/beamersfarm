@@ -2,16 +2,16 @@
 {% block title %}Edit gallery image · Owner desk{% endblock %}
 {% block content %}
 <div class="admin-shell"><div class="container">
-  <div class="page-heading admin-heading"><div><a class="back-link" href="{{ url_for('admin.gallery_manager') }}">← Back to gallery manager</a><p class="eyebrow">Gallery image #{{ image.id }}</p><h1>Edit photo.</h1></div></div>
+  <div class="page-heading admin-heading"><div><a class="back-link" href="{{ url_for('admin.gallery_manager') }}">← Back to gallery manager</a><p class="eyebrow">Gallery image #{{ image.id }}</p><h1>Edit gallery media.</h1></div></div>
   <form class="form-card edit-product-card gallery-edit-card" method="post" enctype="multipart/form-data">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-    {% set image_src = gallery_image_url(image.image) %}{% if image_src %}<figure class="gallery-edit-preview"><img src="{{ image_src }}" alt="{{ image.title }}" loading="lazy" decoding="async"><figcaption>Current image</figcaption></figure>{% endif %}
+    {% set image_src = gallery_image_url(image.image) %}{% if image_src %}<figure class="gallery-edit-preview">{% if image.media_type == "video" %}<video src="{{ image_src }}" controls preload="metadata" playsinline aria-label="{{ image.title }}"></video>{% else %}<img src="{{ image_src }}" alt="{{ image.title }}" loading="lazy" decoding="async">{% endif %}<figcaption>Current {{ "video" if image.media_type == "video" else "image" }}</figcaption></figure>{% endif %}
     <label>Title<input type="text" name="title" maxlength="120" value="{{ image.title }}" required></label>
     <label>Caption / description<textarea name="description" rows="5" maxlength="4000">{{ image.description }}</textarea></label>
-    <label>Replace image <small class="field-help">Optional · JPG, PNG or WEBP · maximum 8 MB</small><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
+    <label>Replace media <small class="field-help">Optional · image up to 8 MB or MP4/WEBM/MOV video up to 80 MB</small><input type="file" name="image" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"></label>
     <label>Display order<input type="number" name="sort_order" step="1" value="{{ image.sort_order }}"><small class="field-help">Lower numbers appear first.</small></label>
-    <label class="catalog-setting-toggle"><input type="checkbox" name="active" value="yes" {% if image.active %}checked{% endif %}><span><strong>Visible on public gallery</strong><small>Uncheck to hide this image without deleting it.</small></span></label>
-    <div class="form-actions"><button class="button button-dark" type="submit">Save gallery image</button><a class="button button-outline" href="{{ url_for('admin.gallery_manager') }}">Cancel</a></div>
+    <label class="catalog-setting-toggle"><input type="checkbox" name="active" value="yes" {% if image.active %}checked{% endif %}><span><strong>Visible on public gallery</strong><small>Uncheck to hide this media without deleting it.</small></span></label><label class="catalog-setting-toggle"><input type="checkbox" name="pinned" value="yes" {% if image.pinned %}checked{% endif %}><span><strong>Pin a short summary on the homepage</strong><small>Only one item is pinned at a time.</small></span></label>
+    <div class="form-actions"><button class="button button-dark" type="submit">Save gallery media</button><a class="button button-outline" href="{{ url_for('admin.gallery_manager') }}">Cancel</a></div>
   </form>
 </div></div>
 {% endblock %}

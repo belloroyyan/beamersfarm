@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Partner submission forms · Owner desk{% endblock %}
+{% block content %}
+<div class="admin-shell"><div class="container">
+  <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.customer_forms') }}">← Back to active customer forms</a><p class="eyebrow">Owner desk / partner advertisements</p><h1>Active partner submission forms.</h1><p class="form-note">Only unused, unexpired secure invite links are listed here. Each link can be used once and expires after 24 hours.</p></div></div>
+  <section class="admin-panel"><div class="panel-heading"><div><h2>Active forms</h2><p class="form-note">{{ invites|length }} active invite(s)</p></div><form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="button button-dark" type="submit">Create secure form link</button></form></div>
+  {% if invites %}<div class="admin-record-list">{% for invite in invites %}<article class="admin-record"><div class="admin-record-head"><div><strong>Partner submission form #{{ invite.id }}</strong><small>Expires {{ invite.expires_at|local_time("%d %b %Y · %H:%M") }}</small></div><span class="status-pill status-open">Active</span></div><p class="form-note">For security, previously generated raw links are not stored and cannot be displayed again. Create a new link if the supplier has lost theirs.</p></article>{% endfor %}</div>{% else %}<div class="empty-state compact"><h2>No active submission forms.</h2><p>Create a secure invite link when you're ready to send a form to a supplier.</p></div>{% endif %}</section>
+</div></div>
+{% endblock %}

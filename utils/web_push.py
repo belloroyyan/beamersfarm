@@ -161,3 +161,18 @@ def send_owner_wholesale_request_push():
 
 def send_salesperson_new_order_push():
     return send_staff_push("salesperson", "New order received", "A customer placed a new order. Sign in to the sales desk to review it.", "/sales/")
+
+
+def send_owner_complaint_push(complaint):
+    return send_staff_push("owner", "New customer complaint", f"A customer reported: {complaint.subject}. Open Customer care to review it.", "/admin/complaints")
+
+def send_customer_community_reply_push(customer, post):
+    empty = {"configured": False, "total": 0, "sent": 0, "failed": 0, "expired": 0}
+    if not customer or not customer.active or not customer.push_notifications_enabled or not web_push_is_configured():
+        return empty
+    try:
+        subscriptions = CustomerPushSubscription.query.filter_by(customer_key=_customer_push_key(customer.phone)).order_by(CustomerPushSubscription.id.asc()).all()
+    except SQLAlchemyError:
+        db.session.rollback(); logger.exception("Could not read community subscriptions for customer %s", customer.id)
+        return {**empty, "configured": True, "failed": 1}
+    return _send_to_subscriptions(subscriptions, "Beamers Farm replied", "The Beamers Farm team replied to your community post.", "/community", "customer community")

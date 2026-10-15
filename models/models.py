@@ -73,6 +73,8 @@ class ShopSettings(db.Model):
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     reviews_auto_publish = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     analytics_paths = db.Column(db.String(2000), nullable=False, default="/", server_default="/")
+    community_open = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    community_closed_message = db.Column(db.String(500), nullable=False, default="The community is currently closed.", server_default="The community is currently closed.")
 
 
 class Coupon(db.Model):
@@ -89,8 +91,9 @@ class Coupon(db.Model):
     starts_at = db.Column(db.DateTime, nullable=True)
     ends_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-
-
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
+    gift_message = db.Column(db.String(500), nullable=False, default="", server_default="")
+    gifted_at = db.Column(db.DateTime, nullable=True)
 class PrivacyRule(db.Model):
     __tablename__ = "privacy_rules"
     id = db.Column(db.Integer, primary_key=True)
@@ -150,6 +153,8 @@ class Customer(db.Model):
     push_notifications_enabled = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     whatsapp_notifications_enabled = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    community_profile_public = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    community_posting_blocked = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     deleted_at = db.Column(db.DateTime, nullable=True)
@@ -430,7 +435,9 @@ class GalleryImage(db.Model):
     title = db.Column(db.String(120), nullable=False)
     description = db.Column(db.Text, nullable=False, default="")
     image = db.Column(db.String(160), nullable=False)
+    media_type = db.Column(db.String(20), nullable=False, default="image", server_default="image")
     active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    pinned = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     sort_order = db.Column(db.Integer, nullable=False, default=0, server_default="0")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
@@ -457,6 +464,7 @@ class PartnerListing(db.Model):
     image = db.Column(db.String(160), nullable=True)
     active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
     recommended = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    submitted_via_invite = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     sort_order = db.Column(db.Integer, nullable=False, default=0, server_default="0")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -480,6 +488,15 @@ class PartnerListing(db.Model):
                 safe_links.append({"label": label, "url": url})
         return safe_links
 
+
+class PartnerAdInvite(db.Model):
+    __tablename__ = "partner_ad_invites"
+    id = db.Column(db.Integer, primary_key=True)
+    token_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)
+    used_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_by = db.Column(db.String(120), nullable=False, default="Owner")
 
 class Review(db.Model):
     __tablename__ = "reviews"
@@ -555,3 +572,82 @@ class CustomerPushSubscription(db.Model):
         secondary=order_customer_push_subscriptions,
         back_populates="customer_push_subscriptions",
     )
+
+
+class CommunityPost(db.Model):
+    __tablename__ = "community_posts"
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
+    author_name = db.Column(db.String(120), nullable=False)
+    category = db.Column(db.String(40), nullable=False, default="", server_default="", index=True)
+    body = db.Column(db.Text, nullable=False)
+    image = db.Column(db.String(160), nullable=True)
+    status = db.Column(db.String(24), nullable=False, default="published", server_default="published", index=True)
+    considering = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CommunityComment(db.Model):
+    __tablename__ = "community_comments"
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
+    author_name = db.Column(db.String(120), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    is_staff = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    status = db.Column(db.String(24), nullable=False, default="published", server_default="published")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CommunityReaction(db.Model):
+    __tablename__ = "community_reactions"
+    __table_args__ = (db.UniqueConstraint("post_id", "customer_id", name="uq_community_reaction_post_customer"),)
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True)
+    reaction = db.Column(db.String(20), nullable=False, default="heart", server_default="heart")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class CommunityReport(db.Model):
+    __tablename__ = "community_reports"
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=True, index=True)
+    comment_id = db.Column(db.Integer, db.ForeignKey("community_comments.id", ondelete="CASCADE"), nullable=True, index=True)
+    reporter_customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="SET NULL"), nullable=True)
+    reason = db.Column(db.String(160), nullable=False)
+    status = db.Column(db.String(24), nullable=False, default="open", server_default="open", index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class CommunityBlock(db.Model):
+    __tablename__ = "community_blocks"
+    __table_args__ = (db.UniqueConstraint("blocker_customer_id", "blocked_customer_id", name="uq_community_block_pair"),)
+    id = db.Column(db.Integer, primary_key=True)
+    blocker_customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True)
+    blocked_customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class CommunityNotification(db.Model):
+    __tablename__ = "community_notifications"
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("community_posts.id", ondelete="SET NULL"), nullable=True)
+    message = db.Column(db.String(240), nullable=False)
+    read_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+
+class CustomerNotice(db.Model):
+    __tablename__ = "customer_notices"
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = db.Column(db.String(140), nullable=False)
+    message = db.Column(db.String(700), nullable=False)
+    kind = db.Column(db.String(32), nullable=False, default="account", server_default="account")
+    created_by = db.Column(db.String(120), nullable=False, default="Beamers Farm", server_default="Beamers Farm")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    dismissed_at = db.Column(db.DateTime, nullable=True)

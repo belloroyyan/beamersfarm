@@ -4,7 +4,7 @@
 <div class="admin-shell"><div class="container">
   <div class="admin-topbar compact-topbar inventory-topbar">
     <div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / inventory</p><h1>Inventory summary.</h1><p class="form-note">View current stock alongside verified, unverified-reserved, and cancelled units for the selected order period.</p></div>
-    <div class="receipt-toolbar-inline"><a class="button button-lime" href="{{ url_for('admin.inventory_summary_pdf', period=report.period, q=report.search_query, start_date=report.start_date, end_date=report.end_date, low_stock=1 if report.low_stock else 0) }}">Download watermarked PDF</a><a class="button button-outline" href="{{ url_for('admin.order_summary', period=report.period, start_date=report.start_date, end_date=report.end_date) }}">Printable order summary</a><button class="button button-outline" type="button" data-print>Print / Save as PDF</button></div>
+    <div class="receipt-toolbar-inline"><a class="button button-lime" href="{{ url_for('admin.inventory_summary_pdf', period=report.period, q=report.search_query, start_date=report.start_date, end_date=report.end_date, low_stock=1 if report.low_stock else 0) }}">Download watermarked PDF</a><a class="button button-outline" href="{{ url_for('admin.order_summary', period=report.period, start_date=report.start_date, end_date=report.end_date) }}">Printable order summary</a><button class="button button-outline" type="button" data-share>Share</button><button class="button button-outline" type="button" data-print>Print / Save as PDF</button></div>
   </div>
 
   <section class="admin-panel inventory-filter-panel">
