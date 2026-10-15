@@ -41,7 +41,7 @@
   <header class="site-header">
     <div class="container header-inner">
       <a class="brand" href="{{ url_for('shop.index') }}">
-        <img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="" class="brand-mark">
+        <img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="" class="brand-mark" loading="lazy" decoding="async">
         <span><strong>BEAMERS FARM</strong><small>Fresh, clean, hygienically packaged.</small></span>
       </a>
       <a class="header-cart" href="{{ url_for('shop.cart') }}" aria-label="Open your cart">Cart <span class="cart-count">{{ format_quantity(cart_count) }}</span></a>
@@ -85,7 +85,15 @@
       {% if messages %}
         <div class="container flash-stack" aria-live="polite">
           {% for category, message in messages %}
-            <div class="flash {{ category }}">{{ message }}</div>
+            {% if category == 'cart-added' %}
+              <aside class="cart-confirmation" data-cart-confirmation role="status" aria-labelledby="cart-confirmation-title">
+                <div class="cart-confirmation-icon" aria-hidden="true">✓</div>
+                <div class="cart-confirmation-copy"><strong id="cart-confirmation-title">{{ message }}</strong><span>Your cart is ready when you are.</span></div>
+                <div class="cart-confirmation-actions"><a class="button button-lime" href="{{ url_for('shop.cart') }}">View cart <span>→</span></a>{% if shop_is_open %}<a class="cart-confirmation-link" href="{{ url_for('shop.checkout') }}">Checkout</a>{% endif %}<button class="cart-confirmation-close" type="button" data-cart-confirmation-close aria-label="Close cart confirmation">×</button></div>
+              </aside>
+            {% else %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endif %}
           {% endfor %}
         </div>
       {% endif %}

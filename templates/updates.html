@@ -8,9 +8,9 @@
     <div class="update-list">
       {% for u in updates %}
         <article class="update-card">
-          <p class="eyebrow">{{ u.created_at.strftime('%d %b %Y · %H:%M') }}</p>
+          <p class="eyebrow">{{ u.created_at|local_time("%d %b %Y · %H:%M") }}</p>
           <h2><a href="{{ url_for('shop.update_detail', update_id=u.id) }}">{{ u.topic }}</a></h2>
-          {% set img = update_image_url(u.image) %}{% if img %}<img class="update-image" src="{{ img }}" alt="" loading="lazy">{% endif %}
+          {% set img = update_image_url(u.image) %}{% if img %}<img class="update-image" src="{{ img }}" alt="" loading="lazy" decoding="async">{% endif %}
           <div class="update-body">{{ u.body|linkify }}</div>
           <p class="update-meta">Posted by {{ u.posted_by }}</p>
           {{ update_share_buttons(u) }}

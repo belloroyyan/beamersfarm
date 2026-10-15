@@ -89,6 +89,7 @@ class Config:
     UPDATE_UPLOAD_FOLDER = str(BASE_DIR / "static" / "uploads" / "updates")
     MAX_CONTENT_LENGTH = 8 * 1024 * 1024
     DELIVERY_FEE = 1500
+    ABANDONED_CART_DELAY_HOURS = int(os.environ.get("ABANDONED_CART_DELAY_HOURS", "24"))
     SHOP_OPEN_DEFAULT = os.environ.get("SHOP_OPEN_DEFAULT", "true").lower() == "true"
     SHOP_CLOSED_MESSAGE = os.environ.get(
         "SHOP_CLOSED_MESSAGE",

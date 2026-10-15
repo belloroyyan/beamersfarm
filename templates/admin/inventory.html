@@ -4,7 +4,7 @@
 <div class="admin-shell"><div class="container">
   <div class="admin-topbar compact-topbar inventory-topbar">
     <div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / inventory</p><h1>Inventory summary.</h1><p class="form-note">View current stock alongside verified, unverified-reserved, and cancelled units for the selected order period.</p></div>
-    <div class="receipt-toolbar-inline"><a class="button button-lime" href="{{ url_for('admin.inventory_summary_pdf', period=report.period, q=report.search_query, start_date=report.start_date, end_date=report.end_date) }}">Download watermarked PDF</a><a class="button button-outline" href="{{ url_for('admin.order_summary', period=report.period, start_date=report.start_date, end_date=report.end_date) }}">Printable order summary</a><button class="button button-outline" type="button" data-print>Print / Save as PDF</button></div>
+    <div class="receipt-toolbar-inline"><a class="button button-lime" href="{{ url_for('admin.inventory_summary_pdf', period=report.period, q=report.search_query, start_date=report.start_date, end_date=report.end_date, low_stock=1 if report.low_stock else 0) }}">Download watermarked PDF</a><a class="button button-outline" href="{{ url_for('admin.order_summary', period=report.period, start_date=report.start_date, end_date=report.end_date) }}">Printable order summary</a><button class="button button-outline" type="button" data-print>Print / Save as PDF</button></div>
   </div>
 
   <section class="admin-panel inventory-filter-panel">
@@ -15,7 +15,7 @@
       <label>Start date<input type="date" name="start_date" value="{{ report.start_date }}"></label>
       <label>End date<input type="date" name="end_date" value="{{ report.end_date }}"></label>
       <label>Search product<input type="search" name="q" maxlength="120" value="{{ report.search_query }}" placeholder="Product name or ID"></label>
-      <button class="button button-dark" type="submit">Apply filters</button>
+      <label class="consent-row inventory-low-stock-toggle"><input type="checkbox" name="low_stock" value="1" {% if report.low_stock %}checked{% endif %}><span><strong>Low-stock only</strong><small>Show products at or below their alert threshold.</small></span></label><button class="button button-dark" type="submit">Apply filters</button>
       {% if report.search_query or report.period != '30d' %}<a class="table-link inventory-clear-link" href="{{ url_for('admin.inventory_summary') }}">Reset</a>{% endif %}
     </form>
     <p class="form-note">Date ranges use Osogbo local dates. Order activity follows order placement; Money Received and refunds use actual transaction settlement time. Current stock counts active catalog units after live reservations; cancelled orders return their units to stock. A product search filters the table, while summary cards cover all products in the selected period.</p>
@@ -32,7 +32,7 @@
 
   <article class="print-receipt inventory-report">
     <div class="inventory-watermark" aria-hidden="true">BEAMERS FARM · INVENTORY REPORT</div>
-    <header class="print-receipt-header"><img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farm"><div><p class="eyebrow">Private · Owner copy</p><h1>Inventory summary</h1><p>{{ report.period_label }}{% if report.search_query %} · Product filter: {{ report.search_query }}{% endif %}</p></div><span class="status-pill status-confirmed">{{ report.rows|length }} product lines</span></header>
+    <header class="print-receipt-header"><img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farm" loading="lazy" decoding="async"><div><p class="eyebrow">Private · Owner copy</p><h1>Inventory summary</h1><p>{{ report.period_label }}{% if report.search_query %} · Product filter: {{ report.search_query }}{% endif %}</p></div><span class="status-pill status-confirmed">{{ report.rows|length }} product lines</span></header>
     <div class="inventory-report-note"><strong>How to read this report.</strong> Current stock is counted in physical sale units. “Verified units” and gross item sales are non-cancelled orders with payment verified during orders placed in the selected period; requested kg is the customer's combined size on verified lines. Gross item sales are before recorded refunds and exclude delivery fees. Unverified orders reserve stock but are not counted as sales. Cancelled orders are excluded and their stock is restored.</div>
     <section class="print-receipt-section">
       <h2>Stock and period activity</h2>

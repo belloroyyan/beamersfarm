@@ -49,7 +49,7 @@
                 <tr>
                   <td><strong>#{{ order.public_id[:8] }}</strong><small>Record ID #{{ order.id }}</small></td>
                   <td><strong>{{ order.customer_name }}</strong><small>{{ order.phone }}</small></td>
-                  <td>{{ order.created_at.strftime('%d %b %Y · %H:%M') }}</td>
+                  <td>{{ order.created_at|local_time("%d %b %Y · %H:%M") }}</td>
                   <td>{{ order.items|length }} item{{ '' if order.items|length == 1 else 's' }}</td>
                   <td><span class="status-pill status-out-for-delivery">{{ order.status }}</span></td>
                   <td><a class="table-link" href="{{ url_for('dispatch.order_detail', order_ref=order.public_id) }}">Open delivery →</a></td>

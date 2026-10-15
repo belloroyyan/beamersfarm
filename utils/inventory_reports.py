@@ -27,7 +27,7 @@ def _utc_naive_midnight(local_day):
     ).replace(tzinfo=None)
 
 
-def build_inventory_report(period="30d", search="", start_raw="", end_raw="", now=None):
+def build_inventory_report(period="30d", search="", start_raw="", end_raw="", low_stock=False, now=None):
     """Build the report; order timeframe boundaries are interpreted in Africa/Lagos."""
     now_local = now.astimezone(SHOP_TIMEZONE) if now else datetime.now(SHOP_TIMEZONE)
     today = now_local.date()
@@ -158,6 +158,12 @@ def build_inventory_report(period="30d", search="", start_raw="", end_raw="", no
     else:
         visible_rows = all_rows
 
+    if low_stock:
+        visible_rows = [
+            row for row in visible_rows
+            if row["product_id"] is not None and row["active"] and Decimal(str(row["stock"] or 0)) <= Decimal(str(product_by_id[row["product_id"]].low_stock_threshold or 0))
+        ]
+
     if period == "all":
         period_label = "All time"
     else:
@@ -170,6 +176,7 @@ def build_inventory_report(period="30d", search="", start_raw="", end_raw="", no
         "start_date": start_day.isoformat() if start_day else "",
         "end_date": end_day.isoformat() if end_day else "",
         "search_query": search,
+        "low_stock": bool(low_stock),
         "rows": visible_rows,
         "orders": orders,
         "metrics": {

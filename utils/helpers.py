@@ -1,4 +1,6 @@
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 QUANTITY_STEP = Decimal("0.001")
 MAX_QUANTITY = Decimal("999999999.999")
@@ -6,6 +8,18 @@ MAX_QUANTITY = Decimal("999999999.999")
 
 def as_decimal(value):
     return Decimal(str(value or 0))
+
+
+def local_time(value, fmt="%d %b %Y · %H:%M"):
+    """Format stored UTC timestamps in the shop's Osogbo/WAT timezone."""
+    if value is None:
+        return "—"
+    try:
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(ZoneInfo("Africa/Lagos")).strftime(fmt)
+    except (AttributeError, TypeError, ValueError):
+        return str(value)
 
 
 def format_currency(value):

@@ -2,7 +2,7 @@
 <article class="partner-ad-card{% if compact %} partner-ad-card-compact{% endif %}">
   <a class="partner-ad-image" href="{{ url_for('shop.partner_offer', listing_id=listing.id) }}" aria-label="View {{ listing.name }} from {{ listing.supplier_name }}">
     {% set image_src = partner_image_url(listing.image) %}
-    {% if image_src %}<img src="{{ image_src }}" alt="{{ listing.name }}" loading="lazy">{% else %}<span>{{ listing.category }}</span>{% endif %}
+    {% if image_src %}<img src="{{ image_src }}" alt="{{ listing.name }}" loading="lazy" decoding="async">{% else %}<span>{{ listing.category }}</span>{% endif %}
     <span class="partner-ad-badge">Independent offer</span>
   </a>
   <div class="partner-ad-copy">

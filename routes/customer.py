@@ -9,6 +9,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from models import Customer, Order, Product, db
 from utils.helpers import format_quantity, parse_quantity, product_uses_requested_kg
 from utils.notifications import normalize_nigerian_phone
+from utils.recommendations import personalized_products
 
 customer_bp = Blueprint("customer", __name__, url_prefix="/account")
 
@@ -119,7 +120,8 @@ def account():
                 previous_product_ids.append(item.product_id)
     previous_recommendations = Product.query.filter(Product.id.in_(previous_product_ids), Product.active.is_(True), Product.stock > 0).all() if previous_product_ids else []
     previous_recommendations.sort(key=lambda item: previous_product_ids.index(item.id))
-    return render_template("customer/account.html", customer=customer, orders=orders, previous_recommendations=previous_recommendations[:4])
+    personalized_recommendations = personalized_products(customer, limit=4)
+    return render_template("customer/account.html", customer=customer, orders=orders, previous_recommendations=previous_recommendations[:4], personalized_recommendations=personalized_recommendations)
 
 
 @customer_bp.post("/settings")
@@ -205,6 +207,8 @@ def reorder(order_id):
         cart[str(product.id)] = value if isinstance(cart.get(str(product.id)), dict) or product_uses_requested_kg(product) else format_quantity(quantity)
         added += 1
     session.modified = True
+    from routes.shop import sync_abandoned_cart
+    sync_abandoned_cart()
     flash(f"{added} available item(s) were added to your cart." if added else "None of those products are currently available.", "success" if added else "error")
     return redirect(url_for("shop.cart"))
 

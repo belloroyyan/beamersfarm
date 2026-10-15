@@ -9,8 +9,8 @@
 <div class="update-popup" role="dialog" aria-modal="true" aria-labelledby="update-popup-title">
   <div class="update-popup-card">
     <a class="update-popup-close" href="{{ url_for('shop.dismiss_update') }}" aria-label="Close update">×</a>
-    <p class="eyebrow">New update · {{ latest_update.created_at.strftime('%d %b %Y') }}</p>
-    {% set img = update_image_url(latest_update.image) %}{% if img %}<img class="update-image" src="{{ img }}" alt="">{% endif %}
+    <p class="eyebrow">New update · {{ latest_update.created_at|local_time("%d %b %Y") }}</p>
+    {% set img = update_image_url(latest_update.image) %}{% if img %}<img class="update-image" src="{{ img }}" alt="" loading="lazy" decoding="async">{% endif %}
     <h2 id="update-popup-title">{{ latest_update.topic }}</h2>
     <div class="update-body">{{ latest_update.body|linkify }}</div>
     <p class="update-meta">Posted by {{ latest_update.posted_by }}</p>
@@ -46,7 +46,7 @@
       {% for product in products %}
         <article class="product-card">
           <a class="product-art product-photo art-{{ product.image }}" href="{{ url_for('shop.product_detail', product_id=product.id) }}" aria-label="View {{ product.name }}">
-            <img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy">
+            <img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy" decoding="async">
             <span class="photo-shade"></span>
           </a>
           <div class="product-info">

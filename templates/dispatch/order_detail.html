@@ -24,7 +24,7 @@
         <a class="button button-outline customer-receipt-link" href="{{ url_for('shop.customer_receipt', order_ref=order.public_id, token=order.public_token) }}" target="_blank" rel="noopener">Open customer receipt to hand over</a>
       </section>
       <aside class="admin-side">
-        <section class="admin-panel contact-panel dispatch-contact"><p class="eyebrow">Deliver to</p><h2>{{ order.customer_name }}</h2><a class="dispatch-phone" href="tel:{{ order.phone }}">Call {{ order.phone }}</a><p class="dispatch-address">{{ order.address }}</p><small>Order placed {{ order.created_at.strftime('%d %b %Y · %H:%M') }}</small></section>
+        <section class="admin-panel contact-panel dispatch-contact"><p class="eyebrow">Deliver to</p><h2>{{ order.customer_name }}</h2><a class="dispatch-phone" href="tel:{{ order.phone }}">Call {{ order.phone }}</a><p class="dispatch-address">{{ order.address }}</p><small>Order placed {{ order.created_at|local_time("%d %b %Y · %H:%M") }}</small></section>
         <section class="admin-panel dispatch-complete"><p class="eyebrow">Delivery progress</p><h2>Complete this delivery</h2><p>Hand over the customer receipt. For new orders, do not collect an extra amount beyond any amount stated on the receipt. Once the customer has received the order, mark it as delivered.</p><form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="delivered"><button class="button button-dark button-full" type="submit">Mark as delivered <span>✓</span></button></form></section>
       </aside>
     </div>

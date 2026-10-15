@@ -10,7 +10,7 @@
       <div class="cart-layout"><div class="cart-lines">
         {% for line in summary.lines %}
         <div class="cart-line">
-          <div class="mini-art product-photo art-{{ line.product.image }}"><img src="{{ product_image_url(line.product.image) }}" alt="{{ line.product.name }}" loading="lazy"></div>
+          <div class="mini-art product-photo art-{{ line.product.image }}"><img src="{{ product_image_url(line.product.image) }}" alt="{{ line.product.name }}" loading="lazy" decoding="async"></div>
           <div class="cart-line-main"><h3>{{ line.product.name }}</h3><span>{{ format_currency(line.product.price) }} per {{ line.product.unit }}</span></div>
           <label class="quantity-control">Qty<input type="number" name="quantity_{{ line.product.id }}" min="0" max="{{ format_quantity(line.product.stock) }}" step="{{ '0.001' if line.product.allow_fractional_quantity else '1' }}" value="{{ format_quantity(line.quantity) }}"></label>
           <strong class="line-price">{{ format_currency(line.line_subtotal) }}</strong>
@@ -26,4 +26,5 @@
     </form>
   {% else %}<div class="empty-state"><span class="empty-icon">+</span><h2>Your cart is empty.</h2><p>Pick a few cuts from today’s cold room to get started.</p><a class="button button-dark" href="{{ url_for('shop.index') }}">Browse products</a></div>{% endif %}
 </div>
+{% if recommendations %}<section class="container recommendations-section" aria-labelledby="cart-recommendations-heading"><p class="eyebrow">{{ 'Picked for you' if signed_in_customer else 'You may also like' }}</p><h2 id="cart-recommendations-heading">Complete your order</h2><div class="cart-recommendation-list">{% for product in recommendations %}<article class="cart-recommendation"><img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy" decoding="async"><div><strong>{{ product.name }}</strong><small>{{ format_currency(product.price) }} per {{ product.unit }}</small></div><a class="table-link" href="{{ url_for('shop.product_detail', product_id=product.id) }}">View</a></article>{% endfor %}</div></section>{% endif %}
 {% endblock %}

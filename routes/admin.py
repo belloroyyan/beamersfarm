@@ -10,7 +10,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import AnalyticsEvent, Coupon, Complaint, PrivacyRule, Customer, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, PartnerListing, Product, Review, SalespersonAccount, ShopSettings, ShopUpdate, StaffPushSubscription, WholesaleOrder, WholesaleOrderItem, db, order_customer_push_subscriptions
+from models import AbandonedCart, AnalyticsEvent, Coupon, Complaint, PrivacyRule, Customer, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, PartnerListing, Product, Review, SalespersonAccount, ShopSettings, ShopUpdate, StaffPushSubscription, WholesaleOrder, WholesaleOrderItem, db, order_customer_push_subscriptions
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.product_images import save_product_image
 from utils.gallery import delete_gallery_image, save_gallery_image
@@ -26,11 +26,23 @@ from utils.inventory_pdf import build_inventory_pdf
 from utils.inventory_reports import build_inventory_report
 from utils.order_search import order_search_filter
 from utils.salesperson_permissions import PERMISSION_DEFINITIONS, get_salesperson_permissions, serialize_salesperson_permissions
+from utils.owner_insights import abandoned_cart_report, customer_segment, operational_snapshot
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 COMPLAINT_STATUSES = ["New", "Under Review", "Resolved", "Closed"]
 COMPLAINT_CATEGORIES = ["Late delivery", "Missing item", "Incorrect item", "Product quality", "Payment issue", "Delivery experience", "Other"]
 REVIEW_STATUSES = ["Pending", "Approved", "Rejected"]
+ANALYTICS_PAGE_OPTIONS = [
+    ("/", "Home page"),
+    ("/products", "Products"),
+    ("/gallery", "Gallery"),
+    ("/updates", "Farm updates"),
+    ("/wholesale", "Wholesale"),
+    ("/help", "Help"),
+    ("/testimonials", "Testimonials"),
+    ("/privacy", "Privacy policy"),
+    ("/track-order", "Track order"),
+]
 
 MAX_PRODUCT_PRICE = Decimal("9999999999.99")
 MAX_DELIVERY_FEE = Decimal("1000000.00")
@@ -43,6 +55,7 @@ def _inventory_report_from_request():
             search=request.args.get("q", ""),
             start_raw=request.args.get("start_date", ""),
             end_raw=request.args.get("end_date", ""),
+            low_stock=request.args.get("low_stock") == "1",
         )
     except ValueError as error:
         flash(str(error), "error")
@@ -275,11 +288,13 @@ def dashboard():
         "low_stock": Product.query.filter(Product.active.is_(True), Product.stock <= Product.low_stock_threshold).count(),
         "complaints": Complaint.query.filter(Complaint.status.in_(["New", "Under Review"])).count(),
     }
+    stats.update(operational_snapshot())
+    abandoned_report = abandoned_cart_report()
     return render_template(
         "admin/dashboard.html", orders=orders, stats=stats, statuses=ORDER_STATUSES,
         search_query=search_query,
         shop_settings=shop_settings, push_configured=web_push_is_configured(),
-        vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""),
+        vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""), abandoned_report=abandoned_report,
     )
 
 
@@ -558,7 +573,12 @@ def customers():
     query = Customer.query.order_by(Customer.active.desc(), Customer.created_at.desc())
     if search:
         query = query.filter(or_(Customer.name.ilike(f"%{search}%"), Customer.phone.ilike(f"%{search}%"), Customer.email.ilike(f"%{search}%")))
-    return render_template("admin/customers.html", customers=query.all(), search_query=search)
+    customers = query.all()
+    segment_filter = request.args.get("segment", "").strip()
+    segments = {customer.id: customer_segment(customer) for customer in customers}
+    if segment_filter:
+        customers = [customer for customer in customers if segments[customer.id]["name"] == segment_filter]
+    return render_template("admin/customers.html", customers=customers, search_query=search, segments=segments, segment_filter=segment_filter, segment_options=["New", "Repeat", "High value", "At risk"])
 
 
 @admin_bp.route("/wholesale-orders", methods=["GET", "POST"])
@@ -575,7 +595,14 @@ def wholesale_orders():
             db.session.commit()
             flash("Wholesale request updated.", "success")
         return redirect(url_for("admin.wholesale_orders"))
-    return render_template("admin/wholesale_orders.html", wholesale_orders=WholesaleOrder.query.order_by(WholesaleOrder.created_at.desc()).all(), statuses=["New", "Contacted", "Quoted", "Approved", "Fulfilled", "Declined"])
+    statuses = ["New", "Contacted", "Quoted", "Approved", "Fulfilled", "Declined"]
+    status_filter = request.args.get("status", "").strip()
+    wholesale_query = WholesaleOrder.query.order_by(WholesaleOrder.created_at.desc())
+    if status_filter in statuses:
+        wholesale_query = wholesale_query.filter_by(status=status_filter)
+    wholesale_orders = wholesale_query.all()
+    status_counts = {status: WholesaleOrder.query.filter_by(status=status).count() for status in statuses}
+    return render_template("admin/wholesale_orders.html", wholesale_orders=wholesale_orders, statuses=statuses, status_filter=status_filter, status_counts=status_counts)
 
 
 @admin_bp.route("/products", methods=["GET", "POST"])
@@ -989,9 +1016,10 @@ def complaints():
         if search_query.isdigit():
             filters.extend([Complaint.id == int(search_query), Order.id == int(search_query)])
         query = query.filter(or_(*filters))
+    status_counts = {item: Complaint.query.filter_by(status=item).count() for item in COMPLAINT_STATUSES}
     return render_template(
         "admin/complaints.html", complaints=query.all(), statuses=COMPLAINT_STATUSES,
-        selected_status=status, search_query=search_query,
+        selected_status=status, search_query=search_query, status_counts=status_counts,
     )
 
 
@@ -1128,6 +1156,30 @@ def toggle_privacy_rule(rule_id):
     rule=PrivacyRule.query.get_or_404(rule_id); rule.active=not rule.active; db.session.commit(); flash("Privacy rule visibility updated.","success"); return redirect(url_for("admin.privacy_rules"))
 
 
+@admin_bp.post("/analytics/settings")
+@admin_required
+def analytics_settings():
+    selected = {path for path, _label in ANALYTICS_PAGE_OPTIONS if path in request.form.getlist("tracked_pages")}
+    custom_paths = []
+    for raw_path in request.form.get("custom_paths", "").split(","):
+        path = raw_path.strip().split("?", 1)[0]
+        if path.startswith("/") and len(path) <= 240 and path not in {item[0] for item in ANALYTICS_PAGE_OPTIONS}:
+            custom_paths.append(path)
+    selected.update(custom_paths)
+    if not selected:
+        selected = {"/"}
+    settings = ShopSettings.query.get(1)
+    if settings is None:
+        settings = ShopSettings(id=1)
+        db.session.add(settings)
+    ordered_paths = [path for path, _label in ANALYTICS_PAGE_OPTIONS if path in selected]
+    ordered_paths.extend(sorted(selected - set(ordered_paths)))
+    settings.analytics_paths = ",".join(ordered_paths)
+    db.session.commit()
+    flash("Analytics page tracking preferences saved.", "success")
+    return redirect(url_for("admin.analytics"))
+
+
 @admin_bp.get("/analytics")
 @admin_required
 def analytics():
@@ -1142,12 +1194,16 @@ def analytics():
     cart_adds = events.filter_by(event_type="cart_add").count()
     checkout_starts = events.filter_by(event_type="checkout_start").count()
     completed_orders = events.filter_by(event_type="order_complete").count()
+    abandoned_carts = abandoned_cart_report()["count"]
     sales_total = db.session.query(db.func.coalesce(db.func.sum(Order.total), 0)).filter(Order.created_at >= since, Order.status.notin_(["Cancelled", "Declined"])).scalar() or 0
     abandonment_rate = round(max(0, (checkout_starts-completed_orders)/checkout_starts*100), 1) if checkout_starts else 0
+    checkout_conversion = round(completed_orders / checkout_starts * 100, 1) if checkout_starts else 0
     unique_visitors = db.session.query(func.count(func.distinct(AnalyticsEvent.user_agent))).filter(AnalyticsEvent.created_at >= since, AnalyticsEvent.event_type == "page_view").scalar() or 0
     popular = db.session.query(AnalyticsEvent.path, func.count(AnalyticsEvent.id).label("views")).filter(AnalyticsEvent.created_at >= since, AnalyticsEvent.event_type == "page_view").group_by(AnalyticsEvent.path).order_by(func.count(AnalyticsEvent.id).desc()).limit(12).all()
     daily = db.session.query(func.date(AnalyticsEvent.created_at).label("day"), func.count(AnalyticsEvent.id).label("views")).filter(AnalyticsEvent.created_at >= since, AnalyticsEvent.event_type == "page_view").group_by(func.date(AnalyticsEvent.created_at)).order_by(func.date(AnalyticsEvent.created_at)).all()
-    return render_template("admin/analytics.html", days=days, total_views=total_views, unique_visitors=unique_visitors, popular=popular, daily=daily, cart_adds=cart_adds, checkout_starts=checkout_starts, completed_orders=completed_orders, sales_total=sales_total, abandonment_rate=abandonment_rate)
+    settings = ShopSettings.query.get(1)
+    tracked_paths = set((settings.analytics_paths if settings else "/").split(",")) or {"/"}
+    return render_template("admin/analytics.html", days=days, total_views=total_views, unique_visitors=unique_visitors, popular=popular, daily=daily, cart_adds=cart_adds, checkout_starts=checkout_starts, completed_orders=completed_orders, sales_total=sales_total, abandonment_rate=abandonment_rate, checkout_conversion=checkout_conversion, abandoned_carts=abandoned_carts, analytics_page_options=ANALYTICS_PAGE_OPTIONS, tracked_paths=tracked_paths, custom_tracked_paths=sorted(tracked_paths - {path for path, _label in ANALYTICS_PAGE_OPTIONS}))
 
 
 @admin_bp.post("/analytics/clear")
@@ -1175,12 +1231,13 @@ def clear_database():
     clear_partner_ads = request.form.get("clear_partner_ads") == "yes"
     clear_gallery = request.form.get("clear_gallery") == "yes"
     clear_customer_push = request.form.get("clear_customer_push") == "yes"
+    clear_abandoned_carts = request.form.get("clear_abandoned_carts") == "yes"
     clear_wholesale = request.form.get("clear_wholesale") == "yes"
     clear_coupons = request.form.get("clear_coupons") == "yes"
     clear_analytics = request.form.get("clear_analytics") == "yes"
     clear_privacy_rules = request.form.get("clear_privacy_rules") == "yes"
     reset_pins = request.form.get("reset_pins") == "yes"
-    if not any((clear_orders, clear_complaints, clear_messages, clear_updates, clear_reviews, clear_partner_ads, clear_gallery, clear_customer_push, clear_wholesale, clear_coupons, clear_analytics, clear_privacy_rules, reset_pins)):
+    if not any((clear_orders, clear_complaints, clear_messages, clear_updates, clear_reviews, clear_partner_ads, clear_gallery, clear_customer_push, clear_abandoned_carts, clear_wholesale, clear_coupons, clear_analytics, clear_privacy_rules, reset_pins)):
         flash("Choose at least one data category or homepage option to clear.", "error")
         return redirect(url_for("admin.dashboard"))
 
@@ -1197,6 +1254,7 @@ def clear_database():
         OrderFinancialRecord.query.delete(synchronize_session=False)
         OrderItem.query.delete(synchronize_session=False)
         Order.query.delete(synchronize_session=False)
+        AbandonedCart.query.delete(synchronize_session=False)
         cleared.append("orders and delivery records (including items, payment/refund history, linked reviews, WhatsApp logs, and customer push subscriptions)")
     elif clear_messages:
         OrderNotification.query.delete(synchronize_session=False)
@@ -1234,6 +1292,9 @@ def clear_database():
         db.session.execute(order_customer_push_subscriptions.delete())
         CustomerPushSubscription.query.delete(synchronize_session=False)
         cleared.append("customer push-notification subscriptions")
+    if clear_abandoned_carts and not clear_orders:
+        AbandonedCart.query.delete(synchronize_session=False)
+        cleared.append("abandoned-cart recovery snapshots")
     if clear_wholesale:
         WholesaleOrderItem.query.delete(synchronize_session=False)
         WholesaleOrder.query.delete(synchronize_session=False)

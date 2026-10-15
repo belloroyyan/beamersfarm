@@ -400,3 +400,12 @@ input[type=file]::file-selector-button:hover{opacity:.85}
 :focus-visible{outline:3px solid #8dbb2f;outline-offset:3px}.coupon-live-status{display:block;min-height:1.3em;margin-top:8px;font-weight:600}.coupon-live-status.is-success{color:#3d6b18}.coupon-live-status.is-error{color:#9d3e36}.coupon-row button[aria-busy="true"]{opacity:.65;cursor:wait}.clear-checkbox-list label:has(input:checked){border-color:#8dbb2f;background:#f3f9e8}.clear-checkbox-list input{width:1.1rem;height:1.1rem}.button:disabled{opacity:.6;cursor:not-allowed}@media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
 
 }
+
+
+/* Reliability fixes: catalog and printable reports must grow with their content. */
+.product-admin-grid, .admin-product-list, .admin-product-row { min-width: 0; }
+.admin-product-list { max-height: none; height: auto; overflow: visible; }
+.admin-product-row { min-height: 75px; }
+.order-summary-report, .inventory-report, .print-receipt { height: auto; max-height: none; overflow: visible; }
+.order-summary-report .order-table-wrap, .inventory-report .order-table-wrap { overflow-x: auto; overflow-y: visible; }
+@media print { .order-summary-report, .inventory-report, .print-receipt { overflow: visible !important; height: auto !important; max-height: none !important; } }

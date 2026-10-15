@@ -50,6 +50,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  document.querySelectorAll('[data-cart-confirmation]').forEach((panel) => {
+    const close = panel.querySelector('[data-cart-confirmation-close]');
+    const dismiss = () => { panel.classList.add('is-dismissed'); window.setTimeout(() => panel.remove(), 220); };
+    close?.addEventListener('click', dismiss);
+    window.setTimeout(dismiss, 9000);
+  });
+
   document.querySelectorAll('.flash').forEach((flash) => {
     window.setTimeout(() => {
       flash.style.opacity = '0';

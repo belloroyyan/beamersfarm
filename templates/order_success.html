@@ -28,7 +28,7 @@
     <div class="payment-detail"><span>Account number</span><strong>{{ payment_account_number }}</strong></div>
     <div class="payment-detail"><span>Account name</span><strong>{{ payment_account_name }}</strong></div>
     <div class="payment-reference"><div><span>Reference</span><strong id="order-reference">Order #{{ order.public_id }}</strong></div><button class="copy-reference-button" type="button" data-copy-reference="{{ order.public_id }}" aria-label="Copy order reference {{ order.public_id }}">Copy reference</button><span class="copy-reference-status" role="status" aria-live="polite"></span></div>
-    {% if order.payment_status == 'Verified' %}<p class="payment-confirmed-note">Payment was verified in the business bank account on {{ order.payment_verified_at.strftime('%d %b %Y · %H:%M') if order.payment_verified_at else 'file' }}.</p>{% endif %}
+    {% if order.payment_status == 'Verified' %}<p class="payment-confirmed-note">Payment was verified in the business bank account on {{ order.payment_verified_at|local_time("%d %b %Y · %H:%M") if order.payment_verified_at else 'file' }}.</p>{% endif %}
   </div>
 
   <div class="receipt-card">
@@ -50,7 +50,7 @@
     <div class="recommendation-grid">
       {% for product in recommended_products %}
       <article class="product-card recommendation-product-card">
-        <a class="product-art product-photo art-{{ product.image }}" href="{{ url_for('shop.product_detail', product_id=product.id) }}" aria-label="View {{ product.name }}"><img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy"><span class="photo-shade"></span></a>
+        <a class="product-art product-photo art-{{ product.image }}" href="{{ url_for('shop.product_detail', product_id=product.id) }}" aria-label="View {{ product.name }}"><img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy" decoding="async"><span class="photo-shade"></span></a>
         <div class="product-info"><div class="product-heading"><h3>{{ product.name }}</h3><span class="stock-badge">{{ format_quantity(product.stock) }} left</span></div><p>{{ product.description|truncate(120) }}</p><div class="product-buy"><div><strong>{{ format_currency(product.price) }}</strong><small>per {{ product.unit }}</small></div><a class="button button-lime" href="{{ url_for('shop.product_detail', product_id=product.id) }}">View product <span>→</span></a></div></div>
       </article>
       {% endfor %}

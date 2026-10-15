@@ -5,7 +5,7 @@
   <a class="back-link" href="{{ url_for('shop.products') }}#partner-offers">← Back to products and partner offers</a>
   <div class="partner-offer-card">
     {% set image_src = partner_image_url(listing.image) %}
-    <div class="partner-offer-visual">{% if image_src %}<img src="{{ image_src }}" alt="{{ listing.name }}">{% else %}<span>{{ listing.category }}</span>{% endif %}</div>
+    <div class="partner-offer-visual">{% if image_src %}<img src="{{ image_src }}" alt="{{ listing.name }}" loading="lazy" decoding="async">{% else %}<span>{{ listing.category }}</span>{% endif %}</div>
     <div class="partner-offer-content">
       <p class="eyebrow">Independent supplier · {{ listing.category }}</p>
       <h1>{{ listing.name }}</h1>

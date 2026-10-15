@@ -72,6 +72,7 @@ class ShopSettings(db.Model):
     )
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     reviews_auto_publish = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    analytics_paths = db.Column(db.String(2000), nullable=False, default="/", server_default="/")
 
 
 class Coupon(db.Model):
@@ -103,8 +104,8 @@ class PrivacyRule(db.Model):
 class AnalyticsEvent(db.Model):
     __tablename__ = "analytics_events"
     id = db.Column(db.Integer, primary_key=True)
-    event_type = db.Column(db.String(40), nullable=False, default="page_view")
-    path = db.Column(db.String(255), nullable=False)
+    event_type = db.Column(db.String(40), nullable=False, default="page_view", index=True)
+    path = db.Column(db.String(255), nullable=False, index=True)
     referrer = db.Column(db.String(500), nullable=False, default="")
     user_agent = db.Column(db.String(500), nullable=False, default="")
     customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -155,6 +156,22 @@ class Customer(db.Model):
 
     orders = db.relationship("Order", back_populates="customer")
     wholesale_orders = db.relationship("WholesaleOrder", back_populates="customer")
+    abandoned_carts = db.relationship("AbandonedCart", back_populates="customer", cascade="all, delete-orphan")
+
+
+class AbandonedCart(db.Model):
+    __tablename__ = "abandoned_carts"
+    __table_args__ = (db.UniqueConstraint("customer_id", name="uq_abandoned_carts_customer"),)
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True)
+    cart_json = db.Column(db.Text, nullable=False)
+    subtotal = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    last_activity_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    recovery_sent_at = db.Column(db.DateTime, nullable=True)
+    recovered_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    customer = db.relationship("Customer", back_populates="abandoned_carts")
 
 
 class WholesaleOrder(db.Model):

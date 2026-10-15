@@ -23,7 +23,7 @@
     <article class="print-receipt order-summary-report">
       <div class="inventory-watermark" aria-hidden="true">BEAMERS FARM · ORDER SUMMARY</div>
       <header class="print-receipt-header">
-        <img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farm">
+        <img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farm" loading="lazy" decoding="async">
         <div><p class="eyebrow">Private · Owner copy</p><h1>Order Summary</h1><p>{{ period_label }}{% if search_query %} · Search: {{ search_query }}{% endif %}</p></div>
         <span class="status-pill status-confirmed">{{ orders|length }} orders</span>
       </header>
@@ -35,7 +35,7 @@
               <tbody>
                 {% for order in orders %}
                   <tr>
-                    <td><strong class="summary-order-id">#{{ order.public_id }}</strong><small>{{ order.created_at.strftime('%d %b %Y · %H:%M') }}</small></td>
+                    <td><strong class="summary-order-id">#{{ order.public_id }}</strong><small>{{ order.created_at|local_time("%d %b %Y · %H:%M") }}</small></td>
                     <td><strong>{{ order.customer_name }}</strong><small>{{ order.phone }} · {% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}{{ order.delivery_zone_name }}{% endif %}</small></td>
                     <td class="order-summary-items-compact">{% for item in order.items %}<span class="summary-item">{{ format_quantity(item.quantity) }} × {{ item.product_name }}</span>{% endfor %}<small>{{ order.items|length }} line item{{ '' if order.items|length == 1 else 's' }}</small></td>
                     <td><strong class="summary-total">{{ format_currency(order.total) }}</strong><small>{{ 'Pickup' if order.fulfillment_type == 'pickup' else 'Delivery' }} · {{ format_currency(order.delivery_fee) }}</small></td>
@@ -51,7 +51,7 @@
         <div class="empty-state compact"><h3>No matching orders.</h3><p>Try a different date range or search term.</p></div>
       {% endif %}
       <div class="inventory-period-footnote"><span>{{ orders|length }} order record(s)</span><span>{{ period_label }}</span><span>Owner copy · customer/payment details are confidential</span></div>
-      <footer class="print-receipt-footer"><span>Beamers Farm · Order Summary</span><span>Generated {{ generated_at.strftime('%d %b %Y · %H:%M') }} WAT</span></footer>
+      <footer class="print-receipt-footer"><span>Beamers Farm · Order Summary</span><span>Generated {{ generated_at|local_time("%d %b %Y · %H:%M") }} WAT</span></footer>
     </article>
   </div>
 </div>

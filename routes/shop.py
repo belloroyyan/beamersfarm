@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import json
 import re
 from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -7,13 +8,14 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from flask import Blueprint, abort, current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 from sqlalchemy import or_
 
-from models import Coupon, Customer, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, PartnerListing, Product, SalespersonAccount, ShopSettings, ShopUpdate, WholesaleOrder, WholesaleOrderItem, db
+from models import AbandonedCart, Coupon, Customer, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, PartnerListing, Product, SalespersonAccount, ShopSettings, ShopUpdate, WholesaleOrder, WholesaleOrderItem, db
 from utils.helpers import build_cart, format_quantity, parse_quantity, product_uses_requested_kg
 from utils.notifications import normalize_nigerian_phone
 from utils.product_images import product_image_url
 from utils.push_subscriptions import valid_push_endpoint
 from utils.update_share import render_update_share_image
 from utils.web_push import send_customer_order_confirmed_push, send_customer_order_out_for_delivery_push, send_owner_low_stock_push, send_owner_new_order_push, send_owner_wholesale_request_push, send_salesperson_new_order_push, web_push_is_configured
+from utils.recommendations import personalized_products
 
 shop_bp = Blueprint("shop", __name__)
 PICKUP_ADDRESS = (
@@ -51,6 +53,35 @@ def record_event(event_type):
 
 def current_cart():
     return session.setdefault("cart", {})
+
+
+def sync_abandoned_cart():
+    """Track only signed-in carts; guests remain session-only and private."""
+    customer_id = session.get("customer_id")
+    if not customer_id:
+        return
+    customer = db.session.get(Customer, customer_id)
+    if not customer or not customer.active:
+        return
+    existing = AbandonedCart.query.filter_by(customer_id=customer.id).first()
+    cart = current_cart()
+    if not cart:
+        if existing:
+            db.session.delete(existing)
+            db.session.commit()
+        return
+    payload = json.dumps(cart, sort_keys=True, separators=(",", ":"), default=str)
+    summary = cart_summary()
+    if not existing:
+        existing = AbandonedCart(customer_id=customer.id, cart_json=payload, subtotal=summary["subtotal"])
+        db.session.add(existing)
+    elif existing.cart_json != payload:
+        existing.cart_json = payload
+        existing.subtotal = summary["subtotal"]
+        existing.last_activity_at = datetime.utcnow()
+        existing.recovery_sent_at = None
+        existing.recovered_at = None
+    db.session.commit()
 
 
 def cart_summary(products=None, delivery_fee=None):
@@ -244,7 +275,7 @@ def track_order():
                 "We could not verify that order reference and phone combination. Please check both and try again.",
                 "error",
             )
-            return render_template("track_order.html", order_ref=order_ref, phone=phone, meta_robots="noindex,follow", **seo_meta("Track Your Beamers Farm Order", "Access the latest status of a Beamers Farm order using its reference and phone number.", "shop.track_order", robots="noindex,follow"))
+            return render_template("track_order.html", order_ref=order_ref, phone=phone, **seo_meta("Track Your Beamers Farm Order", "Access the latest status of a Beamers Farm order using its reference and phone number.", "shop.track_order", robots="noindex,follow"))
 
         # The existing success page and receipt remain protected by the order's
         # random public token. Only a successful two-field match reveals it.
@@ -252,7 +283,7 @@ def track_order():
             url_for("shop.order_success", order_ref=order.public_id, token=order.public_token)
         )
 
-    return render_template("track_order.html", order_ref="", phone="", meta_robots="noindex,follow", **seo_meta("Track Your Beamers Farm Order", "Access the latest status of a Beamers Farm order using its reference and phone number.", "shop.track_order", robots="noindex,follow"))
+    return render_template("track_order.html", order_ref="", phone="", **seo_meta("Track Your Beamers Farm Order", "Access the latest status of a Beamers Farm order using its reference and phone number.", "shop.track_order", robots="noindex,follow"))
 
 
 @shop_bp.get("/updates/dismiss")
@@ -281,7 +312,7 @@ def products():
 @shop_bp.get("/partner-offers/<int:listing_id>")
 def partner_offer(listing_id):
     listing = PartnerListing.query.filter_by(id=listing_id, active=True).first_or_404()
-    return render_template("partner_offer.html", listing=listing, meta_robots="noindex,follow", **seo_meta(f"{listing.name} | Independent Supplier Offer", (listing.description or "Independent supplier offer from the Beamers Farm marketplace.")[:155], "shop.partner_offer", {"listing_id": listing.id}, robots="noindex,follow"))
+    return render_template("partner_offer.html", listing=listing, **seo_meta(f"{listing.name} | Independent Supplier Offer", (listing.description or "Independent supplier offer from the Beamers Farm marketplace.")[:155], "shop.partner_offer", {"listing_id": listing.id}, robots="noindex,follow"))
 
 
 @shop_bp.get("/product/<int:product_id>")
@@ -381,8 +412,20 @@ def validate_coupon_live():
 
 @shop_bp.get("/robots.txt")
 def robots():
-    response=make_response(f"User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /checkout\nDisallow: /cart\nDisallow: /track-order\nDisallow: /account\nDisallow: /customer\nSitemap: {public_url('shop.sitemap')}\n", 200)
-    response.headers["Content-Type"]="text/plain"
+    body = "\n".join([
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /admin",
+        "Disallow: /checkout",
+        "Disallow: /cart",
+        "Disallow: /track-order",
+        "Disallow: /account",
+        "Disallow: /customer",
+        f"Sitemap: {public_url('shop.sitemap')}",
+        "",
+    ])
+    response = make_response(body, 200)
+    response.headers["Content-Type"] = "text/plain; charset=utf-8"
     return response
 
 
@@ -395,13 +438,22 @@ def google_search_console_verification():
 
 @shop_bp.get("/sitemap.xml")
 def sitemap():
-    urls=[public_url("shop.index"), public_url("shop.products"), public_url("shop.gallery"), public_url("shop.updates"), public_url("shop.wholesale"), public_url("shop.help_page"), public_url("shop.privacy"), public_url("reviews.testimonials")]
-    products=Product.query.filter_by(active=True).all()
-    urls += [public_url("shop.product_detail", product_id=p.id) for p in products]
-    updates=ShopUpdate.query.order_by(ShopUpdate.created_at.desc()).all()
-    urls += [public_url("shop.update_detail", update_id=u.id) for u in updates]
-    body='<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+''.join(f'<url><loc>{u}</loc></url>' for u in urls)+'</urlset>'
-    return make_response(body,200,{"Content-Type":"application/xml"})
+    from xml.sax.saxutils import escape
+    entries = [("shop.index", {}, None), ("shop.products", {}, None), ("shop.gallery", {}, None), ("shop.updates", {}, None), ("shop.wholesale", {}, None), ("shop.help_page", {}, None), ("shop.privacy", {}, None), ("reviews.testimonials", {}, None)]
+    products = Product.query.filter_by(active=True).all()
+    entries += [("shop.product_detail", {"product_id": item.id}, getattr(item, "updated_at", None) or item.created_at) for item in products]
+    updates = ShopUpdate.query.order_by(ShopUpdate.created_at.desc()).all()
+    entries += [("shop.update_detail", {"update_id": item.id}, getattr(item, "updated_at", None) or item.created_at) for item in updates]
+    xml = []
+    for endpoint, values, modified in entries:
+        loc = escape(public_url(endpoint, **values))
+        lastmod = f"<lastmod>{modified.date().isoformat()}</lastmod>" if modified else ""
+        xml.append(f"<url><loc>{loc}</loc>{lastmod}</url>")
+    body = '<?xml version="1.0" encoding="UTF-8"?>' + '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + ''.join(xml) + '</urlset>'
+    response = make_response(body, 200)
+    response.headers["Content-Type"] = "application/xml; charset=utf-8"
+    response.headers["Cache-Control"] = "public, max-age=900"
+    return response
 
 
 @shop_bp.get("/cart")
@@ -412,7 +464,8 @@ def cart():
     estimate=None
     if customer and customer.active:
         estimate=cart_summary(delivery_fee=estimate_zone.fee if estimate_zone else current_app.config.get("DELIVERY_FEE", 1500))
-    return render_template("cart.html", summary=summary, signed_in_customer=customer if customer and customer.active else None, delivery_estimate=estimate, estimate_zone=estimate_zone, **seo_meta("Your Cart | Beamers Farm", "Review your selected Beamers Farm chicken products before choosing delivery or pickup.", "shop.cart", robots="noindex,follow"))
+    recommendations=personalized_products(customer if customer and customer.active else None, current_cart().keys(), limit=4)
+    return render_template("cart.html", summary=summary, signed_in_customer=customer if customer and customer.active else None, delivery_estimate=estimate, estimate_zone=estimate_zone, recommendations=recommendations, **seo_meta("Your Cart | Beamers Farm", "Review your selected Beamers Farm chicken products before choosing delivery or pickup.", "shop.cart", robots="noindex,follow"))
 
 
 @shop_bp.post("/cart/add/<int:product_id>")
@@ -466,7 +519,8 @@ def add_to_cart(product_id):
     else:
         cart[key] = format_quantity(new_quantity)
     session.modified = True
-    flash(f"{product.name} added to your cart.", "success")
+    sync_abandoned_cart()
+    flash(f"{product.name} added to your cart.", "cart-added")
     return redirect(request.referrer or url_for("shop.index"))
 
 
@@ -507,6 +561,7 @@ def update_cart():
     cart.clear()
     cart.update(updated_cart)
     session.modified = True
+    sync_abandoned_cart()
     flash("Your cart has been updated.", "success")
     return redirect(url_for("shop.cart"))
 
@@ -515,6 +570,7 @@ def update_cart():
 def remove_from_cart(product_id):
     current_cart().pop(str(product_id), None)
     session.modified = True
+    sync_abandoned_cart()
     flash("Item removed from your cart.", "success")
     return redirect(url_for("shop.cart"))
 
@@ -678,6 +734,9 @@ def checkout():
         if shop_is_open() and SalespersonAccount.query.filter_by(active=True).count():
             send_salesperson_new_order_push()
         session["cart"] = {}
+        if signed_in_customer and signed_in_customer.active:
+            AbandonedCart.query.filter_by(customer_id=signed_in_customer.id).delete(synchronize_session=False)
+            db.session.commit()
         if payment_method == "paystack":
             return redirect(url_for("payments.start_paystack_payment", order_ref=order.public_id, token=order.public_token))
         return redirect(url_for("shop.order_success", order_ref=order.public_id, token=order.public_token))

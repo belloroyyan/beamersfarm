@@ -18,7 +18,7 @@ from routes.salesperson import salesperson_bp
 from routes.payments import payments_bp
 from routes.reviews import reviews_bp
 from routes.customer import current_customer, customer_bp
-from utils.helpers import cart_count, format_currency, format_quantity
+from utils.helpers import cart_count, format_currency, format_quantity, local_time
 from utils.greetings import time_of_day_greeting
 from utils.updates import linkify, update_image_url
 from utils.partner_ads import partner_image_url
@@ -117,6 +117,7 @@ def create_app():
     app.register_blueprint(customer_bp)
 
     app.jinja_env.filters["linkify"] = linkify
+    app.jinja_env.filters["local_time"] = local_time
 
     @app.context_processor
     def inject_helpers():
@@ -152,8 +153,15 @@ def create_app():
             "/static", "/admin", "/dispatch", "/sales", "/health", "/ready",
             "/manus-routes", "/manus-storage/async-images/",
         )
+        settings = db.session.get(ShopSettings, 1)
+        configured_paths = (settings.analytics_paths if settings else "/") or "/"
+        tracked_paths = {
+            path.strip().split("?", 1)[0]
+            for path in configured_paths.split(",")
+            if path.strip().startswith("/")
+        } or {"/"}
         customer_path = request.path not in ignored_paths and not request.path.startswith(ignored_prefixes)
-        if request.method == "GET" and customer_path:
+        if request.method == "GET" and customer_path and request.path in tracked_paths:
             try:
                 db.session.add(AnalyticsEvent(event_type="page_view", path=request.path[:255], referrer=request.referrer or "", user_agent=request.user_agent.string[:500], customer_id=session.get("customer_id")))
                 db.session.commit()

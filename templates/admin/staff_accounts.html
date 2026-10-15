@@ -48,7 +48,7 @@
                   <form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="account_id" value="{{ account.id }}"><input type="hidden" name="action" value="{{ 'deactivate' if account.active else 'activate' }}"><button class="button {% if account.active %}button-outline{% else %}button-lime{% endif %}" type="submit">{{ 'Revoke access' if account.active else 'Reactivate account' }}</button></form>
                   <form method="post" class="staff-reset-form"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="account_id" value="{{ account.id }}"><input type="hidden" name="action" value="reset_password"><label>New password<input type="password" name="password" minlength="12" maxlength="256" autocomplete="new-password" required></label><label>Confirm<input type="password" name="confirm_password" minlength="12" maxlength="256" autocomplete="new-password" required></label><button class="button button-dark" type="submit">Reset password</button></form>
                 </div>
-                <small class="form-note staff-account-meta">Created {{ account.created_at.strftime('%d %b %Y') }}{% if account.disabled_at %} · Access revoked {{ account.disabled_at.strftime('%d %b %Y · %H:%M') }}{% endif %}</small>
+                <small class="form-note staff-account-meta">Created {{ account.created_at|local_time("%d %b %Y") }}{% if account.disabled_at %} · Access revoked {{ account.disabled_at|local_time("%d %b %Y · %H:%M") }}{% endif %}</small>
               </article>
             {% endfor %}
           </div>

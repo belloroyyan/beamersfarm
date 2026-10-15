@@ -10,7 +10,7 @@
       <div class="admin-product-list">
         {% for product in products %}
         <a class="admin-product-row admin-product-row-link" href="{{ url_for('admin.edit_product', product_id=product.id) }}" aria-label="Open product {{ product.name }}">
-          <div class="mini-art product-photo art-{{ product.image }}"><img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy"></div>
+          <div class="mini-art product-photo art-{{ product.image }}"><img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy" decoding="async"></div>
           <div class="admin-product-main"><strong>{{ product.name }}</strong><small>Product ID #{{ product.id }} · {{ product.unit }} · {% if product.active %}Visible{% else %}Archived{% endif %}</small></div>
           <div class="admin-product-number"><span>PRICE PER {{ product.unit|upper }}</span><strong>{{ format_currency(product.price) }}</strong></div>
           <div class="admin-product-number"><span>STOCK UNITS</span><strong class="{% if product.stock <= 5 %}number-alert{% endif %}">{{ format_quantity(product.stock) }}</strong></div>

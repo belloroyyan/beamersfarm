@@ -30,7 +30,7 @@
         {% if permissions.view_customer_settlement and permissions.view_customer_details and order.final_total is not none and order.weighing_completed_at %}
         <div class="weigh-in-result"><div><span>Legacy final total</span><strong>{{ format_currency(order.final_total) }}</strong></div><div><span>Initial amount paid</span><strong>{{ format_currency(order.total) }}</strong></div>
           {% if order.balance_due and order.balance_due > 0 %}<div><span>Balance to collect</span><strong>{{ format_currency(order.balance_due) }}</strong></div>{% elif order.refund_due and order.refund_due > 0 %}<div><span>Refund due within 48 hours</span><strong>{{ format_currency(order.refund_due) }}</strong></div>{% else %}<div><span>Settlement</span><strong>No balance or refund outstanding</strong></div>{% endif %}
-          <small>Weigh-in completed {{ order.weighing_completed_at.strftime('%d %b %Y · %H:%M') }}{% if order.weighing_recorded_by %} · recorded by {{ order.weighing_recorded_by }}{% endif %}.</small>
+          <small>Weigh-in completed {{ order.weighing_completed_at|local_time("%d %b %Y · %H:%M") }}{% if order.weighing_recorded_by %} · recorded by {{ order.weighing_recorded_by }}{% endif %}.</small>
         </div>
         {% elif order.final_total is not none and order.weighing_completed_at %}<p class="form-note">Settlement totals are hidden because the Owner disabled final balance/refund access for this account.</p>{% endif %}
       </section>
@@ -41,7 +41,7 @@
       {% if permissions.verify_payments %}<section class="admin-panel payment-verification-panel">
         <p class="eyebrow">POS / bank transfer</p>
         {% if order.payment_status == 'Verified' %}
-          <h2>Payment verified</h2><span class="status-pill status-delivered">Verified{% if order.payment_verified_at %} · {{ order.payment_verified_at.strftime('%d %b %Y · %H:%M') }}{% endif %}</span>
+          <h2>Payment verified</h2><span class="status-pill status-delivered">Verified{% if order.payment_verified_at %} · {{ order.payment_verified_at|local_time("%d %b %Y · %H:%M") }}{% endif %}</span>
           <p>The full amount due now has been verified. You may confirm and prepare this order.</p>
         {% else %}
           <h2>Awaiting transfer check</h2>
@@ -65,7 +65,7 @@
           <button class="button button-dark button-full" type="submit">Save status</button>
         </form>{% endif %}
       </section>{% endif %}
-      {% if permissions.view_customer_details %}<section class="admin-panel contact-panel"><p class="eyebrow">{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}Delivery · {{ order.delivery_zone_name }}{% endif %}</p><h2>{{ order.customer_name }}</h2><a href="tel:{{ order.phone }}">{{ order.phone }}</a><p>{{ order.address }}</p><small>Placed {{ order.created_at.strftime('%d %b %Y · %H:%M') }}</small></section>{% endif %}
+      {% if permissions.view_customer_details %}<section class="admin-panel contact-panel"><p class="eyebrow">{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}Delivery · {{ order.delivery_zone_name }}{% endif %}</p><h2>{{ order.customer_name }}</h2><a href="tel:{{ order.phone }}">{{ order.phone }}</a><p>{{ order.address }}</p><small>Placed {{ order.created_at|local_time("%d %b %Y · %H:%M") }}</small></section>{% endif %}
     </aside>
   </div>
 </div></div>

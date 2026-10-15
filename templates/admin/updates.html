@@ -22,7 +22,7 @@
   {% if updates %}
     <div class="update-list">{% for u in updates %}
       <article class="update-card">
-        <p class="eyebrow">Update ID #{{ u.id }} · {{ u.created_at.strftime('%d %b %Y · %H:%M') }} · {{ u.posted_by }}</p>
+        <p class="eyebrow">Update ID #{{ u.id }} · {{ u.created_at|local_time("%d %b %Y · %H:%M") }} · {{ u.posted_by }}</p>
         <h3>{{ u.topic }}</h3>
         <div class="update-body">{{ u.body|linkify }}</div>
         {{ update_share_buttons(u, true) }}

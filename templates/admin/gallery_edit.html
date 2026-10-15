@@ -5,7 +5,7 @@
   <div class="page-heading admin-heading"><div><a class="back-link" href="{{ url_for('admin.gallery_manager') }}">← Back to gallery manager</a><p class="eyebrow">Gallery image #{{ image.id }}</p><h1>Edit photo.</h1></div></div>
   <form class="form-card edit-product-card gallery-edit-card" method="post" enctype="multipart/form-data">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-    {% set image_src = gallery_image_url(image.image) %}{% if image_src %}<figure class="gallery-edit-preview"><img src="{{ image_src }}" alt="{{ image.title }}"><figcaption>Current image</figcaption></figure>{% endif %}
+    {% set image_src = gallery_image_url(image.image) %}{% if image_src %}<figure class="gallery-edit-preview"><img src="{{ image_src }}" alt="{{ image.title }}" loading="lazy" decoding="async"><figcaption>Current image</figcaption></figure>{% endif %}
     <label>Title<input type="text" name="title" maxlength="120" value="{{ image.title }}" required></label>
     <label>Caption / description<textarea name="description" rows="5" maxlength="4000">{{ image.description }}</textarea></label>
     <label>Replace image <small class="field-help">Optional · JPG, PNG or WEBP · maximum 8 MB</small><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
