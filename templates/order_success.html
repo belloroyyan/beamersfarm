@@ -11,6 +11,14 @@
   <p class="success-lede">We have received order <strong>#{{ order.public_id }}</strong>. {% if order.payment_status == 'Verified' %}Your payment is verified and your order is {{ order.status|lower }}.{% elif order.payment_method == 'paystack' %}Your online payment is not verified yet. Complete or retry the Paystack checkout below; Beamers Farm will confirm the order after payment is verified.{% else %}Your order is not confirmed yet. Transfer the amount due now below; Beamers Farm confirms only after funds appear in the business bank account.{% endif %} For help, <a class="text-link" href="https://wa.me/2348062074302" target="_blank" rel="noopener">message us on WhatsApp</a>.</p>
   {% if order.status == 'Out for delivery' %}<div class="delivery-alert"><strong>Your order is out for delivery.</strong><span>Our delivery team will contact you shortly.</span></div>{% endif %}
   {% if order.status == 'Ready for pickup' %}<div class="delivery-alert"><strong>Your order is ready for farm pickup.</strong><span>Please visit Beamers Farm during operating hours, 7:00 am–7:00 pm.</span></div>{% endif %}
+  {% if estimate %}
+  <section class="delivery-estimate" aria-labelledby="delivery-estimate-title">
+    <p class="eyebrow">Estimated delivery</p>
+    <h2 id="delivery-estimate-title">{{ estimate.text }}</h2>
+    <p>Your order is in dispatch batch #{{ estimate.batch_id }}, which leaves the farm {{ estimate.dispatch_text }}. {% if estimate.payment_verified %}Our rider will call you before arriving.{% else %}This starts once your payment is verified; if verification takes longer, we will move the estimate forward.{% endif %}</p>
+    <small>An estimate, not a guarantee. We deliver {{ estimate.shop_hours }} daily and update you here and by notification if anything changes.</small>
+  </section>
+  {% endif %}
   <a class="button button-lime receipt-action-top" href="{{ url_for('shop.customer_receipt', order_ref=order.public_id, token=order.public_token) }}">View / print customer receipt</a>
   {% if push_configured %}
   <section class="order-notification-card" data-customer-push data-subscription-url="{{ url_for('shop.customer_push_subscription', order_ref=order.public_id, token=order.public_token) }}" data-vapid-public-key="{{ vapid_public_key }}" data-csrf-token="{{ csrf_token() }}">
@@ -34,7 +42,7 @@
   <div class="receipt-card">
     <div class="receipt-head"><span>ORDER #{{ order.public_id }}</span><span class="status-pill {% if order.payment_status == 'Verified' %}status-confirmed{% else %}status-received{% endif %}">{% if order.payment_status == 'Verified' %}Payment verified{% else %}Awaiting payment{% endif %}</span></div>
     {% for item in order.items %}
-    <div class="receipt-line"><span>{{ format_quantity(item.quantity) }} × {{ item.product_name }}<small class="pricing-line-note">{{ format_currency(item.unit_price) }} per {{ item.unit }} × {{ format_quantity(item.quantity) }}</small></span><strong>{{ format_currency(item.subtotal) }}</strong></div>
+    <div class="receipt-line"><span>{{ format_quantity(item.quantity) }} × {{ item.product_name }}{% if item.processing_method %}<small class="line-processing">Processing: {{ item.processing_method }}</small>{% endif %}<small class="pricing-line-note">{{ format_currency(item.unit_price) }} per {{ item.unit }} × {{ format_quantity(item.quantity) }}</small></span><strong>{{ format_currency(item.subtotal) }}</strong></div>
     {% endfor %}
     <div class="summary-row"><span>Items subtotal</span><strong>{{ format_currency(order.subtotal) }}</strong></div>
     <div class="summary-row"><span>{% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}Delivery · {{ order.delivery_zone_name }}{% endif %}</span><strong>{{ format_currency(order.delivery_fee) }}</strong></div><div class="summary-row coupon-summary-row"><span>Coupon</span><strong>{% if order.coupon_code %}{{ order.coupon_code }} applied · -{{ format_currency(order.discount_amount) }}{% else %}No coupon applied{% endif %}</strong></div>

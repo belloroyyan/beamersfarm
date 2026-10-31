@@ -108,6 +108,8 @@ def build_cart(cart, products, delivery_fee=1500):
         # Retain the old snapshot field for historical compatibility; new products
         # all use standard listed unit price multiplied by the entered quantity.
         requested_kg = _cart_requested_kg(raw_value) if product_uses_requested_kg(product) else None
+        processing_methods = cart_processing_methods(raw_value)
+        processing_method = join_processing_methods(processing_methods)
         price_multiplier = requested_kg if requested_kg is not None else quantity
         line_subtotal = (as_decimal(product.price) * price_multiplier).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
@@ -117,6 +119,8 @@ def build_cart(cart, products, delivery_fee=1500):
             "quantity": quantity,
             "uses_requested_weight": requested_kg is not None,
             "requested_weight_kg": requested_kg,
+            "processing_method": processing_method,
+            "processing_methods": processing_methods,
             "line_subtotal": line_subtotal,
         })
         subtotal += line_subtotal
@@ -128,3 +132,45 @@ def build_cart(cart, products, delivery_fee=1500):
         "delivery_fee": fee,
         "total": subtotal + fee,
     }
+
+PROCESSING_SEPARATOR = ", "
+
+
+def split_processing_methods(value):
+    """Turn a stored 'A, B' string back into a list (owner options never contain commas)."""
+    return [part.strip() for part in str(value or "").split(",") if part.strip()]
+
+
+def join_processing_methods(methods):
+    return PROCESSING_SEPARATOR.join(methods or [])
+
+
+def cart_processing_methods(raw_value):
+    """Read the methods from a cart entry, accepting the old single-string format too."""
+    if not isinstance(raw_value, dict):
+        return []
+    if isinstance(raw_value.get("processing_methods"), list):
+        return [str(item).strip() for item in raw_value["processing_methods"] if str(item).strip()]
+    return split_processing_methods(raw_value.get("processing_method", ""))
+
+
+def parse_processing_selection(submitted, product):
+    """Validate submitted choices against the product's options.
+
+    Returns the choices in the owner's configured order with duplicates removed.
+    Raises ValueError if anything submitted is not a configured option.
+    """
+    allowed = processing_options(product)
+    chosen = {str(item).strip() for item in submitted if str(item).strip()}
+    if not chosen.issubset(allowed):
+        raise ValueError("Choose valid processing options for this product.")
+    return [option for option in allowed if option in chosen]
+
+
+def processing_options(product):
+    import json
+    try:
+        value = json.loads(product.processing_options or "[]")
+        return [str(item).strip()[:120] for item in value if str(item).strip()][:8]
+    except (TypeError, ValueError):
+        return []

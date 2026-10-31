@@ -3,15 +3,12 @@
 {% block content %}
 <section class="community-shell">
   <div class="container">
-    <header class="community-hero">
-      <p class="eyebrow">The farm table</p>
-      <h1>A helpful community, at your pace.</h1>
-      <p>Browse popular conversations, answered questions, product requests, and suggestions the farm is considering. You can read without an account. Contact details only appear in member search when a customer has chosen a public profile.</p>
+    <header class="community-hero {% if customer %}community-hero-signed-in{% endif %}">
+      {% if not customer %}<p class="eyebrow">The farm table</p><h1>A helpful community, at your pace.</h1><p>Browse popular conversations, answered questions, product requests, and suggestions the farm is considering. You can read without an account. Contact details only appear in member search when a customer has chosen a public profile.</p>{% else %}<h1 class="sr-only">Community</h1>{% endif %}
       <div class="community-hero-actions">
+        {% if is_owner %}<button class="button button-lime" type="button" data-open-special-post>Post as Beamers Farm</button>{% endif %}
         {% if customer %}
-          <a class="community-notification-link" href="{{ url_for('community.notifications') }}">Community notifications{% if unread_notifications %} · {{ unread_notifications }} new{% endif %}</a>
-          <a class="community-notification-link" href="{{ url_for('customer.account') }}#community-privacy">Profile privacy settings</a>
-          {% if community_open and not community_blocked %}<button class="button button-dark" type="button" data-open-community-post>New Post</button>{% endif %}
+          <details class="community-action-menu"><summary class="community-icon-action" aria-label="Community actions" title="Community actions"><svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><g fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></g></svg></summary><nav class="community-action-panel"><a href="{{ url_for('community.notifications') }}"><svg class="icon-svg" viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>Notifications{% if unread_notifications %}<b>{{ unread_notifications }}</b>{% endif %}</a><a href="{{ url_for('customer.account') }}#community-privacy"><svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.8 1.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.1h-2.5v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1-1.8-1.8.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H6v-2.5h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1L9 5.7l.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5v-.1h2.5v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1 1.8 1.8-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1V13h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Profile privacy</a>{% if community_open and not community_blocked %}<button type="button" data-open-community-post><svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New post</button>{% endif %}</nav></details>
         {% else %}
           <a class="button button-dark" href="{{ url_for('customer.login', next=url_for('community.feed', new=1)) }}">Join community</a>
           <span class="community-privacy-note">Public reading; an account is needed to post or reply.</span>
@@ -21,7 +18,7 @@
       {% if community_blocked %}<div class="notice-panel community-closed-notice">Your posting access is paused. You can still read public conversations and manage your profile privacy.</div>{% endif %}
     </header>
 
-    <section class="community-activity" aria-labelledby="community-activity-heading">
+    <section class="community-activity {% if customer %}guest-only-activity{% endif %}" aria-labelledby="community-activity-heading">
       <div class="community-section-heading"><div><p class="eyebrow">Public activity</p><h2 id="community-activity-heading">What people are talking about</h2></div><small>Based only on published community conversations.</small></div>
       <div class="community-insights-grid">
         <article class="community-insight-card"><h3>Popular conversations</h3>{% for post in popular_posts %}<a href="#post-{{ post.id }}"><strong>{{ post.body|truncate(96) }}</strong><small>{{ reactions[post.id] }} reactions · {{ comments[post.id]|length }} replies</small></a>{% else %}<p>Public conversations will appear here as customers join in.</p>{% endfor %}</article>
@@ -47,8 +44,8 @@
       </nav>
       <div class="community-feed">
         {% for post in posts %}
-          <article class="community-post" id="post-{{ post.id }}">
-            <header><div class="community-avatar" aria-hidden="true">{{ post_authors[post.id][:1]|upper }}</div><div><strong>{{ post_authors[post.id] }}</strong><small>{{ post.category or 'Open conversation' }} · {{ post.created_at|local_time("%d %b · %H:%M") }}</small></div>{% if post.considering %}<span class="community-considering-badge">Suggestion under consideration</span>{% endif %}{% if customer and post.customer_id == customer.id %}<form method="post" action="{{ url_for('community.delete_post', post_id=post.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="icon-button" title="Delete your post" aria-label="Delete your post">×</button></form>{% endif %}</header>
+          <article class="community-post{% if post.category == special_category %} community-post-special{% endif %}" id="post-{{ post.id }}">
+            <header><div class="community-avatar" aria-hidden="true">{{ post_authors[post.id][:1]|upper }}</div><div><strong>{{ post_authors[post.id] }}</strong><small>{{ 'From the farm' if post.category == special_category else (post.category or 'Open conversation') }} · {{ post.created_at|local_time("%d %b · %H:%M") }} · <a class="post-id" href="{{ url_for('community.post_redirect', post_id=post.id) }}">Post #{{ post.id }}</a></small></div>{% if post.category == special_category %}<span class="community-special-badge">Special post</span>{% endif %}{% if is_owner and post.category == special_category %}<form method="post" action="{{ url_for('community.special_post_delete', post_id=post.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="text-button" type="submit">Remove</button></form>{% endif %}{% if post.considering %}<span class="community-considering-badge">Suggestion under consideration</span>{% endif %}{% if customer and post.customer_id == customer.id %}<form method="post" action="{{ url_for('community.delete_post', post_id=post.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="icon-button" title="Delete your post" aria-label="Delete your post">×</button></form>{% endif %}</header>
             <p class="community-post-body">{{ post.body|community_linkify }}</p>
             {% if post.image and community_image_url(post.image) %}<img class="community-post-image" src="{{ community_image_url(post.image) }}" alt="Image attached to a community post" loading="lazy">{% endif %}
             <div class="community-actions">
@@ -58,7 +55,7 @@
               {% if customer %}<form method="post" action="{{ url_for('community.report_post', post_id=post.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="reason" value="Something else"><button type="submit">Report</button></form>{% endif %}
             </div>
             <div class="community-replies">{% for comment in comments[post.id] %}<div class="community-reply {{ 'staff-reply' if comment.is_staff else '' }}"><strong>{{ comment_authors[comment.id] }}</strong>{% if comment.is_staff %}<span class="community-staff-badge">Beamers Farm team</span>{% endif %}<p>{{ comment.body|community_linkify }}</p><small>{{ comment.created_at|local_time("%d %b · %H:%M") }}</small></div>{% endfor %}
-              {% if customer and community_open and not community_blocked %}<form method="post" action="{{ url_for('community.add_comment', post_id=post.id) }}" class="community-reply-form"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input name="body" maxlength="2000" required placeholder="Reply to this conversation..."><button class="button button-outline" type="submit">Reply</button></form>{% elif not customer %}<p class="form-note"><a class="text-link" href="{{ url_for('customer.login', next=url_for('community.feed')) }}">Sign in to reply.</a></p>{% endif %}
+              {% if customer and community_open and not community_blocked %}<button class="reply-link" type="button" data-open-community-reply data-post-id="{{ post.id }}">Reply</button>{% elif not customer %}<p class="form-note"><a class="text-link" href="{{ url_for('customer.login', next=url_for('community.feed')) }}">Sign in to reply.</a></p>{% endif %}
             </div>
           </article>
         {% else %}<div class="empty-state"><h2>{% if search_query %}No matching conversations.{% else %}No conversations here yet.{% endif %}</h2><p>{% if search_query %}Try another search term or category.{% else %}Public activity will appear here as the community grows.{% endif %}</p></div>{% endfor %}
@@ -67,6 +64,19 @@
   </div>
 </section>
 
+{% if is_owner %}
+  <dialog class="community-post-dialog" data-special-post-dialog aria-labelledby="special-post-title">
+    <div class="community-dialog-head"><div><p class="eyebrow">Beamers Farm</p><h2 id="special-post-title">Special post</h2></div><button type="button" class="community-dialog-close" data-close-special-post aria-label="Close special post">×</button></div>
+    <p class="community-dialog-note">Appears at the top of the community feed as an official post from Beamers Farm. You can remove it later from the feed.</p>
+    <form method="post" action="{{ url_for('community.special_post') }}" enctype="multipart/form-data">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <label for="special-body">Announcement</label>
+      <textarea id="special-body" name="body" maxlength="4000" required placeholder="Share an offer, a restock, a holiday notice or a farm update..."></textarea>
+      <label class="community-file">Attach an image <span class="field-help">Optional · JPG, PNG, WEBP</span><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
+      <div class="community-dialog-actions"><button class="button button-outline" type="button" data-close-special-post>Cancel</button><button class="button button-lime" type="submit">Publish special post</button></div>
+    </form>
+  </dialog>
+{% endif %}
 {% if customer and community_open and not community_blocked %}
   <button class="community-fab" type="button" data-open-community-post aria-label="Create a community post">+</button>
   <dialog class="community-post-dialog" data-community-post-dialog aria-labelledby="community-post-title">
@@ -81,6 +91,12 @@
       <label class="community-file">Attach an image <span class="field-help">Optional · JPG, PNG, WEBP</span><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
       <div class="community-dialog-actions"><button class="button button-outline" type="button" data-close-community-post>Cancel</button><button class="button button-lime" type="submit">Publish post</button></div>
     </form>
+  </dialog>
+{% endif %}
+{% if customer and community_open and not community_blocked %}
+  <dialog class="community-post-dialog community-reply-dialog" data-community-reply-dialog aria-labelledby="reply-title">
+    <div class="community-dialog-head"><div><p class="eyebrow">Community reply</p><h2 id="reply-title">Reply to this conversation</h2></div><button type="button" class="community-dialog-close" data-close-community-reply aria-label="Close reply">×</button></div>
+    <form method="post" data-reply-form><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><label for="reply-body">Your reply</label><textarea id="reply-body" name="body" maxlength="2000" required placeholder="Add a helpful reply..."></textarea><div class="community-dialog-actions"><button class="button button-outline" type="button" data-close-community-reply>Cancel</button><button class="button button-lime" type="submit">Post reply</button></div></form>
   </dialog>
 {% endif %}
 {% endblock %}

@@ -3,12 +3,13 @@ from datetime import datetime
 from functools import wraps
 from urllib.parse import urlparse
 
-from flask import Blueprint, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import Coupon, Customer, CustomerNotice, Order, Product, db
+from models import Coupon, Customer, CustomerNotice, CustomerPushSubscription, Order, Product, ShopSettings, db
 from utils.helpers import format_quantity, parse_quantity, product_uses_requested_kg
 from utils.notifications import normalize_nigerian_phone
+from utils.push_subscriptions import valid_push_endpoint
 from utils.recommendations import personalized_products
 
 customer_bp = Blueprint("customer", __name__, url_prefix="/account")
@@ -46,6 +47,10 @@ def safe_next(value):
 
 @customer_bp.route("/register", methods=["GET", "POST"])
 def register():
+    settings = ShopSettings.query.get(1)
+    if settings and not settings.registration_open:
+        flash("New customer registration is temporarily closed.", "error")
+        return redirect(url_for("customer.login"))
     if current_customer():
         return redirect(url_for("customer.account"))
     if request.method == "POST":
@@ -89,12 +94,13 @@ def login():
         identifier = request.form.get("identifier", "").strip().lower()
         password = request.form.get("password", "")
         phone = normalize_nigerian_phone(identifier)
-        customer = Customer.query.filter(
-            (Customer.phone == phone) | (Customer.email == identifier)
-        ).filter_by(active=True).first() if phone or identifier else None
-        if not customer or not check_password_hash(customer.password_hash, password):
+        matching_customer = Customer.query.filter((Customer.phone == phone) | (Customer.email == identifier)).first() if phone or identifier else None
+        if matching_customer and not matching_customer.active:
+            flash("This customer account has been deactivated. Please contact Beamers Farm customer care for help.", "error")
+        elif not matching_customer or not check_password_hash(matching_customer.password_hash, password):
             flash("The phone/email or password is not correct.", "error")
         else:
+            customer = matching_customer
             session["customer_id"] = customer.id
             flash(f"Welcome back, {customer.name.split()[0]}.", "success")
             return redirect(safe_next(next_url))
@@ -122,7 +128,7 @@ def account():
     previous_recommendations.sort(key=lambda item: previous_product_ids.index(item.id))
     personalized_recommendations = personalized_products(customer, limit=4)
     gifted_coupons = Coupon.query.filter_by(customer_id=customer.id, active=True).order_by(Coupon.gifted_at.desc(), Coupon.created_at.desc()).all()
-    return render_template("customer/account.html", customer=customer, orders=orders, previous_recommendations=previous_recommendations[:4], personalized_recommendations=personalized_recommendations, gifted_coupons=gifted_coupons)
+    return render_template("customer/account.html", customer=customer, orders=orders, previous_recommendations=previous_recommendations[:4], personalized_recommendations=personalized_recommendations, gifted_coupons=gifted_coupons, vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""))
 
 
 @customer_bp.post("/settings")
@@ -290,3 +296,30 @@ def delete_account():
     session.pop("customer_id", None)
     flash("Your account and personal profile details have been removed. Business records were retained in anonymized form.", "success")
     return redirect(url_for("shop.index"))
+
+@customer_bp.post("/push-subscriptions")
+@account_required
+def save_account_push_subscription():
+    customer = current_customer()
+    if not current_app.config.get("VAPID_PUBLIC_KEY"):
+        return jsonify(error="Push notifications are not configured by the site owner."), 503
+    payload = request.get_json(silent=True) or {}
+    endpoint = payload.get("endpoint")
+    if not valid_push_endpoint(endpoint):
+        return jsonify(error="The browser returned an invalid push subscription."), 400
+    import hashlib, hmac, re
+    normalized = normalize_nigerian_phone(customer.phone) or customer.phone
+    customer_key = hmac.new(str(current_app.config["SECRET_KEY"]).encode(), normalized.encode(), hashlib.sha256).hexdigest()
+    endpoint_hash = hashlib.sha256(endpoint.encode()).hexdigest()
+    subscription = CustomerPushSubscription.query.filter_by(customer_key=customer_key, endpoint_hash=endpoint_hash).first()
+    if subscription is None:
+        keys = payload.get("keys") or {}; p256dh, auth = keys.get("p256dh"), keys.get("auth")
+        if not isinstance(p256dh, str) or not re.fullmatch(r"[A-Za-z0-9_-]{40,200}", p256dh) or not isinstance(auth, str) or not re.fullmatch(r"[A-Za-z0-9_-]{16,200}", auth):
+            return jsonify(error="The browser returned an invalid push subscription."), 400
+        subscription = CustomerPushSubscription(customer_key=customer_key, endpoint_hash=endpoint_hash, endpoint=endpoint, p256dh=p256dh, auth=auth)
+        db.session.add(subscription)
+    for order in customer.orders:
+        if subscription not in order.customer_push_subscriptions: order.customer_push_subscriptions.append(subscription)
+    customer.push_notifications_enabled = True
+    db.session.commit()
+    return jsonify(enabled=True, message="Customer notifications are enabled for updates, gallery posts, community notices, coupons, and order changes."), 201

@@ -8,7 +8,7 @@
         <a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a>
         <p class="eyebrow">Owner settings</p>
         <h1>Staff access.</h1>
-        <p class="form-note">Create an individual account for each salesperson and control their allowed operations. Deactivation blocks access on their next request; accounts are retained for accountability.</p>
+        <p class="form-note">Create an individual account for each salesperson and control exactly what they can do. Each salesperson’s Actions menu shows only what you allow here. Deactivation blocks access on their next request; accounts are retained for accountability.</p>
       </div>
     </div>
 
@@ -36,11 +36,16 @@
                   <summary><span>Manage operations and alerts</span><small>Choose exactly what this salesperson can do</small></summary>
                   <form method="post" class="staff-permissions-form">
                     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="account_id" value="{{ account.id }}"><input type="hidden" name="action" value="save_permissions">
-                    <div class="permission-checklist">
-                      {% for key, label, default_enabled in permission_definitions %}
-                        <label class="permission-option"><input type="checkbox" name="permissions" value="{{ key }}" {% if key in account_permissions[account.id] %}checked{% endif %}><span><strong>{{ label }}</strong>{% if default_enabled %}<small>Enabled by default for existing accounts</small>{% endif %}</span></label>
-                      {% endfor %}
-                    </div>
+                    {% for group_title, keys in permission_groups %}
+                    <fieldset class="permission-group"><legend>{{ group_title }}</legend>
+                      <div class="permission-checklist">
+                        {% for key in keys %}{% set label, default_enabled = permission_meta[key] %}
+                        {# account_permissions[id] maps key -> True/False, so test the value, not whether the key exists. #}
+                        <label class="permission-option"><input type="checkbox" name="permissions" value="{{ key }}" {% if account_permissions[account.id][key] %}checked{% endif %}><span><strong>{{ label }}</strong>{% if default_enabled %}<small>On by default</small>{% endif %}</span></label>
+                        {% endfor %}
+                      </div>
+                    </fieldset>
+                    {% endfor %}
                     <button class="button button-dark" type="submit">Save permissions</button>
                   </form>
                 </details>
@@ -68,7 +73,7 @@
           <label>Confirm password<input type="password" name="confirm_password" minlength="12" maxlength="256" autocomplete="new-password" required></label>
           <button class="button button-dark button-full" type="submit">Add salesperson</button>
         </form>
-        <div class="staff-permission-note"><strong>Default operating profile</strong><p>New accounts receive core order desk access, payment verification, order status changes, weigh-ins, customer receipts, and new-order alerts. Enable other capabilities above only when needed.</p><p>Payment-before-confirmation safeguards remain enforced regardless of permissions.</p></div>
+        <div class="staff-permission-note"><strong>Default operating profile</strong><p>New accounts can view the live order stream, verify payments, change order status, print receipts, view and manage complaints, and receive new-order alerts. Community moderation, in-person sales and inventory are off until you enable them above.</p><p>Payment-before-confirmation safeguards remain enforced regardless of permissions.</p></div>
       </aside>
     </div>
   </div>

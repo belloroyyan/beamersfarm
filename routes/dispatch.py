@@ -49,7 +49,7 @@ def dashboard():
     order_filter = order_search_filter(search_query)
     if order_filter is not None:
         filtered_queue = filtered_queue.filter(order_filter)
-    orders = filtered_queue.order_by(Order.created_at.asc()).limit(100).all()
+    orders = filtered_queue.order_by(Order.dispatch_batch_id.asc(), Order.created_at.asc()).limit(100).all()
     queue_count = queue.count()
     completed_count = Order.query.filter_by(status="Delivered").count()
     return render_template(

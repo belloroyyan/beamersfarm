@@ -43,11 +43,12 @@
       {% if orders %}
         <div class="order-table-wrap">
           <table class="order-table dispatch-table">
-            <thead><tr><th>Order</th><th>Customer</th><th>Placed</th><th>Items</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Order</th><th>Batch</th><th>Customer</th><th>Placed</th><th>Items</th><th>Status</th><th></th></tr></thead>
             <tbody>
               {% for order in orders %}
                 <tr>
                   <td><strong>#{{ order.public_id[:8] }}</strong><small>Record ID #{{ order.id }}</small></td>
+                  <td>{% if order.dispatch_batch %}<strong>Batch #{{ order.dispatch_batch.id }}</strong><small>{{ order.dispatch_batch.window_start|local_time("%d %b · %H:%M") }} – {{ order.dispatch_batch.window_end|local_time("%H:%M") }}</small>{% else %}<small>No batch</small>{% endif %}</td>
                   <td><strong>{{ order.customer_name }}</strong><small>{{ order.phone }}</small></td>
                   <td>{{ order.created_at|local_time("%d %b %Y · %H:%M") }}</td>
                   <td>{{ order.items|length }} item{{ '' if order.items|length == 1 else 's' }}</td>

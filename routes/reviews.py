@@ -2,7 +2,7 @@ from datetime import datetime
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 
-from models import Order, Review, ShopSettings, db
+from models import ShopSettings, Order, Review, ShopSettings, db
 from utils.notifications import normalize_nigerian_phone
 
 reviews_bp = Blueprint("reviews", __name__)
@@ -25,6 +25,10 @@ def find_order(order_ref):
 
 @reviews_bp.route("/reviews", methods=["GET", "POST"])
 def submit_review():
+    settings = ShopSettings.query.get(1)
+    if settings and not settings.reviews_open:
+        flash("Reviews are temporarily closed.", "error")
+        return redirect(url_for("shop.index"))
     if request.method == "POST":
         order_ref = request.form.get("order_ref", "").strip()
         customer_name = request.form.get("customer_name", "").strip()

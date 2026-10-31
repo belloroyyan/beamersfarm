@@ -170,6 +170,7 @@ def build_inventory_report(period="30d", search="", start_raw="", end_raw="", lo
         range_label = f"{start_day:%d %b %Y} – {end_day:%d %b %Y}"
         period_label = f"{PERIOD_LABELS[period]} · {range_label}"
 
+    in_person_orders = [order for order in orders if order.order_channel == "in_person"]
     return {
         "period": period,
         "period_label": period_label,
@@ -192,6 +193,8 @@ def build_inventory_report(period="30d", search="", start_raw="", end_raw="", lo
             "money_received": money_received,
             "money_refunded": money_refunded,
             "net_cash_inflow": money_received - money_refunded,
+            "in_person_orders": len(in_person_orders),
+            "in_person_sales": sum((Decimal(str(order.total or 0)) for order in in_person_orders if order.status != "Cancelled"), Decimal("0.00")),
         },
         "products_total": len(products),
         "lines_total": len(all_rows),

@@ -6,14 +6,16 @@ from sqlalchemy import or_
 from models import (
     CommunityBlock, CommunityComment, CommunityNotification, CommunityPost,
     CommunityReaction, CommunityReport, Customer, CustomerNotice, Product,
-    ShopSettings, db,
+    SalespersonAccount, ShopSettings, db,
 )
 from routes.customer import current_customer
 from utils.community_media import community_image_url, save_community_image
+from utils.salesperson_permissions import salesperson_has_permission
 from utils.web_push import send_customer_community_reply_push
 
 community_bp = Blueprint("community", __name__, url_prefix="/community")
 CATEGORIES = ["Everything", "Order help", "Little notes", "Ideas & feedback"]
+SPECIAL_CATEGORY = "From Beamers Farm"
 REPORT_REASONS = ["Spam", "Abusive or hateful", "Inappropriate content", "Something else"]
 
 
@@ -40,7 +42,17 @@ def write_redirect():
 
 
 def staff():
-    return session.get("staff_role") == "owner" or session.get("admin_logged_in")
+    """Owner always; a salesperson only while active and granted community moderation."""
+    if session.get("staff_role") == "owner" or session.get("admin_logged_in"):
+        return True
+    if session.get("staff_role") == "salesperson" and session.get("salesperson_id"):
+        account = db.session.get(SalespersonAccount, session.get("salesperson_id"))
+        return bool(account and account.active and salesperson_has_permission(account, "manage_community"))
+    return False
+
+
+def is_owner():
+    return session.get("staff_role") == "owner" or bool(session.get("admin_logged_in"))
 
 
 def community_write_guard():
@@ -94,7 +106,7 @@ def feed():
     else:
         query = CommunityPost.query.filter_by(status="published")
         if category in CATEGORIES[1:]:
-            query = query.filter_by(category=category)
+            query = query.filter(or_(CommunityPost.category == category, CommunityPost.category == SPECIAL_CATEGORY))
         if search_query:
             pattern = f"%{search_query}%"
             matching_comment_post_ids = db.session.query(CommunityComment.post_id).filter(
@@ -104,6 +116,7 @@ def feed():
             query = query.filter(or_(CommunityPost.body.ilike(pattern), CommunityPost.id.in_(matching_comment_post_ids)))
         posts = query.order_by(CommunityPost.created_at.desc()).limit(100).all()
         posts = [post for post in posts if post.customer_id not in blocked]
+        posts.sort(key=lambda post: post.category != SPECIAL_CATEGORY)  # special posts stay pinned on top
 
     comments = {}
     reactions = {}
@@ -111,6 +124,9 @@ def feed():
         comments[post.id] = CommunityComment.query.filter_by(post_id=post.id, status="published").order_by(CommunityComment.created_at.asc()).all()
         reactions[post.id] = CommunityReaction.query.filter_by(post_id=post.id).count()
     post_authors, comment_authors = _community_author_names(posts, comments)
+    for post in posts:
+        if post.category == SPECIAL_CATEGORY:
+            post_authors[post.id] = "Beamers Farm"
     unread = CommunityNotification.query.filter_by(customer_id=customer.id, read_at=None).count() if customer else 0
     settings = ShopSettings.query.get(1)
 
@@ -158,6 +174,8 @@ def feed():
         community_open=settings.community_open if settings else True,
         community_closed_message=settings.community_closed_message if settings else "The community is currently closed.",
         community_blocked=bool(customer and customer.community_posting_blocked),
+        is_owner=is_owner(),
+        special_category=SPECIAL_CATEGORY,
     )
 
 
@@ -188,6 +206,37 @@ def create_post():
     ))
     db.session.commit()
     flash("Your post is now in the community.", "success")
+    return redirect(url_for("community.feed"))
+
+
+@community_bp.post("/special-post")
+def special_post():
+    if not is_owner():
+        abort(403)
+    body = request.form.get("body", "").strip()
+    if not body or len(body) > 4000:
+        flash("Write a special post up to 4,000 characters.", "error")
+        return redirect(url_for("community.feed"))
+    image, error = save_community_image(request.files.get("image"))
+    if error:
+        flash(error, "error")
+        return redirect(url_for("community.feed"))
+    db.session.add(CommunityPost(customer_id=None, author_name="Beamers Farm", category=SPECIAL_CATEGORY, body=body, image=image))
+    db.session.commit()
+    flash("Your special post is live at the top of the community.", "success")
+    return redirect(url_for("community.feed"))
+
+
+@community_bp.post("/posts/<int:post_id>/special-delete")
+def special_post_delete(post_id):
+    if not is_owner():
+        abort(403)
+    post = CommunityPost.query.get_or_404(post_id)
+    if post.category != SPECIAL_CATEGORY:
+        abort(404)
+    post.status = "deleted"
+    db.session.commit()
+    flash("Special post removed.", "success")
     return redirect(url_for("community.feed"))
 
 
@@ -357,11 +406,15 @@ def support():
         db.session.commit()
         flash("Community settings saved.", "success")
         return redirect(url_for("community.support"))
-    posts = CommunityPost.query.filter_by(status="published").order_by(CommunityPost.created_at.desc()).limit(100).all()
+    post_query = CommunityPost.query.filter_by(status="published")
+    post_search = request.args.get("post_id", "").strip()
+    if post_search.isdigit(): post_query = post_query.filter_by(id=int(post_search))
+    posts = post_query.order_by(CommunityPost.created_at.desc()).limit(100).all()
     unanswered = [post for post in posts if not CommunityComment.query.filter_by(post_id=post.id, is_staff=True, status="published").first()]
     reports = CommunityReport.query.filter_by(status="open").order_by(CommunityReport.created_at.desc()).all()
     comments = {post.id: CommunityComment.query.filter_by(post_id=post.id, status="published").all() for post in posts}
-    author_names, _ = _community_author_names(posts, comments)
+    author_names = {post.id: (db.session.get(Customer, post.customer_id).name if post.customer_id and db.session.get(Customer, post.customer_id) else "Community member") for post in posts}
+    author_names.update({comment.id: (db.session.get(Customer, comment.customer_id).name if comment.customer_id and db.session.get(Customer, comment.customer_id) else ("Beamers Farm team" if comment.is_staff else "Community member")) for thread in comments.values() for comment in thread})
     return render_template("admin/community_support.html", unanswered=unanswered, reports=reports, comments=comments, author_names=author_names, community_settings=settings, suggestions=[post for post in posts if post.category == "Ideas & feedback"])
 
 
@@ -402,3 +455,8 @@ def moderate_report(report_id):
         db.session.add(CustomerNotice(customer_id=affected_customer_id, title="A community post was moderated", message="The Beamers Farm team reviewed community content connected to your account. Please keep future posts respectful and helpful.", kind="community"))
     db.session.commit()
     return redirect(url_for("community.support"))
+
+@community_bp.get("/post/<int:post_id>")
+def post_redirect(post_id):
+    CommunityPost.query.get_or_404(post_id)
+    return redirect(url_for("community.feed", post_id=post_id) + f"#post-{post_id}")

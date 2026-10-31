@@ -27,6 +27,7 @@
     <div class="metric-card"><span>Verified orders</span><strong>{{ report.metrics.verified_orders }}</strong><small>Non-cancelled · {{ report.period_label }}</small></div>
     <div class="metric-card"><span>Gross verified item sales</span><strong>{{ format_currency(report.metrics.verified_item_sales) }}</strong><small>Before refunds · excludes delivery fees</small></div>
     <div class="metric-card"><span>Money received</span><strong>{{ format_currency(report.metrics.money_received) }}</strong><small>Settled initial and balance payments</small></div>
+    <div class="metric-card"><span>Farm-counter sales</span><strong>{{ report.metrics.in_person_orders }}</strong><small>{{ format_currency(report.metrics.in_person_sales) }} recorded in person</small></div>
     <div class="metric-card"><span>Net cash inflow</span><strong>{{ format_currency(report.metrics.net_cash_inflow) }}</strong><small>Money received less {{ format_currency(report.metrics.money_refunded) }} refunded</small></div>
   </div>
 

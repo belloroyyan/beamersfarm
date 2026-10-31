@@ -27,7 +27,8 @@
       <ol class="help-list">
         <li>Open <strong>Products</strong> in the navigation or browse the popular picks on the home page.</li>
         <li>Open a product to see its details, price, pack size, and availability.</li>
-        <li>Select a quantity and choose <strong>Add to cart</strong>. The cart count in the header updates as you shop.</li>
+        <li>Select a quantity (some products accept part quantities, such as 1.5 kg) and tick any <strong>processing preferences</strong> you want. Leave them unticked to receive the product as listed.</li>
+        <li>Choose <strong>Add to cart</strong>. The cart count in the header updates as you shop. Ready-made <strong>packages</strong> can be added in one tap from the home and products pages.</li>
       </ol>
     </section>
 
@@ -35,7 +36,7 @@
       <div class="help-section-heading"><span class="help-number">03</span><div><p class="eyebrow">Review</p><h2 id="cart-title">Check your cart</h2></div></div>
       <ol class="help-list">
         <li>Open <strong>Cart</strong> to review your items, quantities, and subtotal. The delivery fee is calculated after you select a zone at checkout.</li>
-        <li>Change a quantity and press <strong>Update cart</strong>, or use the × control to remove an item.</li>
+        <li>Change a quantity or processing option and press <strong>Update cart</strong>, or use the × control to remove an item.</li>
         <li>When your order looks right, continue to checkout to choose delivery or free farm pickup.</li>
       </ol>
       <a class="help-inline-link" href="{{ url_for('shop.cart') }}">Open your cart →</a>
@@ -46,7 +47,8 @@
       <ol class="help-list">
         <li>Enter the name and phone number the farm should use to contact you.</li>
         <li>Choose a delivery zone and enter a complete address in that area, including house number, street, and neighborhood. Or choose free pickup from Beamers Farm.</li>
-        <li>The WhatsApp order-update checkbox is optional. Submit the order when your details are ready.</li>
+        <li>Provide an email address only if you plan to pay online. The WhatsApp order-update checkbox is optional.</li>
+        <li>Continue through the three steps: <strong>Delivery</strong>, <strong>Payment</strong> (including any coupon), then <strong>Review</strong> before you place the order.</li>
       </ol>
       <p class="help-note">Available delivery zones and their current fees are shown at checkout. Please ensure your selected dropdown zone matches your typed address to avoid order cancellation or extra cash-on-delivery charges. Farm pickup is free from Elapop Estate, 7:00 AM–7:00 PM. If the shop is closed for orders, you can still browse the site and return when ordering reopens.</p>
     </section>
@@ -54,10 +56,11 @@
     <section class="help-card" aria-labelledby="after-order-title">
       <div class="help-section-heading"><span class="help-number">05</span><div><p class="eyebrow">After checkout</p><h2 id="after-order-title">Keep your order reference</h2></div></div>
       <ol class="help-list">
-        <li>Choose the quantity you need for each product. Every current product uses its listed price multiplied by the quantity ordered.</li>
-        <li>After submitting, the order page shows your order number, items, fulfillment choice, complete amount due, and bank-transfer details. You can open and print a customer receipt from there.</li>
-        <li>Transfer the complete amount before your order is confirmed. Use the order number as the bank-transfer reference. Beamers Farm checks its business bank/POS account and confirms only after the payment appears.</li>
-        <li>Keep the order reference so the farm can find your order quickly. You can optionally enable browser notifications on the receipt page to hear when payment is verified and your order is confirmed.</li>
+        <li>Every product is priced at its listed price multiplied by the quantity ordered. The full amount, including any delivery fee, is due before the order is confirmed.</li>
+        <li>Pay by <strong>direct bank transfer to Opay</strong> (use your order number as the reference) or, when available, <strong>online with Paystack</strong> by card, bank, transfer or USSD.</li>
+        <li>Transfers are confirmed by Beamers Farm only after the money appears in the business account. Paystack payments are verified automatically, then reviewed before fulfilment.</li>
+        <li>The order page shows your order number, items, delivery or pickup choice and payment status. You can open and print a customer receipt from there.</li>
+        <li>Optionally enable browser notifications on the order page to hear when payment is verified, and when a delivery goes out.</li>
       </ol>
       <a class="help-inline-link" href="{{ url_for('complaints.create_complaint') }}">Contact customer care →</a>
     </section>
@@ -78,21 +81,24 @@
     <section class="help-card" aria-labelledby="account-help-title">
       <div class="help-section-heading"><span class="help-number">07</span><div><p class="eyebrow">Your account</p><h2 id="account-help-title">Accounts &amp; tracking</h2></div></div>
       <ol class="help-list">
-        <li><a class="text-link" href="{{ url_for('customer.login') }}">Sign in or create an account</a> to save your details and see past orders.</li>
+        <li><a class="text-link" href="{{ url_for('customer.login') }}">Sign in or create an account</a> to save your details, see past orders, reorder in one tap, and receive gifted coupons.</li>
         <li>Use <a class="text-link" href="{{ url_for('shop.track_order') }}">Track order</a> with your order reference and phone number to check its status.</li>
         <li>Forgot your password? Use the “Forgot password” link on the sign-in page.</li>
+        <li>Made an order as a guest? Sign in and use <strong>Claim an order</strong> in your account to attach it.</li>
       </ol>
     </section>
   </div>
 
   <section class="help-card" aria-labelledby="nav-help-title">
     <div class="help-section-heading"><span class="help-number">08</span><div><p class="eyebrow">Find your way</p><h2 id="nav-help-title">Navigating the site</h2></div></div>
-    <p>Use the menu at the top of every page (tap the menu icon on mobile). Here’s what each page is for:</p>
+    <p>Use the menu at the top of every page (tap the menu icon on phones and tablets). The <strong>?</strong> button beside your cart replays the how-to-order guide at any time. Here’s what each page is for:</p>
     <ul class="help-list">
       <li><a class="text-link" href="{{ url_for('shop.index') }}">Home</a> — popular picks, offers and shop news.</li>
       <li><a class="text-link" href="{{ url_for('shop.products') }}">Products</a> — the full list of chicken and farm produce with prices.</li>
       <li><a class="text-link" href="{{ url_for('shop.cart') }}">Cart</a> — review items, change quantities, then go to checkout.</li>
+      <li><a class="text-link" href="{{ url_for('shop.track_order') }}">Track order</a> — check the status of an order with its reference and phone number.</li>
       <li><a class="text-link" href="{{ url_for('shop.wholesale') }}">Wholesale</a> — request bulk orders for businesses and events.</li>
+      <li><a class="text-link" href="{{ url_for('community.feed') }}">Community</a> — ask questions, share ideas and see what the farm is considering. Reading is open to everyone; posting needs a customer account.</li>
       <li><a class="text-link" href="{{ url_for('shop.gallery') }}">Gallery</a> and <a class="text-link" href="{{ url_for('shop.updates') }}">Updates</a> — photos and the latest farm news.</li>
       <li><a class="text-link" href="{{ url_for('reviews.testimonials') }}">Reviews</a> — read what customers say, or <a class="text-link" href="{{ url_for('reviews.submit_review') }}">leave a review</a>.</li>
       <li><a class="text-link" href="{{ url_for('complaints.create_complaint') }}">Customer care</a> — report a problem with an order.</li>

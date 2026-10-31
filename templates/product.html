@@ -15,8 +15,8 @@
       <form class="quantity-form" action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
         <label for="quantity">Quantity ({{ product.unit }})</label>
-        <div class="quantity-row"><input id="quantity" name="quantity" type="number" min="{{ '0.001' if product.allow_fractional_quantity else '1' }}" max="{{ format_quantity(product.stock) }}" step="{{ '0.001' if product.allow_fractional_quantity else '1' }}" value="{{ '1' if product.stock >= 1 else format_quantity(product.stock) }}" required><button class="button button-dark" type="submit">Add to cart <span>+</span></button></div>
-        {% if product.allow_fractional_quantity %}<small class="field-help">Partial quantities are accepted up to three decimal places.</small>{% endif %}
+        <div class="quantity-row"><input id="quantity" name="quantity" type="number" min="{{ product.minimum_order_quantity }}" max="{{ format_quantity(product.stock) }}" step="{{ '0.001' if product.allow_fractional_quantity else '1' }}" value="{{ format_quantity(product.minimum_order_quantity if product.stock >= product.minimum_order_quantity else product.stock) }}" required><button class="button button-dark" type="submit">Add to cart <span>+</span></button></div>
+        {% if processing_options %}<fieldset class="processing-choice"><legend>Processing preferences <small>(choose any, or none)</small></legend><div class="processing-option-list">{% for option in processing_options %}<label class="processing-option"><input type="checkbox" name="processing_method" value="{{ option }}"><span>{{ option }}</span></label>{% endfor %}</div><small class="field-help">Leave everything unticked to receive the product as listed.</small></fieldset>{% endif %}<small class="field-help">Minimum order: {{ format_quantity(product.minimum_order_quantity) }} {{ product.unit }}.{% if product.allow_fractional_quantity %} Partial quantities are accepted up to three decimal places.{% endif %}</small>
       </form>
       {% else %}<div class="out-of-stock">Currently unavailable</div>{% endif %}
     </div>

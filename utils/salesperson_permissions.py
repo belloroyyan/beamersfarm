@@ -4,15 +4,32 @@ import json
 
 
 PERMISSION_DEFINITIONS = [
+    # Order desk
+    ("view_order_stream", "View the live order stream", True),
     ("view_customer_details", "View customer contact and delivery details", True),
     ("verify_payments", "Verify incoming POS / bank transfers", True),
     ("change_order_status", "Change order status (full status list)", True),
     ("record_weigh_ins", "Record weigh-ins on legacy orders", True),
     ("print_customer_receipts", "Open and print customer receipts", True),
     ("view_customer_settlement", "View final customer balances/refunds on legacy settlement receipts", True),
-    ("receive_order_alerts", "Receive new-order push alerts while the shop is open", True),
-    ("view_complaints", "View customer complaints", False),
+    # Customer care
+    ("view_complaints", "View customer complaints", True),
+    ("manage_complaints", "Manage complaints: update status and add notes", True),
+    ("manage_community", "Moderate community posts, reports and suggestions", False),
+    # Counter and stock
+    ("record_in_person_orders", "Record cash/POS orders at the farm counter", False),
     ("view_inventory", "View product stock summary", False),
+    # Alerts
+    ("receive_order_alerts", "Receive new-order push alerts while the shop is open", True),
+]
+
+# Used by the owner's Staff access page to show the checkboxes in sections.
+PERMISSION_GROUPS = [
+    ("Order desk", ["view_order_stream", "view_customer_details", "verify_payments", "change_order_status",
+                    "record_weigh_ins", "print_customer_receipts", "view_customer_settlement"]),
+    ("Customer care", ["view_complaints", "manage_complaints", "manage_community"]),
+    ("Counter and stock", ["record_in_person_orders", "view_inventory"]),
+    ("Alerts", ["receive_order_alerts"]),
 ]
 
 DEFAULT_PERMISSIONS = {

@@ -1,35 +1,192 @@
 {
   "routes": [
-    { "path": "/", "title": "Shop" },
-    { "path": "/product/:product_id", "title": "Product detail" },
-    { "path": "/cart", "title": "Shopping cart" },
-    { "path": "/help", "title": "Help and ordering guide" },
-    { "path": "/track-order", "title": "Track a guest order" },
-    { "path": "/account/login", "title": "Customer sign in" },
-    { "path": "/account/register", "title": "Create customer account" },
-    { "path": "/account/forgot-password", "title": "Recover customer account" },
-    { "path": "/account", "title": "Customer account" },
-    { "path": "/reviews", "title": "Leave a customer review" },
-    { "path": "/testimonials", "title": "Customer testimonials" },
-    { "path": "/checkout", "title": "Delivery details" },
-    { "path": "/order/:order_id/:token/success", "title": "Order confirmation" },
-    { "path": "/order/:order_id/:token/receipt", "title": "Printable customer receipt" },
-    { "path": "/admin/login", "title": "Staff login" },
-    { "path": "/admin/", "title": "Order desk" },
-    { "path": "/admin/staff", "title": "Salesperson account management" },
-    { "path": "/sales/", "title": "Salesperson order desk" },
-    { "path": "/sales/orders/:order_id", "title": "Salesperson order details" },
-    { "path": "/dispatch/", "title": "Dispatch rider queue" },
-    { "path": "/dispatch/orders/:order_id", "title": "Dispatch order detail" },
-    { "path": "/admin/orders/:order_id", "title": "Order detail" },
-    { "path": "/admin/products", "title": "Product management" },
-    { "path": "/admin/products/:product_id/edit", "title": "Edit product" },
-    { "path": "/admin/delivery-zones", "title": "Delivery zones and pickup fees" },
-    { "path": "/admin/orders/:order_id/receipt", "title": "Private owner receipt" },
-    { "path": "/admin/complaints", "title": "Complaints" },
-    { "path": "/admin/complaints/:complaint_id", "title": "Complaint detail" },
-    { "path": "/admin/reviews", "title": "Review moderation" },
-    { "path": "/complaint", "title": "Customer care" },
-    { "path": "/webhooks/whatsapp", "title": "WhatsApp webhook" }
+    {
+      "path": "/",
+      "title": "Shop"
+    },
+    {
+      "path": "/product/:product_id",
+      "title": "Product detail"
+    },
+    {
+      "path": "/cart",
+      "title": "Shopping cart"
+    },
+    {
+      "path": "/help",
+      "title": "Help and ordering guide"
+    },
+    {
+      "path": "/track-order",
+      "title": "Track a guest order"
+    },
+    {
+      "path": "/account/login",
+      "title": "Customer sign in"
+    },
+    {
+      "path": "/account/register",
+      "title": "Create customer account"
+    },
+    {
+      "path": "/account/forgot-password",
+      "title": "Recover customer account"
+    },
+    {
+      "path": "/account",
+      "title": "Customer account"
+    },
+    {
+      "path": "/reviews",
+      "title": "Leave a customer review"
+    },
+    {
+      "path": "/testimonials",
+      "title": "Customer testimonials"
+    },
+    {
+      "path": "/checkout",
+      "title": "Delivery details"
+    },
+    {
+      "path": "/order/:order_id/:token/success",
+      "title": "Order confirmation"
+    },
+    {
+      "path": "/order/:order_id/:token/receipt",
+      "title": "Printable customer receipt"
+    },
+    {
+      "path": "/admin/login",
+      "title": "Staff login"
+    },
+    {
+      "path": "/admin/",
+      "title": "Order desk"
+    },
+    {
+      "path": "/admin/staff",
+      "title": "Salesperson account management"
+    },
+    {
+      "path": "/sales/",
+      "title": "Salesperson order desk"
+    },
+    {
+      "path": "/sales/orders/:order_id",
+      "title": "Salesperson order details"
+    },
+    {
+      "path": "/dispatch/",
+      "title": "Dispatch rider queue"
+    },
+    {
+      "path": "/dispatch/orders/:order_id",
+      "title": "Dispatch order detail"
+    },
+    {
+      "path": "/admin/orders/:order_id",
+      "title": "Order detail"
+    },
+    {
+      "path": "/admin/products",
+      "title": "Product management"
+    },
+    {
+      "path": "/admin/products/:product_id/edit",
+      "title": "Edit product"
+    },
+    {
+      "path": "/admin/delivery-zones",
+      "title": "Delivery zones and pickup fees"
+    },
+    {
+      "path": "/admin/orders/:order_id/receipt",
+      "title": "Private owner receipt"
+    },
+    {
+      "path": "/admin/complaints",
+      "title": "Complaints"
+    },
+    {
+      "path": "/admin/complaints/:complaint_id",
+      "title": "Complaint detail"
+    },
+    {
+      "path": "/admin/reviews",
+      "title": "Review moderation"
+    },
+    {
+      "path": "/complaint",
+      "title": "Customer care"
+    },
+    {
+      "path": "/webhooks/whatsapp",
+      "title": "WhatsApp webhook"
+    },
+    {
+      "path": "/products",
+      "title": "Products"
+    },
+    {
+      "path": "/secure-drop",
+      "title": "Secure drop"
+    },
+    {
+      "path": "/secure-drop/:token",
+      "title": "Secure drop receiver"
+    },
+    {
+      "path": "/admin/packages",
+      "title": "Predefined packages"
+    },
+    {
+      "path": "/admin/order-stream",
+      "title": "Live order stream"
+    },
+    {
+      "path": "/updates",
+      "title": "Shop updates"
+    },
+    {
+      "path": "/updates/:update_id",
+      "title": "Update detail"
+    },
+    {
+      "path": "/gallery",
+      "title": "Gallery"
+    },
+    {
+      "path": "/wholesale",
+      "title": "Wholesale orders"
+    },
+    {
+      "path": "/privacy",
+      "title": "Privacy and security"
+    },
+    {
+      "path": "/community/",
+      "title": "Community"
+    },
+    {
+      "path": "/community/notifications",
+      "title": "Community notifications"
+    },
+    {
+      "path": "/community/support",
+      "title": "Community support (staff)"
+    },
+    {
+      "path": "/partner-offers/:listing_id",
+      "title": "Independent supplier offer"
+    },
+    {
+      "path": "/sitemap.xml",
+      "title": "Sitemap"
+    },
+    {
+      "path": "/robots.txt",
+      "title": "Robots"
+    }
   ]
 }

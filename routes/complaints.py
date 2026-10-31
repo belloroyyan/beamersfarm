@@ -2,7 +2,7 @@ from datetime import datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
-from models import Complaint, Order, db
+from models import Complaint, Order, ShopSettings, db
 from utils.web_push import send_owner_complaint_push
 
 complaints_bp = Blueprint("complaints", __name__)
@@ -19,6 +19,10 @@ COMPLAINT_CATEGORIES = [
 
 @complaints_bp.route("/complaint", methods=["GET", "POST"])
 def create_complaint():
+    settings = ShopSettings.query.get(1)
+    if settings and not settings.customer_care_open:
+        flash("Customer care is temporarily unavailable. Please try again later.", "error")
+        return redirect(url_for("shop.index"))
     if request.method == "POST":
         name = request.form.get("customer_name", "").strip()
         phone = request.form.get("phone", "").strip()

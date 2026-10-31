@@ -31,14 +31,17 @@
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/brand-mark.png') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/refinement.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/community-release.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/editorial.css') }}">
   {% block head %}{% endblock %}
   {% block structured_data %}{% endblock %}
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
   <header class="site-header">
     <div class="container header-inner">
       <a class="brand" href="{{ url_for('shop.index') }}">
@@ -46,6 +49,7 @@
         <span><strong>BEAMERS FARM</strong><small>Fresh, clean, hygienically packaged.</small></span>
       </a>
       <a class="header-cart" href="{{ url_for('shop.cart') }}" aria-label="Open your cart">Cart <span class="cart-count">{{ format_quantity(cart_count) }}</span></a>
+      <button class="tour-toggle" type="button" data-tour-open aria-label="Show the how-to-order guide" title="How to order"><svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2 1-1.2 1.8"/><circle cx="12" cy="16.9" r=".6" fill="currentColor"/></svg></button>
       <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="main-menu" aria-label="Open menu"><span></span><span></span><span></span></button>
       <nav class="main-nav" id="main-menu" aria-label="Main navigation">
         <a href="{{ url_for('shop.index') }}"><span>Shop</span></a>
@@ -83,7 +87,7 @@
 
   {% if customer_notice %}
     <aside class="customer-notice-popup" role="status" aria-labelledby="customer-notice-title">
-      <div class="customer-notice-copy"><p class="eyebrow">{{ customer_notice.created_by or 'Beamers Farm' }}</p><strong id="customer-notice-title">{{ customer_notice.title }}</strong><p>{{ customer_notice.message }}</p></div>
+      <div class="customer-notice-copy"><p class="eyebrow">{{ customer_notice.created_by or 'Beamers Farm' }}</p><strong id="customer-notice-title">{{ customer_notice.title }}</strong><p>{{ customer_notice.message }}</p>{% if customer_notice.related_url %}<form method="post" action="{{ url_for('customer.dismiss_notice', notice_id=customer_notice.id) }}" class="notification-related-form"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ customer_notice.related_url }}"><button class="notification-related-link" type="submit">Open related page →</button></form>{% endif %}</div>
       <form method="post" action="{{ url_for('customer.dismiss_notice', notice_id=customer_notice.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ request.full_path }}"><button type="submit" aria-label="Dismiss update">×</button></form>
     </aside>
   {% elif gifted_coupon %}
@@ -94,7 +98,26 @@
     </aside>
   {% endif %}
 
-  <main>
+  {% if vapid_public_key %}{% if current_customer %}<aside class="site-notification-prompt" role="status"><strong>Stay close to the farm.</strong><span>Enable updates, gallery posts, community notices, coupons, and order changes.</span><a class="button button-lime" href="{{ url_for('customer.account') }}#customer-notifications">Enable customer notifications</a></aside>{% else %}<aside class="site-notification-prompt" data-site-notifications data-vapid-public-key="{{ vapid_public_key }}" role="status"><strong>Stay close to the farm.</strong><span>Allow notifications for new updates, gallery moments, and order news.</span><button class="button button-lime" type="button" data-site-notifications-enable>Enable customer notifications</button><button type="button" data-site-notifications-dismiss aria-label="Dismiss notification prompt">×</button></aside><script src="{{ url_for('static', filename='js/public-notifications.js') }}" defer></script>{% endif %}{% endif %}
+  <div class="site-tour" data-site-tour hidden role="dialog" aria-labelledby="tour-title">
+    <div class="site-tour-card">
+      <button class="site-tour-close" type="button" data-tour-collapse aria-label="Minimise the guide">×</button>
+      <p class="eyebrow" data-tour-eyebrow>A quick Beamers guide</p>
+      <ol class="site-tour-progress" data-tour-progress hidden aria-label="Order steps">
+        <li data-tour-step="0">Products</li><li data-tour-step="1">Cart</li><li data-tour-step="2">Checkout</li><li data-tour-step="3">Done</li>
+      </ol>
+      <h2 id="tour-title" data-tour-title>Need a tour of the site?</h2>
+      <p data-tour-copy>We can guide you from choosing products to a successful order. The guide stays with you until your order is placed.</p>
+      <div class="site-tour-actions">
+        <a class="button button-lime" href="/products" data-tour-primary>Show me how to order</a>
+        <button class="button button-outline" type="button" data-tour-ack hidden>Got it</button>
+        <button class="button button-outline" type="button" data-tour-skip>Maybe later</button>
+      </div>
+      <button class="site-tour-stop" type="button" data-tour-stop hidden>End the guide</button>
+    </div>
+  </div>
+  <button class="site-tour-pill" type="button" data-tour-pill hidden><span class="site-tour-pill-dot" aria-hidden="true"></span><span data-tour-pill-text>Order guide</span></button>
+<main id="main-content">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         <div class="container flash-stack" aria-live="polite">
@@ -121,14 +144,16 @@
 
   <footer class="site-footer">
     <div class="container footer-columns">
-      <div><strong class="footer-brand">BEAMERS FARM</strong><p>Fresh, clean, hygienically packaged chicken for Osogbo kitchens.</p><small>Elapop Estate, Oke Baale, Osogbo, Nigeria</small></div>
-      <div><h3>Shop</h3><a href="{{ url_for('shop.products') }}">Products</a><a href="{{ url_for('shop.gallery') }}">Gallery</a><a href="{{ url_for('shop.track_order') }}">Track order</a></div>
-      <div><h3>Community</h3><a href="{{ url_for('community.feed') }}">Community</a><a href="{{ url_for('reviews.testimonials') }}">Testimonials</a><a href="{{ url_for('reviews.submit_review') }}">Leave a review</a></div>
+      <div><strong class="footer-brand">BEAMERS FARM</strong><p>Fresh, clean, hygienically packaged chicken for Osogbo kitchens.</p><small>Elapop Estate, Oke Baale, Osogbo, Nigeria</small><small>Open daily · 7:00 AM–7:00 PM</small><small class="company-registration">CAC registration no. 9967398</small><small class="footer-copy">© {{ now_year|default(2026) }} Beamers Farm</small></div>
+      <div><h3>Shop</h3><a href="{{ url_for('shop.products') }}">Products</a><a href="{{ url_for('shop.wholesale') }}">Wholesale orders</a><a href="{{ url_for('shop.updates') }}">Updates</a><a href="{{ url_for('shop.gallery') }}">Gallery</a><a href="{{ url_for('shop.track_order') }}">Track order</a></div>
+      <div><h3>Community</h3><a href="{{ url_for('community.feed') }}">Community</a><a href="{{ url_for('reviews.testimonials') }}">Testimonials</a><a href="{{ url_for('reviews.submit_review') }}">Leave a review</a><a href="{{ url_for('customer.account') if current_customer else url_for('customer.login') }}">{{ 'My account' if current_customer else 'Customer account' }}</a></div>
       <div><h3>Help & contact</h3><a href="https://wa.me/2348062074302" target="_blank" rel="noopener">WhatsApp 0806 207 4302</a><a href="{{ url_for('shop.help_page') }}">Help centre</a><a href="{{ url_for('shop.privacy') }}">Privacy & security</a><a href="{{ url_for('complaints.create_complaint') }}">Customer care</a></div>
     </div>
   </footer>
   <script src="{{ url_for('static', filename='js/cart.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/site-overlays.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/menu-fit.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/share.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/pwa-register.js') }}" defer></script>
   {% block scripts %}{% endblock %}
 </body>

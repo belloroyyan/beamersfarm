@@ -1,0 +1,110 @@
+/* =========================================================================
+   Polish layer — loaded last. Fixes tablet dropdown clipping, bigger product
+   cards, the secure-drop popup, the data-clearing form, and general UI/UX.
+   ========================================================================= */
+
+/* ---- 1. Dropdown panels never leave the screen ------------------------- */
+.admin-shell, .admin-shell > .container, .admin-topbar, .admin-actions, .community-hero, .community-hero-actions { overflow: visible; }
+.owner-actions-menu, .community-action-menu { position: relative; }
+.owner-actions-panel, .community-action-panel {
+  max-width: calc(100vw - 24px);
+  translate: var(--fit-shift, 0) 0;
+}
+.owner-actions-panel { overscroll-behavior: contain; }
+/* Tablet: open the panel toward the screen centre instead of off the edge. */
+@media (min-width: 701px) and (max-width: 1100px) {
+  .owner-actions-panel { right: 0; left: auto; width: min(340px, calc(100vw - 48px)); }
+  .admin-topbar { gap: 16px; }
+  .admin-topbar > div:first-child { flex: 1 1 320px; min-width: 0; }
+  .admin-actions { flex: 0 1 auto; margin-left: auto; justify-content: flex-end; }
+  .community-action-panel { right: 0; left: auto; }
+  /* Header "Menu" dropdown at tablet width: float it, right-aligned, inside the viewport. */
+  .site-header .nav-more { position: relative; }
+  .site-header .nav-more-menu { position: absolute !important; top: calc(100% + 8px); right: 0; left: auto; width: min(260px, calc(100vw - 24px)); margin: 0; z-index: 60; }
+}
+.actions-search input { width: 100%; margin: 4px 0 8px; }
+.owner-actions-panel a[hidden] { display: none; }
+
+/* ---- 2. Product cards: a teeny bit bigger ------------------------------- */
+.product-grid, .recommendation-grid { grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)) !important; gap: 18px !important; justify-content: stretch; }
+.product-card { max-width: none; }
+.product-art, .recommendation-grid > .product-card .product-art { height: 140px; }
+.product-info { padding: 14px; }
+.product-info h3, .product-heading h3 { font-size: 1rem; }
+.stock-badge { font-size: .66rem; padding: 3px 7px; }
+.product-minimum { font-size: .7rem; }
+.product-buy strong { font-size: 1.02rem; }
+.product-buy .button { font-size: .82rem; min-height: 42px; padding: 9px 12px; }
+.product-card { transition: box-shadow .2s ease, transform .2s ease; }
+.product-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(27,48,38,.14); }
+@media (max-width: 560px) {
+  .product-grid, .recommendation-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px !important; }
+  .product-art, .recommendation-grid > .product-card .product-art { height: 116px; }
+  .product-info { padding: 12px; }
+}
+
+/* ---- 3. Secure drop ------------------------------------------------------ */
+.secure-drop-shell .page-heading { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.drop-new-button { display: inline-flex; align-items: center; gap: 8px; }
+.drop-new-button .icon-svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.vault-assets { max-width: 860px; }
+.vault-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.vault-head h2 { margin-bottom: 4px; }
+.vault-count { padding: 4px 10px; border-radius: 999px; background: #eef5dc; color: #385b16; font-size: .74rem; font-weight: 700; white-space: nowrap; }
+.vault-asset-icon { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: #eef2ea; color: #1f3b31; font-weight: 800; font-size: .8rem; }
+.drop-dialog [data-drop-text], .drop-dialog [data-drop-file] { display: grid; gap: 6px; }
+.drop-dialog [hidden] { display: none; }
+.drop-dialog input[readonly] { width: 100%; }
+.drop-dialog .permission-option { display: flex; gap: 10px; align-items: flex-start; font-weight: 500; }
+.drop-dialog .permission-option small { display: block; color: #52625b; font-weight: 400; }
+.drop-dialog .permission-option input { width: 18px; height: 18px; margin-top: 3px; flex: 0 0 18px; }
+
+/* ---- 4. Clear selected data --------------------------------------------- */
+.danger-zone { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+@media (min-width: 1100px) { .danger-zone { grid-template-columns: minmax(0, .8fr) minmax(0, 1.4fr); } }
+.clear-category-picker { display: grid; gap: 14px; }
+.clear-group { margin: 0; padding: 14px 14px 12px; border: 1px solid #ecd6d0; border-radius: 12px; background: #fffdfb; position: relative; min-width: 0; }
+.clear-group legend { padding: 0 6px; font-size: .7rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #8a4a3e; }
+.clear-group-toggle { position: absolute; top: -13px; right: 12px; padding: 4px 10px; border: 1px solid #ecd6d0; border-radius: 999px; background: #fff; color: #8a4a3e; font-size: .72rem; font-weight: 700; }
+.clear-group-toggle:hover { background: #fbeae6; }
+.clear-checkbox-list { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.clear-checkbox-list label { align-items: flex-start; }
+.clear-checkbox-list label:has(input:checked) { border-color: #b4412f; background: #fdf0ed; }
+.clear-checkbox-list label span { display: grid; gap: 2px; }
+.clear-checkbox-list label small { color: #6b7a7b; font-size: .72rem; font-weight: 400; }
+.clear-checkbox-list label em { font-style: normal; font-weight: 700; color: #8a4a3e; }
+.selected-clear-wrap { padding: 12px 14px; border-radius: 12px; background: #f7f4ef; }
+.selected-clear-categories { display: flex; flex-wrap: wrap; gap: 6px; }
+.clear-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border-radius: 999px; background: #fdf0ed; border: 1px solid #ecc2b8; color: #7a2f22; font-size: .75rem; font-weight: 600; }
+.clear-chip button { width: 20px; height: 20px; border-radius: 50%; background: #b4412f; color: #fff; line-height: 1; font-size: 14px; }
+.button-danger[disabled] { opacity: .45; cursor: not-allowed; }
+
+/* ---- 5. General UI / UX polish ------------------------------------------ */
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+:focus-visible { outline: 3px solid #8dbb2f; outline-offset: 2px; border-radius: 4px; }
+.skip-link { position: absolute; left: 12px; top: -60px; z-index: 300; padding: 10px 16px; border-radius: 8px; background: #1f3b31; color: #fff; font-weight: 700; transition: top .15s; }
+.skip-link:focus { top: 10px; }
+.site-header { position: sticky; top: 0; z-index: 90; }
+.main-nav a[aria-current="page"], .main-nav a.is-current { color: var(--lime, #d6e8a6); box-shadow: inset 0 -2px 0 currentColor; }
+input, select, textarea { transition: border-color .15s, box-shadow .15s; }
+input:focus, select:focus, textarea:focus { border-color: #4f7a2c; box-shadow: 0 0 0 3px rgba(141,187,47,.25); outline: none; }
+.button { transition: transform .12s ease, box-shadow .15s ease, background-color .15s ease; }
+.button:hover { transform: translateY(-1px); }
+.button:active { transform: translateY(0); }
+.button[disabled] { cursor: not-allowed; }
+.flash { border-radius: 10px; box-shadow: 0 2px 8px rgba(27,48,38,.08); }
+.empty-state { text-align: center; padding: 32px 18px; border: 1px dashed var(--line, #dde5dc); border-radius: 14px; background: rgba(255,255,255,.6); }
+.empty-state.compact { padding: 20px 14px; }
+.form-card, .admin-panel, .auth-card { border-radius: 14px; }
+img { max-width: 100%; height: auto; }
+table { width: 100%; }
+.table-wrap, .table-scroll, .admin-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* Tap targets */
+@media (pointer: coarse) { .button, button, select, input:not([type=checkbox]):not([type=radio]), summary { min-height: 44px; } }
+/* Footer: cleaner columns on tablets */
+@media (min-width: 561px) and (max-width: 900px) { .footer-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; } }
+.site-footer a { display: block; padding: 4px 0; }
+.site-footer a:hover { text-decoration: underline; text-underline-offset: 3px; }
+/* Floating helpers must not hide page actions on small screens */
+@media (max-width: 560px) { .community-fab { bottom: 76px; } }

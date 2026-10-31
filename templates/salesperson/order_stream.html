@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Live order stream · Sales desk{% endblock %}
+{% block content %}
+<div class="admin-shell"><div class="container">
+  <div class="admin-topbar">
+    <div>
+      <a class="back-link" href="{{ url_for('salesperson.dashboard') }}">← Back to sales desk</a>
+      <p class="eyebrow">Sales desk · {{ account.display_name }}</p>
+      <h1>Live order stream.</h1>
+      <p class="form-note">New website orders appear here. Open any order to verify payment or move it along.</p>
+    </div>
+  </div>
+  <section class="admin-panel live-stream-panel">
+    <form method="get" class="record-search" role="search">
+      <label>Search the stream<input type="search" name="q" maxlength="120" value="{{ search_query }}" placeholder="Order ID{% if permissions.view_customer_details %}, customer, phone{% endif %}"></label>
+      <label class="order-stream-sort">Sort by
+        <select name="sort">
+          <option value="newest" {% if sort == "newest" %}selected{% endif %}>Newest first</option>
+          <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Oldest first</option>
+          <option value="value" {% if sort == "value" %}selected{% endif %}>Highest value</option>
+        </select>
+      </label>
+      <button class="button button-dark" type="submit">Apply</button>
+      {% if search_query %}<a class="table-link" href="{{ url_for('salesperson.order_stream') }}">Clear</a>{% endif %}
+    </form>
+    <div class="live-stream-list">
+      {% for order in orders %}
+      <a class="live-stream-row" href="{{ url_for('salesperson.order_detail', order_ref=order.public_id) }}">
+        <span class="live-stream-time">{{ order.created_at|local_time("%H:%M") }}</span>
+        <span><strong>{% if permissions.view_customer_details %}{{ order.customer_name }}{% else %}Customer details restricted{% endif %}</strong><small>#{{ order.public_id }} · {% if order.fulfillment_type == 'pickup' %}Farm pickup{% else %}{{ order.delivery_zone_name }}{% endif %}</small></span>
+        <span class="status-pill status-{{ order.status|lower|replace(' ', '-') }}">{{ order.status }}</span>
+        <strong>{{ format_currency(order.total) }}</strong>
+        {% if order.dispatch_batch %}<small class="dispatch-batch-card">Batch #{{ order.dispatch_batch.id }} · ETA window {{ order.dispatch_batch.window_start|local_time("%H:%M") }}–{{ order.dispatch_batch.window_end|local_time("%H:%M") }}</small>{% endif %}
+        <span>Open →</span>
+      </a>
+      {% else %}
+      <div class="empty-state compact"><h3>No orders in the stream.</h3><p>New customer orders will appear here.</p></div>
+      {% endfor %}
+    </div>
+  </section>
+</div></div>
+{% endblock %}

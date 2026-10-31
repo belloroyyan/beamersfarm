@@ -2,20 +2,25 @@ import hashlib
 import hmac
 import json
 import re
+import secrets
 from datetime import datetime, timedelta
+from io import BytesIO
+import base64
 import logging
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from flask import Blueprint, abort, current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 from sqlalchemy import or_
+from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import AbandonedCart, Coupon, Customer, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, PartnerAdInvite, PartnerListing, Product, SalespersonAccount, ShopSettings, ShopUpdate, WholesaleOrder, WholesaleOrderItem, db
-from utils.helpers import build_cart, format_quantity, parse_quantity, product_uses_requested_kg
+from models import AbandonedCart, Coupon, Customer, CustomerPushSubscription, DeliveryZone, DropShare, GalleryImage, Order, OrderFinancialRecord, OrderItem, PartnerAdInvite, PartnerListing, Product, ProductPackage, ProductPackageItem, SalespersonAccount, ShopSettings, ShopUpdate, SiteOverlaySeen, WholesaleOrder, WholesaleOrderItem, db
+from utils.helpers import build_cart, cart_processing_methods, format_quantity, parse_processing_selection, parse_quantity, product_uses_requested_kg, processing_options
 from utils.notifications import normalize_nigerian_phone
 from utils.product_images import product_image_url
 from utils.push_subscriptions import valid_push_endpoint
 from utils.update_share import render_update_share_image
 from utils.web_push import send_customer_order_confirmed_push, send_customer_order_out_for_delivery_push, send_owner_low_stock_push, send_owner_new_order_push, send_owner_wholesale_request_push, send_salesperson_new_order_push, web_push_is_configured
+from utils.dispatch_batches import assign_dispatch_batch, delivery_estimate
 from utils.recommendations import personalized_products
 
 shop_bp = Blueprint("shop", __name__)
@@ -199,27 +204,40 @@ def index():
         )
     total_products = available_products_query().count()
     latest_update = ShopUpdate.query.order_by(ShopUpdate.id.desc()).first()
-    show_update = bool(latest_update and last_seen_update_id() < latest_update.id)
+    show_update = bool(latest_update and _unseen_overlay("update", latest_update.id))
     return render_template(
         "index.html", products=featured, total_products=total_products,
         **seo_meta("Fresh Frozen Chicken Delivery in Osogbo | Beamers Farm", "Buy fresh, hygienically packaged frozen chicken, whole birds and chicken parts with delivery across Osogbo or farm pickup.", "shop.index", keywords="frozen chicken Osogbo, chicken delivery Osogbo, fresh chicken Nigeria, Beamers Farm"),
         latest_update=latest_update if show_update else None,
+        latest_gallery=(lambda g: g if g and _unseen_overlay("gallery", g.id) else None)(GalleryImage.query.filter_by(active=True).order_by(GalleryImage.created_at.desc(), GalleryImage.id.desc()).first()),
         partner_ads=partner_advertisements_query().all(),
         pinned_gallery=GalleryImage.query.filter_by(active=True, pinned=True).order_by(GalleryImage.created_at.desc()).first(),
     )
 
 
-SEEN_UPDATE_COOKIE = "bf_seen_update"
+def _signed_customer_id():
+    value = session.get("customer_id")
+    return int(value) if value else None
 
 
-def last_seen_update_id():
-    value = request.cookies.get(SEEN_UPDATE_COOKIE, "0")
-    return int(value) if value.isdigit() else 0
+def _unseen_overlay(kind, object_id):
+    customer_id = _signed_customer_id()
+    if not customer_id:
+        return False
+    seen = SiteOverlaySeen.query.filter_by(customer_id=customer_id, visitor_key=None, overlay_type=kind, object_id=object_id).first()
+    if seen:
+        return False
+    db.session.add(SiteOverlaySeen(customer_id=customer_id, overlay_type=kind, object_id=object_id))
+    db.session.commit()
+    return True
 
 
 def mark_updates_seen(response):
-    latest = db.session.query(db.func.max(ShopUpdate.id)).scalar() or 0
-    response.set_cookie(SEEN_UPDATE_COOKIE, str(latest), max_age=60 * 60 * 24 * 365, samesite="Lax", httponly=True)
+    latest = ShopUpdate.query.order_by(ShopUpdate.id.desc()).first()
+    customer_id = _signed_customer_id()
+    if latest and customer_id and not SiteOverlaySeen.query.filter_by(customer_id=customer_id, visitor_key=None, overlay_type="update", object_id=latest.id).first():
+        db.session.add(SiteOverlaySeen(customer_id=customer_id, overlay_type="update", object_id=latest.id))
+        db.session.commit()
     return response
 
 
@@ -296,7 +314,9 @@ def track_order():
 
 @shop_bp.get("/updates/dismiss")
 def dismiss_update():
-    return mark_updates_seen(redirect(url_for("shop.index")))
+    next_url = request.args.get("next", "")
+    target = next_url if next_url.startswith("/") and not next_url.startswith("//") else url_for("shop.index")
+    return mark_updates_seen(redirect(target))
 
 
 @shop_bp.get("/products")
@@ -309,16 +329,32 @@ def products():
             filters.append(Product.id == int(search_query))
         products_query = products_query.filter(or_(*filters))
     products = products_query.order_by(Product.created_at.asc()).all()
+    packages = ProductPackage.query.filter_by(active=True).order_by(ProductPackage.created_at.desc()).all()
+    partner_ads = (PartnerListing.query.filter_by(active=True).order_by(PartnerListing.sort_order.asc(), PartnerListing.updated_at.desc(), PartnerListing.id.desc()).all() if search_query else partner_advertisements_query().all())
+    if search_query:
+        q = search_query.casefold()
+        packages = [package for package in packages if q in (package.name or '').casefold() or q in (package.description or '').casefold() or any(q in (item.product.name or '').casefold() for item in package.items)]
+        partner_ads = [listing for listing in partner_ads if any(q in (getattr(listing, field) or '').casefold() for field in ('name', 'category', 'description', 'supplier_name', 'supplier_location'))]
+    latest_previous_purchase = None
+    customer_id = session.get("customer_id")
+    if customer_id:
+        latest_order = Order.query.filter_by(customer_id=customer_id).order_by(Order.created_at.desc()).first()
+        if latest_order and latest_order.items:
+            latest_previous_purchase = latest_order.items[0].product
     return render_template(
-        "products.html", products=products,
-        partner_ads=partner_advertisements_query().all(),
-        search_query=search_query,
+        "products.html", products=products, packages=packages,
+        partner_ads=partner_ads,
+        search_query=search_query, latest_previous_purchase=latest_previous_purchase,
         **seo_meta("Fresh Frozen Chicken Products in Osogbo | Beamers Farm", "Browse fresh frozen chicken, whole birds and clean chicken portions available for Osogbo delivery or farm pickup.", "shop.products", robots="noindex,follow" if search_query else "index,follow,max-image-preview:large", keywords="buy frozen chicken Osogbo, chicken parts Nigeria, Beamers Farm products"),
     )
 
 
 @shop_bp.route("/partner-advertisements/apply/<string:token>", methods=["GET", "POST"])
 def partner_advertisement_form(token):
+    settings = ShopSettings.query.get(1)
+    if settings and not settings.partner_forms_open:
+        flash("Partner submissions are temporarily closed.", "error")
+        return redirect(url_for("shop.index"))
     digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
     invite = PartnerAdInvite.query.filter_by(token_hash=digest).first()
     if not invite or invite.used_at or invite.expires_at < datetime.utcnow():
@@ -330,7 +366,7 @@ def partner_advertisement_form(token):
         except ValueError as error:
             flash(str(error), "error")
             return render_template("partner_ad_submit.html", invite=invite, token=token)
-        values.update(active=False, recommended=False, submitted_via_invite=True)
+        values.update(active=False, recommended=False, submitted_via_invite=True, invite_id=invite.id)
         db.session.add(PartnerListing(**values))
         invite.used_at = datetime.utcnow()
         db.session.commit()
@@ -352,7 +388,7 @@ def product_detail(product_id):
     if customer and customer.active:
         reorder_order = Order.query.filter_by(customer_id=customer.id).join(OrderItem).filter(OrderItem.product_id == product.id).order_by(Order.created_at.desc()).first()
     description = " ".join((product.description or "").split())[:155]
-    return render_template("product.html", product=product, reorder_order=reorder_order, **seo_meta(f"{product.name} | Fresh Frozen Chicken in Osogbo", description or f"Buy {product.name} from Beamers Farm with Osogbo delivery or farm pickup.", "shop.product_detail", {"product_id": product.id}, public_asset_url(url_for("static", filename="images/brand-mark.png")), "product", keywords=f"{product.name}, frozen chicken Osogbo, buy chicken Nigeria"))
+    return render_template("product.html", product=product, processing_options=processing_options(product), reorder_order=reorder_order, **seo_meta(f"{product.name} | Fresh Frozen Chicken in Osogbo", description or f"Buy {product.name} from Beamers Farm with Osogbo delivery or farm pickup.", "shop.product_detail", {"product_id": product.id}, public_asset_url(url_for("static", filename="images/brand-mark.png")), "product", keywords=f"{product.name}, frozen chicken Osogbo, buy chicken Nigeria"))
 
 
 @shop_bp.get("/gallery")
@@ -365,6 +401,10 @@ def gallery():
 
 @shop_bp.route("/wholesale", methods=["GET", "POST"])
 def wholesale():
+    settings = ShopSettings.query.get(1)
+    if settings and not settings.wholesale_open:
+        flash("Wholesale requests are temporarily closed.", "error")
+        return redirect(url_for("shop.index"))
     customer = db.session.get(Customer, session.get("customer_id")) if session.get("customer_id") else None
     products = available_products_query().order_by(Product.name.asc()).all()
     if request.method == "POST":
@@ -374,8 +414,8 @@ def wholesale():
         email = request.form.get("email", "").strip().lower() or None
         address = request.form.get("delivery_address", "").strip()
         notes = request.form.get("notes", "").strip()[:3000]
-        if not name or not business or not phone or not address:
-            flash("Add your name, business name, phone number, and delivery address.", "error")
+        if not name or not phone or not address:
+            flash("Add your name, phone number, and delivery address. Business name is optional.", "error")
             return render_template("wholesale.html", products=products, customer=customer, **seo_meta("Wholesale Chicken Orders in Osogbo | Beamers Farm", "Request larger chicken quantities for restaurants, caterers, resellers, and food businesses in Osogbo.", "shop.wholesale", keywords="wholesale chicken Osogbo, bulk chicken Nigeria, restaurant chicken supplier"))
         selected = []
         for product in products:
@@ -441,20 +481,31 @@ def validate_coupon_live():
 
 @shop_bp.get("/robots.txt")
 def robots():
+    # Public pages are crawlable. Anything private, personal, staff-only or tokenised is not.
     body = "\n".join([
         "User-agent: *",
         "Allow: /",
         "Disallow: /admin",
+        "Disallow: /sales",
+        "Disallow: /dispatch",
         "Disallow: /checkout",
         "Disallow: /cart",
         "Disallow: /track-order",
         "Disallow: /account",
-        "Disallow: /customer",
+        "Disallow: /order/",
+        "Disallow: /secure-drop",
+        "Disallow: /payments",
+        "Disallow: /webhooks",
+        "Disallow: /partner-advertisements/",
+        "Disallow: /community/notifications",
+        "Disallow: /community/support",
+        "Disallow: /coupon/",
         f"Sitemap: {public_url('shop.sitemap')}",
         "",
     ])
     response = make_response(body, 200)
     response.headers["Content-Type"] = "text/plain; charset=utf-8"
+    response.headers["Cache-Control"] = "public, max-age=3600"
     return response
 
 
@@ -465,17 +516,115 @@ def google_search_console_verification():
     response.headers["Cache-Control"] = "public, max-age=3600"
     return response
 
+def _staff_can_drop():
+    if session.get("staff_role") == "owner" or session.get("admin_logged_in"):
+        return True
+    if session.get("staff_role") == "salesperson" and session.get("salesperson_id"):
+        account = db.session.get(SalespersonAccount, session.get("salesperson_id"))
+        return bool(account and account.active)
+    return False
+
+def _delete_drop(share):
+    db.session.delete(share)
+    db.session.commit()
+
+def _drop_receiver_context(share, token):
+    if share.payload_kind == "text":
+        value = share.text_content or ""
+        if share.one_time: _delete_drop(share)
+        return render_template("secure_drop_receive.html", token=token, asset_kind="text", text_content=value, original_filename=None, persistent=not share.one_time)
+    if share.payload_kind == "image":
+        encoded = base64.b64encode(share.blob_content or b"").decode("ascii")
+        data_url = f"data:{share.mimetype};base64,{encoded}"
+        filename = share.original_filename
+        if share.one_time: _delete_drop(share)
+        return render_template("secure_drop_receive.html", token=token, asset_kind="image", asset_data_url=data_url, original_filename=filename, persistent=not share.one_time)
+    response = make_response(share.blob_content or b"")
+    response.headers["Content-Type"] = share.mimetype or "application/octet-stream"
+    response.headers["Content-Disposition"] = f'attachment; filename="{(share.original_filename or "download").replace(chr(34), "")}"'
+    if share.one_time: _delete_drop(share)
+    return response
+
+@shop_bp.route("/secure-drop", methods=["GET", "POST"])
+def secure_drop():
+    if not _staff_can_drop():
+        flash("This secure drop desk is available to the Owner or an active salesperson.", "error")
+        return redirect(url_for("admin.login", next=request.path))
+    if request.method == "POST":
+        kind = request.form.get("payload_kind", "text")
+        password = request.form.get("password", "")
+        text_content = request.form.get("text_content", "") if kind == "text" else None
+        upload = request.files.get("asset")
+        blob = None; filename = None; mimetype = "text/plain"
+        if kind == "text":
+            if not text_content or len(text_content) > 100000:
+                flash("Add text up to 100,000 characters.", "error")
+                return redirect(url_for("shop.secure_drop"))
+        else:
+            if not upload or not upload.filename:
+                flash("Choose a file or image to drop.", "error")
+                return redirect(url_for("shop.secure_drop"))
+            blob = upload.read()
+            if not blob or len(blob) > 8 * 1024 * 1024:
+                flash("Choose a file no larger than 8 MB.", "error")
+                return redirect(url_for("shop.secure_drop"))
+            filename = upload.filename[:255]
+            mimetype = upload.mimetype or "application/octet-stream"
+            kind = "image" if mimetype.startswith("image/") else "file"
+        raw_token = secrets.token_urlsafe(24)
+        one_time = request.form.get("one_time") == "yes"
+        share = DropShare(token_hash=hashlib.sha256(raw_token.encode()).hexdigest(), access_token=raw_token, one_time=one_time, password_hash=generate_password_hash(password) if password else None, payload_kind=kind, text_content=text_content, blob_content=blob, original_filename=filename, mimetype=mimetype, expires_at=datetime.utcnow() + timedelta(hours=24))
+        db.session.add(share); db.session.commit()
+        link = public_url("shop.receive_drop", token=raw_token)
+        flash("Asset stored in the vault." if not share.one_time else "One-time link created.", "success")
+        if share.one_time:
+            vault_shares = DropShare.query.filter(DropShare.expires_at > datetime.utcnow()).order_by(DropShare.created_at.desc()).all()
+            return render_template("secure_drop.html", created_link=link, created_until=share.expires_at, created_asset=share, vault_shares=vault_shares)
+        return redirect(url_for("shop.secure_drop"))
+    DropShare.query.filter(DropShare.expires_at <= datetime.utcnow()).delete(synchronize_session=False)
+    db.session.commit()
+    vault_shares = DropShare.query.filter(DropShare.expires_at > datetime.utcnow()).order_by(DropShare.created_at.desc()).all()
+    return render_template("secure_drop.html", created_link=None, created_until=None, vault_shares=vault_shares)
+
+@shop_bp.route("/secure-drop/<string:token>", methods=["GET", "POST"])
+def receive_drop(token):
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    share = DropShare.query.filter_by(token_hash=token_hash).first()
+    if not share or share.expires_at <= datetime.utcnow():
+        if share: _delete_drop(share)
+        return render_template("secure_drop_receive.html", expired=True), 404
+    access_key = f"drop_access:{token_hash}"
+    if share.password_hash and not session.get(access_key):
+        if request.method == "POST":
+            if check_password_hash(share.password_hash, request.form.get("password", "")):
+                session[access_key] = True
+            else:
+                return render_template("secure_drop_receive.html", requires_password=True, token=token), 403
+        else:
+            return render_template("secure_drop_receive.html", requires_password=True, token=token)
+    session.pop(access_key, None)
+    return _drop_receiver_context(share, token)
+
 @shop_bp.get("/sitemap.xml")
 def sitemap():
+    """Public, indexable pages only. Staff, account, checkout, tokenised and noindex pages are excluded (see robots.txt)."""
     from xml.sax.saxutils import escape
-    entries = [("shop.index", {}, None), ("shop.products", {}, None), ("shop.gallery", {}, None), ("shop.updates", {}, None), ("shop.wholesale", {}, None), ("shop.help_page", {}, None), ("shop.privacy", {}, None), ("reviews.testimonials", {}, None)]
+    entries = [
+        ("shop.index", {}, None), ("shop.products", {}, None), ("shop.gallery", {}, None),
+        ("shop.updates", {}, None), ("shop.wholesale", {}, None), ("shop.help_page", {}, None),
+        ("shop.privacy", {}, None), ("reviews.testimonials", {}, None),
+        ("community.feed", {}, None), ("complaints.create_complaint", {}, None),
+    ]
     products = Product.query.filter_by(active=True).all()
     entries += [("shop.product_detail", {"product_id": item.id}, getattr(item, "updated_at", None) or item.created_at) for item in products]
     updates = ShopUpdate.query.order_by(ShopUpdate.created_at.desc()).all()
     entries += [("shop.update_detail", {"update_id": item.id}, getattr(item, "updated_at", None) or item.created_at) for item in updates]
     xml = []
     for endpoint, values, modified in entries:
-        loc = escape(public_url(endpoint, **values))
+        try:
+            loc = escape(public_url(endpoint, **values))
+        except Exception:
+            continue
         lastmod = f"<lastmod>{modified.date().isoformat()}</lastmod>" if modified else ""
         xml.append(f"<url><loc>{loc}</loc>{lastmod}</url>")
     body = '<?xml version="1.0" encoding="UTF-8"?>' + '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + ''.join(xml) + '</urlset>'
@@ -497,6 +646,29 @@ def cart():
     return render_template("cart.html", summary=summary, signed_in_customer=customer if customer and customer.active else None, delivery_estimate=estimate, estimate_zone=estimate_zone, recommendations=recommendations, **seo_meta("Your Cart | Beamers Farm", "Review your selected Beamers Farm chicken products before choosing delivery or pickup.", "shop.cart", robots="noindex,follow"))
 
 
+@shop_bp.post("/packages/<int:package_id>/add")
+def add_package_to_cart(package_id):
+    package = ProductPackage.query.filter_by(id=package_id, active=True).first_or_404()
+    cart = current_cart()
+    unavailable = [item.product.name for item in package.items if not item.product.is_available or item.product.stock < item.quantity]
+    if unavailable:
+        flash("This package is temporarily unavailable because: " + ", ".join(unavailable) + ".", "error")
+        return redirect(request.referrer or url_for("shop.products"))
+    for item in package.items:
+        key = str(item.product.id)
+        existing = cart.get(key, 0)
+        existing_value = existing.get("quantity", 0) if isinstance(existing, dict) else existing
+        current = parse_quantity(existing_value or "0", allow_fractional=bool(item.product.allow_fractional_quantity), allow_zero=True)
+        total = current + item.quantity
+        if total > item.product.stock:
+            flash(f"Adding this package would exceed stock for {item.product.name}.", "error")
+            return redirect(request.referrer or url_for("shop.products"))
+        cart[key] = format_quantity(total)
+    session.modified = True
+    sync_abandoned_cart()
+    flash(f"{package.name} added to your cart.", "cart-added")
+    return redirect(request.referrer or url_for("shop.products"))
+
 @shop_bp.post("/cart/add/<int:product_id>")
 def add_to_cart(product_id):
     record_event("cart_add")
@@ -511,6 +683,9 @@ def add_to_cart(product_id):
         )
     except ValueError as error:
         flash(str(error), "error")
+        return redirect(request.referrer or url_for("shop.product_detail", product_id=product.id))
+    if quantity < (product.minimum_order_quantity or Decimal("1")):
+        flash(f"The minimum order for {product.name} is {format_quantity(product.minimum_order_quantity)} {product.unit}.", "error")
         return redirect(request.referrer or url_for("shop.product_detail", product_id=product.id))
     if quantity > product.stock:
         flash(f"Only {format_quantity(product.stock)} {product.name} unit(s) are available.", "error")
@@ -531,6 +706,14 @@ def add_to_cart(product_id):
     if new_quantity > product.stock:
         flash(f"Your cart would exceed the available stock of {product.name}.", "error")
         return redirect(request.referrer or url_for("shop.product_detail", product_id=product.id))
+    try:
+        chosen_processing = parse_processing_selection(request.form.getlist("processing_method"), product)
+    except ValueError as error:
+        flash(str(error), "error")
+        return redirect(request.referrer or url_for("shop.product_detail", product_id=product.id))
+    # Adding the same product again keeps earlier choices and adds any new ones.
+    merged = set(cart_processing_methods(existing)) | set(chosen_processing)
+    selected_processing = [option for option in processing_options(product) if option in merged]
     if product_uses_requested_kg(product):
         try:
             requested_kg = Decimal(request.form.get("requested_weight_kg", ""))
@@ -544,9 +727,9 @@ def add_to_cart(product_id):
         except (InvalidOperation, TypeError, ValueError):
             flash("Enter the combined requested weight for this product in kg (0.001–500 kg).", "error")
             return redirect(request.referrer or url_for("shop.product_detail", product_id=product.id))
-        cart[key] = {"quantity": format_quantity(new_quantity), "requested_weight_kg": str(combined_kg)}
+        cart[key] = {"quantity": format_quantity(new_quantity), "requested_weight_kg": str(combined_kg), "processing_methods": selected_processing}
     else:
-        cart[key] = format_quantity(new_quantity)
+        cart[key] = {"quantity": format_quantity(new_quantity), "processing_methods": selected_processing} if selected_processing else format_quantity(new_quantity)
     session.modified = True
     sync_abandoned_cart()
     flash(f"{product.name} added to your cart.", "cart-added")
@@ -572,6 +755,9 @@ def update_cart():
             return redirect(url_for("shop.cart"))
         if quantity <= 0:
             continue
+        if quantity < (product.minimum_order_quantity or Decimal("1")):
+            flash(f"The minimum order for {product.name} is {format_quantity(product.minimum_order_quantity)} {product.unit}.", "error")
+            return redirect(url_for("shop.cart"))
         if quantity > product.stock:
             flash(f"Only {format_quantity(product.stock)} {product.name} unit(s) are available. No cart changes were saved.", "error")
             return redirect(url_for("shop.cart"))
@@ -584,9 +770,17 @@ def update_cart():
             except (InvalidOperation, TypeError, ValueError):
                 flash("Enter a valid total requested weight in kg (0.001–500 kg). No cart changes were saved.", "error")
                 return redirect(url_for("shop.cart"))
-            updated_cart[key] = {"quantity": format_quantity(quantity), "requested_weight_kg": str(requested_kg)}
+            try:
+                selected_methods = parse_processing_selection(request.form.getlist(f"processing_methods_{key}"), product)
+            except ValueError:
+                flash(f"Choose valid processing methods for {product.name}.", "error"); return redirect(url_for("shop.cart"))
+            updated_cart[key] = {"quantity": format_quantity(quantity), "requested_weight_kg": str(requested_kg), "processing_methods": selected_methods}
         else:
-            updated_cart[key] = format_quantity(quantity)
+            try:
+                selected_methods = parse_processing_selection(request.form.getlist(f"processing_methods_{key}"), product)
+            except ValueError:
+                flash(f"Choose valid processing methods for {product.name}.", "error"); return redirect(url_for("shop.cart"))
+            updated_cart[key] = {"quantity": format_quantity(quantity), "processing_methods": selected_methods} if selected_methods else format_quantity(quantity)
     cart.clear()
     cart.update(updated_cart)
     session.modified = True
@@ -619,6 +813,7 @@ def checkout():
     selected_zone = next((zone for zone in zones if str(zone.id) == selected_zone_id), None)
     summary = cart_summary(delivery_fee=selected_zone.fee if selected_zone else None)
     signed_in_customer = db.session.get(Customer, session.get("customer_id")) if session.get("customer_id") else None
+    available_account_coupons = Coupon.query.filter_by(customer_id=signed_in_customer.id, active=True).order_by(Coupon.created_at.desc()).all() if signed_in_customer and signed_in_customer.active else []
     signed_in_customer = signed_in_customer if signed_in_customer and signed_in_customer.active else None
     explicit_coupon_code = request.values.get("coupon_code")
     coupon_code = (explicit_coupon_code if explicit_coupon_code is not None else session.get("coupon_code", "")).strip().upper()
@@ -764,10 +959,12 @@ def checkout():
                         unit=product.unit,
                         pricing_type="unit_price",  # New orders use the same ordinary per-unit price for every product.
                         requested_weight_kg=line["requested_weight_kg"],
+                        processing_method=line.get("processing_method", ""),
                         subtotal=line["line_subtotal"],
                     )
                 )
                 product.stock -= line["quantity"]
+            assign_dispatch_batch(order)
             low_stock_products = [line["product"] for line in summary["lines"] if line["product"].stock <= line["product"].low_stock_threshold]
             db.session.commit()
         except Exception:
@@ -805,6 +1002,7 @@ def order_success(order_ref, token):
     ).order_by(PartnerListing.sort_order.asc(), PartnerListing.updated_at.desc()).limit(6).all()
     return render_template(
         "order_success.html", order=order,
+        estimate=delivery_estimate(order),
         recommended_products=recommended_products,
         recommended_partner_listings=recommended_partner_listings,
         push_configured=web_push_is_configured(),
@@ -819,7 +1017,7 @@ def customer_receipt(order_ref, token):
         order = Order.query.filter_by(id=int(order_ref), public_token=token).first()
     if order is None:
         abort(404)
-    return render_template("customer_receipt.html", order=order)
+    return render_template("customer_receipt.html", order=order, estimate=delivery_estimate(order))
 
 
 @shop_bp.post("/order/<string:order_ref>/<string:token>/push-subscriptions")

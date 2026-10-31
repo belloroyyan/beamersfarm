@@ -89,6 +89,12 @@ class Config:
     UPDATE_UPLOAD_FOLDER = str(BASE_DIR / "static" / "uploads" / "updates")
     MAX_CONTENT_LENGTH = 8 * 1024 * 1024
     DELIVERY_FEE = 1500
+    # Delivery estimate shown to customers: dispatch batch close time plus this transit range.
+    # Only shop opening hours (local Osogbo time, 24h clock) count towards transit time.
+    DELIVERY_TRANSIT_MIN_MINUTES = int(os.environ.get("DELIVERY_TRANSIT_MIN_MINUTES", "30"))
+    DELIVERY_TRANSIT_MAX_MINUTES = int(os.environ.get("DELIVERY_TRANSIT_MAX_MINUTES", "90"))
+    SHOP_OPEN_HOUR = int(os.environ.get("SHOP_OPEN_HOUR", "7"))
+    SHOP_CLOSE_HOUR = int(os.environ.get("SHOP_CLOSE_HOUR", "19"))
     ABANDONED_CART_DELAY_HOURS = int(os.environ.get("ABANDONED_CART_DELAY_HOURS", "24"))
     SHOP_OPEN_DEFAULT = os.environ.get("SHOP_OPEN_DEFAULT", "true").lower() == "true"
     SHOP_CLOSED_MESSAGE = os.environ.get(

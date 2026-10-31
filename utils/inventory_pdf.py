@@ -16,6 +16,10 @@ LIME = colors.HexColor("#d4e88f")
 MUTED = colors.HexColor("#68776f")
 
 
+from pathlib import Path as _Path
+
+WATERMARK_PNG = _Path(__file__).resolve().parent.parent / "static" / "images" / "receipt-watermark.png"
+
 def _amount(value):
     return f"NGN {Decimal(str(value or 0)):,.2f}"
 
@@ -180,14 +184,14 @@ def build_inventory_pdf(report, brand_mark_path=None):
         while offset < width:
             canvas.line(offset, 0, offset + height, height)
             offset += step
-        # Large brand-neutral report watermark behind the printed content.
-        canvas.saveState()
-        canvas.translate(width / 2, height / 2)
-        canvas.rotate(28)
-        canvas.setFillColor(colors.Color(0.14, 0.22, 0.18, alpha=0.055))
-        canvas.setFont("Helvetica-Bold", 31)
-        canvas.drawCentredString(0, 0, "BEAMERS FARM  ·  INVENTORY")
-        canvas.restoreState()
+        # Brand watermark: the supplied barn logo, drawn very faintly behind the content.
+        # (PNG rendered from static/images/receipt-watermark.svg so no SVG library is needed.)
+        if WATERMARK_PNG.exists():
+            canvas.saveState()
+            canvas.setFillAlpha(0.07)
+            size = 120 * mm
+            canvas.drawImage(str(WATERMARK_PNG), (width - size) / 2, (height - size) / 2, size, size, mask="auto", preserveAspectRatio=True)
+            canvas.restoreState()
         canvas.setStrokeColor(LIME)
         canvas.setLineWidth(2)
         canvas.line(11 * mm, 9 * mm, width - 11 * mm, 9 * mm)

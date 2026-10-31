@@ -36,13 +36,65 @@ class Product(db.Model):
     featured = db.Column(db.Boolean, nullable=False, default=False)
     recommended = db.Column(db.Boolean, nullable=False, default=False)
     low_stock_threshold = db.Column(db.Numeric(12, 3), nullable=False, default=Decimal("5.000"), server_default="5.000")
+    minimum_order_quantity = db.Column(db.Numeric(12, 3), nullable=False, default=Decimal("1.000"), server_default="1.000")
+    processing_options = db.Column(db.Text, nullable=False, default="", server_default="")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     order_items = db.relationship("OrderItem", back_populates="product")
 
     @property
+    def processing_options_list(self):
+        import json
+        try: return [str(item).strip() for item in json.loads(self.processing_options or "[]") if str(item).strip()]
+        except (TypeError, ValueError): return []
+    @property
     def is_available(self):
         return self.active and self.stock > 0
+
+class ProductPackage(db.Model):
+    __tablename__ = "product_packages"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(140), nullable=False)
+    description = db.Column(db.Text, nullable=False, default="")
+    discount_percent = db.Column(db.Numeric(5, 2), nullable=False, default=Decimal("0.00"), server_default="0")
+    active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    items = db.relationship("ProductPackageItem", back_populates="package", cascade="all, delete-orphan", order_by="ProductPackageItem.id")
+
+class ProductPackageItem(db.Model):
+    __tablename__ = "product_package_items"
+    id = db.Column(db.Integer, primary_key=True)
+    package_id = db.Column(db.Integer, db.ForeignKey("product_packages.id", ondelete="CASCADE"), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id", ondelete="RESTRICT"), nullable=False, index=True)
+    quantity = db.Column(db.Numeric(12, 3), nullable=False)
+    package = db.relationship("ProductPackage", back_populates="items")
+    product = db.relationship("Product")
+
+class DropShare(db.Model):
+    __tablename__ = "drop_shares"
+    id = db.Column(db.Integer, primary_key=True)
+    token_hash = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(255), nullable=True)
+    payload_kind = db.Column(db.String(12), nullable=False, default="text")
+    text_content = db.Column(db.Text, nullable=True)
+    blob_content = db.Column(db.LargeBinary, nullable=True)
+    original_filename = db.Column(db.String(255), nullable=True)
+    mimetype = db.Column(db.String(160), nullable=False, default="application/octet-stream")
+    access_token = db.Column(db.String(80), unique=True, nullable=True, index=True)
+    one_time = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)
+
+class DispatchBatch(db.Model):
+    __tablename__ = "dispatch_batches"
+    id = db.Column(db.Integer, primary_key=True)
+    window_start = db.Column(db.DateTime, nullable=False, index=True)
+    window_end = db.Column(db.DateTime, nullable=False)
+    weight_limit = db.Column(db.Numeric(12, 3), nullable=False, default=Decimal("50.000"))
+    assigned_weight = db.Column(db.Numeric(12, 3), nullable=False, default=Decimal("0.000"))
+    status = db.Column(db.String(24), nullable=False, default="open", server_default="open")
+    orders = db.relationship("Order", backref="dispatch_batch", foreign_keys="Order.dispatch_batch_id")
 
 class DeliveryZone(db.Model):
     __tablename__ = "delivery_zones"
@@ -75,6 +127,13 @@ class ShopSettings(db.Model):
     analytics_paths = db.Column(db.String(2000), nullable=False, default="/", server_default="/")
     community_open = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
     community_closed_message = db.Column(db.String(500), nullable=False, default="The community is currently closed.", server_default="The community is currently closed.")
+    dispatch_batch_hours = db.Column(db.Numeric(5, 2), nullable=False, default=Decimal("2.00"), server_default="2.00")
+    dispatch_batch_weight_limit = db.Column(db.Numeric(12, 3), nullable=False, default=Decimal("50.000"), server_default="50.000")
+    wholesale_open = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    customer_care_open = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    reviews_open = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    registration_open = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    partner_forms_open = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
 
 
 class Coupon(db.Model):
@@ -94,6 +153,7 @@ class Coupon(db.Model):
     customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
     gift_message = db.Column(db.String(500), nullable=False, default="", server_default="")
     gifted_at = db.Column(db.DateTime, nullable=True)
+    gift_viewed_at = db.Column(db.DateTime, nullable=True)
 class PrivacyRule(db.Model):
     __tablename__ = "privacy_rules"
     id = db.Column(db.Integer, primary_key=True)
@@ -238,6 +298,7 @@ class Order(db.Model):
     payment_verified_by_name = db.Column(db.String(120), nullable=True)
     fulfillment_type = db.Column(db.String(20), nullable=False, default="delivery", server_default="delivery")
     delivery_zone_name = db.Column(db.String(100), nullable=False, default="Pre-zone delivery", server_default="Pre-zone delivery")
+    dispatch_batch_id = db.Column(db.Integer, db.ForeignKey("dispatch_batches.id", ondelete="SET NULL"), nullable=True, index=True)
     weighing_completed_at = db.Column(db.DateTime, nullable=True)
     weighing_recorded_by = db.Column(db.String(120), nullable=True)
     subtotal = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
@@ -245,6 +306,8 @@ class Order(db.Model):
     total = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     coupon_code = db.Column(db.String(40), nullable=True)
     discount_amount = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    order_channel = db.Column(db.String(20), nullable=False, default="website", server_default="website", index=True)
+    recorded_by = db.Column(db.String(120), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     items = db.relationship(
@@ -404,6 +467,7 @@ class OrderItem(db.Model):
     weight_price_per_kg = db.Column(db.Numeric(12, 2), nullable=True)
     actual_weight_kg = db.Column(db.Numeric(10, 3), nullable=True)
     requested_weight_kg = db.Column(db.Numeric(10, 3), nullable=True)
+    processing_method = db.Column(db.String(1000), nullable=False, default="", server_default="")
     subtotal = db.Column(db.Numeric(12, 2), nullable=False)
 
     order = db.relationship("Order", back_populates="items")
@@ -465,6 +529,7 @@ class PartnerListing(db.Model):
     active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
     recommended = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     submitted_via_invite = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    invite_id = db.Column(db.Integer, db.ForeignKey("partner_ad_invites.id", ondelete="SET NULL"), nullable=True, index=True)
     sort_order = db.Column(db.Integer, nullable=False, default=0, server_default="0")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -497,6 +562,20 @@ class PartnerAdInvite(db.Model):
     used_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     created_by = db.Column(db.String(120), nullable=False, default="Owner")
+    push_endpoint = db.Column(db.Text, nullable=True)
+    push_p256dh = db.Column(db.String(200), nullable=True)
+    push_auth = db.Column(db.String(200), nullable=True)
+    push_endpoint_hash = db.Column(db.String(64), nullable=True, unique=True, index=True)
+
+class SiteOverlaySeen(db.Model):
+    __tablename__ = "site_overlay_seen"
+    __table_args__ = (db.UniqueConstraint("visitor_key", "customer_id", "overlay_type", "object_id", name="uq_site_overlay_seen_identity"),)
+    id = db.Column(db.Integer, primary_key=True)
+    visitor_key = db.Column(db.String(64), nullable=True, index=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="CASCADE"), nullable=True, index=True)
+    overlay_type = db.Column(db.String(32), nullable=False)
+    object_id = db.Column(db.Integer, nullable=False)
+    seen_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 class Review(db.Model):
     __tablename__ = "reviews"
@@ -648,6 +727,7 @@ class CustomerNotice(db.Model):
     title = db.Column(db.String(140), nullable=False)
     message = db.Column(db.String(700), nullable=False)
     kind = db.Column(db.String(32), nullable=False, default="account", server_default="account")
+    related_url = db.Column(db.String(500), nullable=True)
     created_by = db.Column(db.String(120), nullable=False, default="Beamers Farm", server_default="Beamers Farm")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
     dismissed_at = db.Column(db.DateTime, nullable=True)

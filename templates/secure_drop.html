@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Secure drop · Beamers Farm{% endblock %}
+{% block content %}
+<div class="container page-shell secure-drop-shell">
+  <div class="page-heading">
+    <div>
+      <p class="eyebrow">Owner / salesperson tool</p>
+      <h1>Secure asset vault.</h1>
+      <p class="hero-lede">Store private sales assets behind a password-protected vault. Owners and salespeople can open the right key without exposing a public link.</p>
+    </div>
+    <button class="button button-lime drop-new-button" type="button" data-open-drop-dialog><svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New drop</button>
+  </div>
+
+  <section class="form-card vault-assets">
+    <div class="vault-head">
+      <div><p class="eyebrow">Encrypted assets</p><h2>Vault keys</h2></div>
+      <span class="vault-count">{{ (vault_shares or [])|length }} active</span>
+    </div>
+    <p class="form-note">Each active asset has its own key. Assets are removed automatically 24 hours after they are stored. Open only the asset assigned to you.</p>
+    {% for asset in vault_shares or [] %}
+      {% set protected = asset.one_time or asset.password_hash %}
+      <div class="vault-asset-row">
+        <span class="vault-asset-icon" aria-hidden="true">{{ 'T' if asset.payload_kind == 'text' else 'F' }}</span>
+        <a class="vault-asset-link" href="{{ url_for('shop.receive_drop', token=asset.access_token) }}">
+          <span><strong>{{ asset.original_filename or 'Private text asset' }}</strong><small>Stored {{ asset.created_at|local_time("%d %b %Y · %H:%M") }} · expires {{ asset.expires_at|local_time("%d %b %H:%M") }}</small></span>
+          <span class="vault-lock">{{ 'One-time · password protected' if asset.one_time and asset.password_hash else 'One-time' if asset.one_time else 'Password protected' if asset.password_hash else 'Persistent key' }}</span>
+        </a>
+        <div class="vault-asset-actions">
+          {% if asset.payload_kind == 'text' %}
+            {% if not protected and (asset.text_content or '')|length <= 5000 %}
+              <button class="button button-outline vault-action" type="button" data-copy-text="{{ asset.text_content }}">Copy text</button>
+            {% else %}
+              <a class="button button-outline vault-action" href="{{ url_for('shop.receive_drop', token=asset.access_token) }}">Open to copy</a>
+            {% endif %}
+          {% elif asset.payload_kind == 'file' %}
+            <a class="button button-outline vault-action" href="{{ url_for('shop.receive_drop', token=asset.access_token) }}">Download</a>
+          {% else %}
+            <a class="button button-outline vault-action" href="{{ url_for('shop.receive_drop', token=asset.access_token) }}">Open to download</a>
+          {% endif %}
+        </div>
+      </div>
+    {% else %}
+      <div class="empty-state compact"><h3>No active assets yet.</h3><p>Use <strong>New drop</strong> to store the first one.</p></div>
+    {% endfor %}
+  </section>
+</div>
+
+<dialog class="community-post-dialog drop-dialog" data-drop-dialog aria-labelledby="drop-dialog-title"{% if reopen_form %} data-reopen{% endif %}>
+  <div class="community-dialog-head"><div><p class="eyebrow">Secure drop</p><h2 id="drop-dialog-title">New drop</h2></div><button type="button" class="community-dialog-close" data-close-drop-dialog aria-label="Close new drop">×</button></div>
+  <p class="community-dialog-note">Text and files are stored for 24 hours, then deleted. Add a password if the asset should only be opened by someone who knows it.</p>
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('shop.secure_drop') }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <label for="drop-kind">What are you dropping?</label>
+    <select id="drop-kind" name="payload_kind" data-drop-kind><option value="text">Text</option><option value="file">File or image</option></select>
+    <div data-drop-text>
+      <label for="drop-text">Text to share</label>
+      <textarea id="drop-text" name="text_content" rows="8" maxlength="100000" placeholder="Paste a note, instruction, or other text..."></textarea>
+    </div>
+    <div data-drop-file hidden>
+      <label for="drop-file">File or image <span class="field-help">Max 8 MB</span></label>
+      <input id="drop-file" type="file" name="asset" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip">
+    </div>
+    <label for="drop-password">Optional password <span class="field-help">Leave blank for a key-only asset</span></label>
+    <input id="drop-password" type="password" name="password" maxlength="120" autocomplete="new-password">
+    <label class="permission-option"><input type="checkbox" name="one_time" value="yes"><span><strong>Generate a one-time link</strong><small>Off by default: vault assets stay available from their key until they expire.</small></span></label>
+    <div class="community-dialog-actions"><button class="button button-outline" type="button" data-close-drop-dialog>Cancel</button><button class="button button-lime" type="submit">Store in vault</button></div>
+  </form>
+</dialog>
+
+{% if created_link %}
+<dialog class="community-post-dialog drop-dialog" data-drop-created aria-labelledby="drop-created-title">
+  <div class="community-dialog-head"><div><p class="eyebrow">Vault key ready</p><h2 id="drop-created-title">Asset stored securely.</h2></div><button type="button" class="community-dialog-close" data-close-drop-dialog aria-label="Close">×</button></div>
+  <p class="community-dialog-note">This one-time link expires {{ created_until|local_time("%d %b %Y · %H:%M") }} and stops working once opened. Share it only with the intended Beamers Farm teammate.</p>
+  <label for="drop-link">One-time link</label>
+  <input id="drop-link" value="{{ created_link }}" readonly data-drop-link>
+  <div class="community-dialog-actions"><button class="button button-outline" type="button" data-close-drop-dialog>Done</button><button class="button button-lime" type="button" data-copy-drop-link>Copy link</button></div>
+</dialog>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/secure-drop.js') }}" defer></script>{% endblock %}

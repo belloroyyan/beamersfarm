@@ -12,11 +12,11 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import AbandonedCart, AnalyticsEvent, Coupon, Complaint, PrivacyRule, Customer, CustomerNotice, CustomerPushSubscription, DeliveryZone, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, PartnerListing, Product, Review, SalespersonAccount, ShopSettings, ShopUpdate, StaffPushSubscription, WholesaleOrder, WholesaleOrderItem, PartnerAdInvite, CommunityPost, CommunityComment, CommunityReaction, CommunityReport, CommunityBlock, CommunityNotification, db, order_customer_push_subscriptions
+from models import AbandonedCart, AnalyticsEvent, Coupon, Complaint, PrivacyRule, Customer, CustomerNotice, CustomerPushSubscription, DeliveryZone, DropShare, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, DispatchBatch, PartnerListing, Product, ProductPackage, ProductPackageItem, Review, SalespersonAccount, ShopSettings, ShopUpdate, StaffPushSubscription, WholesaleOrder, WholesaleOrderItem, PartnerAdInvite, SiteOverlaySeen, CommunityPost, CommunityComment, CommunityReaction, CommunityReport, CommunityBlock, CommunityNotification, db, order_customer_push_subscriptions
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.product_images import save_product_image
 from utils.gallery import delete_gallery_image, save_gallery_image, save_gallery_media, gallery_media_type
-from utils.helpers import parse_quantity
+from utils.helpers import parse_quantity, processing_options
 from utils.partner_ads import delete_partner_image, normalize_http_url, parse_social_links, save_partner_image, social_links_text
 from utils.updates import delete_update_image, save_update_image
 from utils.security import is_safe_redirect_url
@@ -27,8 +27,10 @@ from utils.order_settlement import save_order_weights
 from utils.inventory_pdf import build_inventory_pdf
 from utils.inventory_reports import build_inventory_report
 from utils.order_search import order_search_filter
-from utils.salesperson_permissions import PERMISSION_DEFINITIONS, get_salesperson_permissions, serialize_salesperson_permissions
+from utils.dispatch_batches import assign_dispatch_batch
+from utils.salesperson_permissions import PERMISSION_DEFINITIONS, PERMISSION_GROUPS, get_salesperson_permissions, serialize_salesperson_permissions
 from utils.owner_insights import abandoned_cart_report, customer_segment, operational_snapshot
+from utils.in_person_orders import create_in_person_order
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 COMPLAINT_STATUSES = ["New", "Under Review", "Resolved", "Closed"]
@@ -117,14 +119,8 @@ def authenticate_salesperson(username, password):
     return None
 
 
-def add_customer_notice(customer_id, title, message, kind="account"):
-    db.session.add(CustomerNotice(
-        customer_id=customer_id,
-        title=title[:140],
-        message=message[:700],
-        kind=kind[:32],
-        created_by="Beamers Farm Owner",
-    ))
+def add_customer_notice(customer_id, title, message, kind="account", related_url=None):
+    db.session.add(CustomerNotice(customer_id=customer_id, title=title[:140], message=message[:700], kind=kind[:32], related_url=related_url, created_by="Beamers Farm Owner"))
 
 
 @admin_bp.route("/login", methods=["GET", "POST"])
@@ -246,6 +242,8 @@ def staff_accounts():
         accounts=accounts,
         search_query=search_query,
         permission_definitions=PERMISSION_DEFINITIONS,
+        permission_groups=PERMISSION_GROUPS,
+        permission_meta={key: (label, default) for key, label, default in PERMISSION_DEFINITIONS},
         account_permissions={account.id: get_salesperson_permissions(account) for account in accounts},
     )
 
@@ -287,7 +285,7 @@ def delete_owner_push_subscription():
 @admin_required
 def dashboard():
     search_query = request.args.get("q", "").strip()[:120]
-    orders_query = Order.query.order_by(Order.created_at.desc())
+    orders_query = Order.query.filter(Order.order_channel != "in_person").order_by(Order.created_at.desc())
     order_filter = order_search_filter(search_query)
     if order_filter is not None:
         orders_query = orders_query.filter(order_filter)
@@ -304,11 +302,21 @@ def dashboard():
     abandoned_report = abandoned_cart_report()
     return render_template(
         "admin/dashboard.html", orders=orders, stats=stats, statuses=ORDER_STATUSES,
-        search_query=search_query,
+        search_query=search_query, clear_groups=CLEAR_CATEGORY_GROUPS, clear_counts=_clear_category_counts(),
         shop_settings=shop_settings, push_configured=web_push_is_configured(),
         vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""), abandoned_report=abandoned_report,
     )
 
+
+@admin_bp.route("/in-person-orders", methods=["GET","POST"])
+@admin_required
+def in_person_order():
+ products=Product.query.filter_by(active=True).order_by(Product.name.asc()).all()
+ if request.method=="POST":
+  try:o=create_in_person_order(request.form,"Owner")
+  except ValueError as ex: flash(str(ex),"error");return render_template("admin/in_person_order.html",products=products)
+  flash(f"In-person order {o.customer_name} recorded in inventory and reports.","success");return redirect(url_for("admin.in_person_order"))
+ return render_template("admin/in_person_order.html",products=products)
 
 @admin_bp.get("/inventory")
 @admin_required
@@ -337,6 +345,18 @@ def inventory_summary_pdf():
         download_name=f"beamers-inventory-{start}-to-{end}.pdf",
     )
 
+
+@admin_bp.get("/order-stream")
+@admin_required
+def order_stream():
+    search_query = request.args.get("q", "").strip()[:120]
+    sort = request.args.get("sort", "newest")
+    sort_column = Order.created_at.asc() if sort == "oldest" else (Order.total.desc() if sort == "value" else Order.created_at.desc())
+    query = Order.query.filter(Order.order_channel != "in_person").order_by(sort_column)
+    order_filter = order_search_filter(search_query)
+    if order_filter is not None:
+        query = query.filter(order_filter)
+    return render_template("admin/order_stream.html", orders=query.limit(150).all(), search_query=search_query, sort=sort, dispatch_settings=ShopSettings.query.get(1), stream_refresh_seconds=20)
 
 @admin_bp.get("/orders/summary")
 @admin_required
@@ -407,7 +427,7 @@ def order_detail(order_ref):
             actor_name="Owner",
         )
         if ok and order.customer_id and old_status != order.status:
-            add_customer_notice(order.customer_id, "Order status updated", f"Your order {order.public_id} is now {order.status}.", kind="order")
+            add_customer_notice(order.customer_id, "Order status updated", f"Your order {order.public_id} is now {order.status}.", kind="order", related_url=url_for("shop.order_success", order_ref=order.public_id, token=order.public_token))
             db.session.commit()
         flash(message, "success" if ok else "error")
         return redirect(url_for("admin.order_detail", order_ref=order.public_id))
@@ -605,24 +625,36 @@ def customers():
     customers = query.all()
     segment_filter = request.args.get("segment", "").strip()
     segments = {customer.id: customer_segment(customer) for customer in customers}
+    customer_coupons = {customer.id: Coupon.query.filter_by(customer_id=customer.id).order_by(Coupon.created_at.desc()).all() for customer in customers}
     if segment_filter:
         customers = [customer for customer in customers if segments[customer.id]["name"] == segment_filter]
-    return render_template("admin/customers.html", customers=customers, search_query=search, segments=segments, segment_filter=segment_filter, segment_options=["New", "Repeat", "High value", "At risk"], gift_coupons=Coupon.query.filter_by(active=True, customer_id=None).order_by(Coupon.code.asc()).all())
+    return render_template("admin/customers.html", customers=customers, customer_coupons=customer_coupons, search_query=search, segments=segments, segment_filter=segment_filter, segment_options=["New", "Repeat", "High value", "At risk"], gift_coupons=Coupon.query.filter_by(active=True, customer_id=None).order_by(Coupon.code.asc()).all())
 
 
-@admin_bp.get("/forms")
+@admin_bp.route("/forms", methods=["GET", "POST"])
 @admin_required
 def customer_forms():
     settings = ShopSettings.query.get(1)
+    if request.method == "POST":
+        key = request.form.get("form_key", "")
+        allowed = {"shop": "is_open", "wholesale": "wholesale_open", "community": "community_open", "care": "customer_care_open", "reviews": "reviews_open", "registration": "registration_open", "partner": "partner_forms_open"}
+        field = allowed.get(key)
+        if field:
+            setattr(settings, field, not bool(getattr(settings, field)))
+            db.session.commit()
+            flash(f"{request.form.get('form_name', 'Customer form')} is now {'available' if getattr(settings, field) else 'disabled'}.", "success")
+        return redirect(url_for("admin.customer_forms"))
+    settings = ShopSettings.query.get(1)
     active_invites = PartnerAdInvite.query.filter(PartnerAdInvite.used_at.is_(None), PartnerAdInvite.expires_at > datetime.utcnow()).count()
+    settings = settings or ShopSettings(id=1)
     forms = [
-        {"name": "Shop order checkout", "description": "Customers can submit a standard shop order.", "url": url_for("admin.dashboard"), "status": "Open" if settings and settings.is_open else "Closed", "active": bool(settings and settings.is_open), "volume": Order.query.filter(Order.status != "Cancelled").count()},
-        {"name": "Wholesale request", "description": "Businesses can request wholesale availability and pricing.", "url": url_for("admin.wholesale_orders"), "status": "Open", "active": True, "volume": WholesaleOrder.query.filter(WholesaleOrder.status.in_(["New", "Under Review", "Approved"])).count()},
-        {"name": "Community posts and replies", "description": "Signed-in customers can start conversations, reply, and react.", "url": url_for("community.support"), "status": "Open" if settings and settings.community_open else "Closed", "active": bool(settings and settings.community_open), "volume": CommunityPost.query.filter_by(status="published").count()},
-        {"name": "Customer care / complaint", "description": "Customers can submit a private support request.", "url": url_for("admin.complaints"), "status": "Open", "active": True, "volume": Complaint.query.filter(Complaint.status.in_(["New", "Under Review"])).count()},
-        {"name": "Leave a review", "description": "Verified customers can submit a review for Owner moderation.", "url": url_for("admin.reviews"), "status": "Open", "active": True, "volume": Review.query.filter_by(status="Pending").count()},
-        {"name": "Customer account registration", "description": "Customers can register and manage saved details and orders.", "url": url_for("admin.customers"), "status": "Open", "active": True, "volume": Customer.query.filter_by(active=True).count()},
-        {"name": "Partner advertisement submission", "description": "Supplier submissions require a valid one-time Owner invite.", "url": url_for("admin.partner_ad_invites"), "status": f"{active_invites} active invite(s)", "active": active_invites > 0, "volume": active_invites},
+        {"key": "shop", "name": "Shop order checkout", "description": "Customers can submit a standard shop order.", "url": url_for("admin.dashboard"), "status": "Open" if settings and settings.is_open else "Closed", "active": bool(settings and settings.is_open), "volume": Order.query.filter(Order.status != "Cancelled").count()},
+        {"key": "wholesale", "name": "Wholesale request", "description": "Businesses can request wholesale availability and pricing.", "url": url_for("admin.wholesale_orders"), "status": "Open" if settings.wholesale_open else "Closed", "active": settings.wholesale_open, "volume": WholesaleOrder.query.filter(WholesaleOrder.status.in_(["New", "Under Review", "Approved"])).count()},
+        {"key": "community", "name": "Community posts and replies", "description": "Signed-in customers can start conversations, reply, and react.", "url": url_for("community.support"), "status": "Open" if settings and settings.community_open else "Closed", "active": bool(settings and settings.community_open), "volume": CommunityPost.query.filter_by(status="published").count()},
+        {"key": "care", "name": "Customer care / complaint", "description": "Customers can submit a private support request.", "url": url_for("admin.complaints"), "status": "Open" if settings.customer_care_open else "Closed", "active": settings.customer_care_open, "volume": Complaint.query.filter(Complaint.status.in_(["New", "Under Review"])).count()},
+        {"key": "reviews", "name": "Leave a review", "description": "Verified customers can submit a review for Owner moderation.", "url": url_for("admin.reviews"), "status": "Open" if settings.reviews_open else "Closed", "active": settings.reviews_open, "volume": Review.query.filter_by(status="Pending").count()},
+        {"key": "registration", "name": "Customer account registration", "description": "Customers can register and manage saved details and orders.", "url": url_for("admin.customers"), "status": "Open" if settings.registration_open else "Closed", "active": settings.registration_open, "volume": Customer.query.filter_by(active=True).count()},
+        {"key": "partner", "name": "Partner advertisement submission", "description": "Supplier submissions require a valid one-time Owner invite.", "url": url_for("admin.partner_ad_invites"), "status": f"{active_invites} active invite(s)" if settings.partner_forms_open else "Closed", "active": bool(active_invites and settings.partner_forms_open), "volume": active_invites},
     ]
     return render_template("admin/customer_forms.html", forms=forms)
 
@@ -679,6 +711,8 @@ def products():
                 allow_fractional_quantity=request.form.get("allow_fractional_quantity") == "yes",
                 image=image_path or "chicken",
                 low_stock_threshold=Decimal(request.form.get("low_stock_threshold", "5") or "5"),
+                minimum_order_quantity=max(Decimal("0.001"), Decimal(request.form.get("minimum_order_quantity", "1") or "1")),
+                processing_options=__import__("json").dumps([x.strip()[:120] for x in request.form.get("processing_options", "").replace(",", "\n").splitlines() if x.strip()][:8]),
             ))
             db.session.commit()
             flash("Product added to the catalog.", "success")
@@ -733,8 +767,9 @@ def edit_product(product_id):
         product.stock = stock
         try:
             product.low_stock_threshold = max(Decimal("0"), Decimal(request.form.get("low_stock_threshold", "5") or "5"))
+            product.minimum_order_quantity = max(Decimal("0.001"), Decimal(request.form.get("minimum_order_quantity", "1") or "1"))
         except (ArithmeticError, ValueError):
-            flash("Enter a valid low-stock threshold.", "error")
+            flash("Enter valid stock thresholds and a minimum order quantity.", "error")
             return render_edit()
         product.allow_fractional_quantity = request.form.get("allow_fractional_quantity") == "yes"
         product.active = active
@@ -742,6 +777,7 @@ def edit_product(product_id):
         product.name = request.form.get("name", "").strip()[:120] or product.name
         product.description = request.form.get("description", "").strip()[:2000]
         product.unit = request.form.get("unit", "per pack").strip()[:80] or "per pack"
+        product.processing_options = __import__("json").dumps([x.strip()[:120] for x in request.form.get("processing_options", "").replace(",", "\n").splitlines() if x.strip()][:8])
         image_path, image_error = save_product_image(request.files.get("image"))
         if image_error:
             flash(image_error, "error")
@@ -767,6 +803,54 @@ def toggle_product(product_id):
     flash(f"{product.name} is now {'visible in the catalog' if product.active else 'archived from the catalog'}.", "success")
     return redirect(url_for("admin.products"))
 
+
+@admin_bp.route("/packages", methods=["GET", "POST"])
+@admin_required
+def packages():
+    products = Product.query.filter_by(active=True).order_by(Product.name.asc()).all()
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()[:140]
+        description = request.form.get("description", "").strip()[:1200]
+        if not name:
+            flash("Give the package a name.", "error")
+            return redirect(url_for("admin.packages"))
+        try:
+            discount_percent = max(Decimal("0"), min(Decimal("100"), Decimal(request.form.get("discount_percent", "0") or "0")))
+        except (ArithmeticError, ValueError):
+            flash("Enter a package discount between 0 and 100 percent.", "error")
+            return redirect(url_for("admin.packages"))
+        package = ProductPackage(name=name, description=description, discount_percent=discount_percent)
+        selected = []
+        for product in products:
+            raw = request.form.get(f"package_quantity_{product.id}", "").strip()
+            if not raw:
+                continue
+            try:
+                quantity = parse_quantity(raw, allow_fractional=bool(product.allow_fractional_quantity))
+            except ValueError:
+                flash(f"Enter a valid quantity for {product.name}.", "error")
+                return redirect(url_for("admin.packages"))
+            if quantity > 0:
+                selected.append((product, quantity))
+        if not selected:
+            flash("Choose at least one product quantity for the package.", "error")
+            return redirect(url_for("admin.packages"))
+        for product, quantity in selected:
+            package.items.append(ProductPackageItem(product=product, quantity=quantity))
+        db.session.add(package)
+        db.session.commit()
+        flash(f"Package {package.name} was saved.", "success")
+        return redirect(url_for("admin.packages"))
+    return render_template("admin/packages.html", packages=ProductPackage.query.order_by(ProductPackage.created_at.desc()).all(), products=products)
+
+@admin_bp.post("/packages/<int:package_id>/toggle")
+@admin_required
+def toggle_package(package_id):
+    package = ProductPackage.query.get_or_404(package_id)
+    package.active = not package.active
+    db.session.commit()
+    flash(f"Package {package.name} is now {'available' if package.active else 'hidden'}.", "success")
+    return redirect(url_for("admin.packages"))
 
 FEATURED_LIMIT = 3
 
@@ -1336,6 +1420,89 @@ def clear_analytics():
     return redirect(url_for("admin.analytics"))
 
 
+# --- "Clear selected data" categories -------------------------------------------------
+# One source of truth: the dashboard renders these groups, the clear route validates against them.
+# (key, label, hint) - `key` is the checkbox name posted by the form.
+CLEAR_CATEGORY_GROUPS = [
+    ("Orders & fulfilment", [
+        ("clear_orders", "Online orders & delivery records", "Items, payments, refunds and linked reviews"),
+        ("clear_in_person", "In-person sales", "Counter sales recorded by the owner or sales staff"),
+        ("clear_messages", "WhatsApp message logs", "Order notification history"),
+        ("clear_dispatch", "Dispatch batches", "Rider batching windows; orders stay"),
+        ("clear_abandoned_carts", "Abandoned-cart snapshots", "Recovery queue entries"),
+        ("clear_wholesale", "Wholesale requests", "Requests and their line items"),
+        ("clear_coupons", "Coupons & usage counts", "Includes gifted coupons"),
+    ]),
+    ("Customer care & community", [
+        ("clear_complaints", "Customer complaints", "Customer care queue"),
+        ("clear_reviews", "Reviews & testimonials", "Including owner responses"),
+        ("clear_community", "Community posts, replies & notifications", "Reactions, reports and blocks too"),
+        ("clear_notices", "Customer notices & popup history", "Account notices and seen-popup records"),
+    ]),
+    ("Public content", [
+        ("clear_updates", "Shop updates", "Deletes uploaded update images"),
+        ("clear_gallery", "Gallery images & captions", "Deletes uploaded gallery files"),
+        ("clear_partner_ads", "Partner advertisements & supplier details", "Listings and pending supplier links"),
+    ]),
+    ("Notifications, vault & system", [
+        ("clear_customer_push", "Customer push subscriptions", "Devices must opt in again"),
+        ("clear_staff_push", "Staff push subscriptions", "Owner, rider and sales devices must opt in again"),
+        ("clear_vault", "Secure drop vault", "Every stored text and file asset"),
+        ("clear_analytics", "Site analytics events", "Page views and funnel data"),
+        ("clear_privacy_rules", "Owner privacy rules", "Custom privacy rules"),
+    ]),
+]
+CLEAR_CATEGORY_KEYS = [key for _group, items in CLEAR_CATEGORY_GROUPS for key, _label, _hint in items]
+
+
+def _clear_category_counts():
+    """Row counts shown beside each category so the owner can see what a clear would remove."""
+    def n(query):
+        try:
+            return query.count()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return None
+    return {
+        "clear_orders": n(Order.query.filter(Order.order_channel != "in_person")),
+        "clear_in_person": n(Order.query.filter(Order.order_channel == "in_person")),
+        "clear_messages": n(OrderNotification.query),
+        "clear_dispatch": n(DispatchBatch.query),
+        "clear_abandoned_carts": n(AbandonedCart.query),
+        "clear_wholesale": n(WholesaleOrder.query),
+        "clear_coupons": n(Coupon.query),
+        "clear_complaints": n(Complaint.query),
+        "clear_reviews": n(Review.query),
+        "clear_community": n(CommunityPost.query),
+        "clear_notices": n(CustomerNotice.query),
+        "clear_updates": n(ShopUpdate.query),
+        "clear_gallery": n(GalleryImage.query),
+        "clear_partner_ads": n(PartnerListing.query),
+        "clear_customer_push": n(CustomerPushSubscription.query),
+        "clear_staff_push": n(StaffPushSubscription.query),
+        "clear_vault": n(DropShare.query),
+        "clear_analytics": n(AnalyticsEvent.query),
+        "clear_privacy_rules": n(PrivacyRule.query),
+    }
+
+
+def _delete_orders(channel_filter):
+    """Delete the orders matching `channel_filter` together with everything that hangs off them."""
+    ids = [row[0] for row in db.session.query(Order.id).filter(channel_filter).all()]
+    if not ids:
+        return 0
+    for i in range(0, len(ids), 500):
+        chunk = ids[i:i + 500]
+        Complaint.query.filter(Complaint.order_id.in_(chunk)).update({Complaint.order_id: None}, synchronize_session=False)
+        db.session.execute(order_customer_push_subscriptions.delete().where(order_customer_push_subscriptions.c.order_id.in_(chunk)))
+        Review.query.filter(Review.order_id.in_(chunk)).delete(synchronize_session=False)
+        OrderNotification.query.filter(OrderNotification.order_id.in_(chunk)).delete(synchronize_session=False)
+        OrderFinancialRecord.query.filter(OrderFinancialRecord.order_id.in_(chunk)).delete(synchronize_session=False)
+        OrderItem.query.filter(OrderItem.order_id.in_(chunk)).delete(synchronize_session=False)
+        Order.query.filter(Order.id.in_(chunk)).delete(synchronize_session=False)
+    return len(ids)
+
+
 @admin_bp.post("/clear-database")
 @admin_required
 def clear_database():
@@ -1344,107 +1511,108 @@ def clear_database():
         flash('Nothing was deleted. Type CLEAR in the box to confirm.', "error")
         return redirect(url_for("admin.dashboard"))
 
-    clear_orders = request.form.get("clear_orders") == "yes"
-    clear_complaints = request.form.get("clear_complaints") == "yes"
-    clear_messages = request.form.get("clear_messages") == "yes"
-    clear_updates = request.form.get("clear_updates") == "yes"
-    clear_reviews = request.form.get("clear_reviews") == "yes"
-    clear_partner_ads = request.form.get("clear_partner_ads") == "yes"
-    clear_gallery = request.form.get("clear_gallery") == "yes"
-    clear_customer_push = request.form.get("clear_customer_push") == "yes"
-    clear_abandoned_carts = request.form.get("clear_abandoned_carts") == "yes"
-    clear_wholesale = request.form.get("clear_wholesale") == "yes"
-    clear_coupons = request.form.get("clear_coupons") == "yes"
-    clear_analytics = request.form.get("clear_analytics") == "yes"
-    clear_privacy_rules = request.form.get("clear_privacy_rules") == "yes"
-    clear_community = request.form.get("clear_community") == "yes"
+    chosen = {key: request.form.get(key) == "yes" for key in CLEAR_CATEGORY_KEYS}
     reset_pins = request.form.get("reset_pins") == "yes"
-    if not any((clear_orders, clear_complaints, clear_messages, clear_updates, clear_reviews, clear_partner_ads, clear_gallery, clear_customer_push, clear_abandoned_carts, clear_wholesale, clear_coupons, clear_analytics, clear_privacy_rules, clear_community, reset_pins)):
+    if not any(chosen.values()) and not reset_pins:
         flash("Choose at least one data category or homepage option to clear.", "error")
         return redirect(url_for("admin.dashboard"))
 
     cleared = []
-    if clear_orders:
-        # Preserve complaint records even when their related order is removed.
-        Complaint.query.filter(Complaint.order_id.isnot(None)).update(
-            {Complaint.order_id: None}, synchronize_session=False
-        )
-        # Keep device opt-in, but remove links to the deleted orders.
-        db.session.execute(order_customer_push_subscriptions.delete())
-        CustomerPushSubscription.query.delete(synchronize_session=False)
-        OrderNotification.query.delete(synchronize_session=False)
-        OrderFinancialRecord.query.delete(synchronize_session=False)
-        OrderItem.query.delete(synchronize_session=False)
-        Order.query.delete(synchronize_session=False)
+    if chosen["clear_orders"]:
+        count = _delete_orders(Order.order_channel != "in_person")
         AbandonedCart.query.delete(synchronize_session=False)
-        cleared.append("orders and delivery records (including items, payment/refund history, linked reviews, WhatsApp logs, and customer push subscriptions)")
-    elif clear_messages:
+        cleared.append(f"{count} online order(s) with items, payment/refund history, linked reviews and WhatsApp logs")
+        cleared.append("complaint records kept with order links removed" if not chosen["clear_complaints"] else "")
+    if chosen["clear_in_person"]:
+        count = _delete_orders(Order.order_channel == "in_person")
+        cleared.append(f"{count} in-person sale(s)")
+    if chosen["clear_messages"] and not chosen["clear_orders"]:
         OrderNotification.query.delete(synchronize_session=False)
         cleared.append("WhatsApp message logs")
-
-    if clear_complaints:
+    if chosen["clear_dispatch"] or chosen["clear_orders"] or chosen["clear_in_person"]:
+        # Orders that are gone no longer need a batch; unassigned batches are cleared with the dispatch category.
+        if chosen["clear_dispatch"]:
+            Order.query.filter(Order.dispatch_batch_id.isnot(None)).update({Order.dispatch_batch_id: None}, synchronize_session=False)
+            DispatchBatch.query.delete(synchronize_session=False)
+            cleared.append("dispatch batches")
+    if chosen["clear_complaints"]:
         Complaint.query.delete(synchronize_session=False)
         cleared.append("complaints")
-    elif clear_orders:
-        cleared.append("complaint records retained with order links removed")
-
-    if clear_updates:
+    if chosen["clear_updates"]:
         for item in ShopUpdate.query.all():
             delete_update_image(item.image)
         ShopUpdate.query.delete(synchronize_session=False)
         cleared.append("shop updates")
-
-    if clear_reviews:
+    if chosen["clear_reviews"]:
         Review.query.delete(synchronize_session=False)
         cleared.append("customer reviews and owner responses")
-
-    if clear_partner_ads:
+    if chosen["clear_partner_ads"]:
         for listing in PartnerListing.query.all():
             delete_partner_image(listing.image)
         PartnerListing.query.delete(synchronize_session=False)
-        cleared.append("independent partner advertisements and supplier contact details")
-
-    if clear_gallery:
+        PartnerAdInvite.query.delete(synchronize_session=False)
+        cleared.append("partner advertisements, supplier details and pending supplier links")
+    if chosen["clear_gallery"]:
         for image in GalleryImage.query.all():
             delete_gallery_image(image.image)
         GalleryImage.query.delete(synchronize_session=False)
         cleared.append("gallery images and captions")
-
-    if clear_customer_push and not clear_orders:
+    if chosen["clear_customer_push"]:
         db.session.execute(order_customer_push_subscriptions.delete())
         CustomerPushSubscription.query.delete(synchronize_session=False)
-        cleared.append("customer push-notification subscriptions")
-    if clear_abandoned_carts and not clear_orders:
+        cleared.append("customer push subscriptions")
+    if chosen["clear_staff_push"]:
+        StaffPushSubscription.query.delete(synchronize_session=False)
+        cleared.append("staff push subscriptions")
+    if chosen["clear_abandoned_carts"] and not chosen["clear_orders"]:
         AbandonedCart.query.delete(synchronize_session=False)
-        cleared.append("abandoned-cart recovery snapshots")
-    if clear_wholesale:
+        cleared.append("abandoned-cart snapshots")
+    if chosen["clear_wholesale"]:
         WholesaleOrderItem.query.delete(synchronize_session=False)
         WholesaleOrder.query.delete(synchronize_session=False)
         cleared.append("wholesale requests")
-    if clear_coupons:
+    if chosen["clear_coupons"]:
         Coupon.query.delete(synchronize_session=False)
         cleared.append("coupons and usage counts")
-    if clear_analytics:
+    if chosen["clear_analytics"]:
         AnalyticsEvent.query.delete(synchronize_session=False)
         cleared.append("site analytics events")
-    if clear_privacy_rules:
+    if chosen["clear_privacy_rules"]:
         PrivacyRule.query.delete(synchronize_session=False)
         cleared.append("owner privacy rules")
-    if clear_community:
+    if chosen["clear_vault"]:
+        DropShare.query.delete(synchronize_session=False)
+        cleared.append("secure drop vault assets")
+    if chosen["clear_notices"]:
+        CustomerNotice.query.delete(synchronize_session=False)
+        SiteOverlaySeen.query.delete(synchronize_session=False)
+        cleared.append("customer notices and popup history")
+    if chosen["clear_community"]:
         CommunityNotification.query.delete(synchronize_session=False)
         CommunityReport.query.delete(synchronize_session=False)
         CommunityReaction.query.delete(synchronize_session=False)
         CommunityBlock.query.delete(synchronize_session=False)
         CommunityComment.query.delete(synchronize_session=False)
         CommunityPost.query.delete(synchronize_session=False)
-        cleared.append("community posts, replies, reactions, reports, blocks, and notifications")
-
+        cleared.append("community posts, replies, reactions, reports, blocks and notifications")
     if reset_pins:
         Product.query.update({Product.featured: False}, synchronize_session=False)
         cleared.append("homepage product pins")
     db.session.commit()
     flash(
-        "Cleared: " + "; ".join(cleared) + ". Products, stock, and shop settings were kept.",
+        "Cleared: " + "; ".join(item for item in cleared if item) + ". Products, stock, delivery zones, staff accounts and shop settings were kept.",
         "success",
     )
     return redirect(url_for("admin.dashboard"))
+
+@admin_bp.post("/dispatch/settings")
+@admin_required
+def save_dispatch_settings():
+    settings=ShopSettings.query.get(1)
+    if not settings: settings=ShopSettings(id=1); db.session.add(settings)
+    try:
+        settings.dispatch_batch_hours=max(Decimal("0.25"), min(Decimal("24"), Decimal(request.form.get("dispatch_batch_hours","2"))))
+        settings.dispatch_batch_weight_limit=max(Decimal("0.001"), Decimal(request.form.get("dispatch_batch_weight_limit","50")))
+    except (ArithmeticError, ValueError):
+        flash("Enter a valid dispatch interval and weight limit.","error"); return redirect(url_for("admin.order_stream"))
+    db.session.commit(); flash("Dispatch batching settings saved.","success"); return redirect(url_for("admin.order_stream"))

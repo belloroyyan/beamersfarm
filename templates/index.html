@@ -14,11 +14,12 @@
     <h2 id="update-popup-title">{{ latest_update.topic }}</h2>
     <div class="update-body">{{ latest_update.body|linkify }}</div>
     <p class="update-meta">Posted by {{ latest_update.posted_by }}</p>
-    <div class="update-popup-actions"><a class="button button-dark" href="{{ url_for('shop.updates') }}">See all updates <span>→</span></a><a class="button button-outline" href="{{ url_for('shop.dismiss_update') }}">Close</a></div>
+    <div class="update-popup-actions"><a class="button button-dark" href="{{ url_for('shop.dismiss_update', next=url_for('shop.updates')) }}">See all updates <span>→</span></a><a class="button button-outline" href="{{ url_for('shop.dismiss_update') }}">Close</a></div>
     {{ update_share_buttons(latest_update, true) }}
   </div>
 </div>
 {% endif %}
+{% if latest_gallery %}<div class="gallery-update-strip"><p class="eyebrow">New in the farm journal</p><strong>{{ latest_gallery.title }}</strong><a class="table-link" href="{{ url_for('shop.gallery') }}">View the new gallery image →</a></div>{% endif %}
 <section class="hero container">
   <div class="hero-copy">
     <p class="eyebrow">{{ greeting }}, welcome to Beamers Farm · Osogbo delivery or farm pickup</p>
@@ -35,7 +36,7 @@
   <div class="container trust-grid">
     <div><span class="trust-number">01</span><strong>Choose your portions</strong><small>Whole birds and delicious parts</small></div>
     <div><span class="trust-number">02</span><strong>Choose fulfillment</strong><small>Delivery zone or free farm pickup</small></div>
-    <div><span class="trust-number">03</span><strong>Pay by transfer</strong><small>We confirm every order</small></div>
+    <div><span class="trust-number">03</span><strong>Pay your way</strong><small>Opay transfer or secure online payment</small></div>
   </div>
 </section>
 {% if pinned_gallery %}<section class="container pinned-gallery-summary" aria-labelledby="pinned-gallery-heading"><div class="pinned-gallery-media">{% if pinned_gallery.media_type == "video" %}<video controls preload="metadata" src="{{ gallery_image_url(pinned_gallery.image) }}"></video>{% else %}<img src="{{ gallery_image_url(pinned_gallery.image) }}" alt="{{ pinned_gallery.title }}" loading="lazy">{% endif %}</div><div><p class="eyebrow">Pinned from the farm gallery</p><h2 id="pinned-gallery-heading">{{ pinned_gallery.title }}</h2><p>{{ pinned_gallery.description }}</p><a class="button button-outline" href="{{ url_for('shop.gallery') }}">Explore the gallery ▧</a></div></section>{% endif %}
@@ -51,7 +52,6 @@
           </a>
           <div class="product-info">
             <div class="product-heading"><h3>{{ product.name }}</h3><span class="stock-badge">{{ format_quantity(product.stock) }} left</span></div>
-            <p>{{ product.description }}</p>
             <div class="product-buy"><div><strong>{{ format_currency(product.price) }}</strong><small>per {{ product.unit }}</small></div>{% if product.allow_fractional_quantity %}<a class="button button-lime" href="{{ url_for('shop.product_detail', product_id=product.id) }}">Choose quantity <span>→</span></a>{% else %}<form action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1"><button class="button button-lime" type="submit">Add to cart <span>+</span></button></form>{% endif %}</div>
           </div>
         </article>

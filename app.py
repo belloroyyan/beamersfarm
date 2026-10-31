@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -134,12 +135,15 @@ def create_app():
             if signed_customer else None
         )
         gifted_coupon = (
-            Coupon.query.filter_by(customer_id=signed_customer.id, active=True)
+            Coupon.query.filter_by(customer_id=signed_customer.id, active=True, gift_viewed_at=None)
             .filter(Coupon.gift_message != "")
             .order_by(Coupon.gifted_at.desc(), Coupon.id.desc())
             .first()
             if signed_customer else None
         )
+        if gifted_coupon:
+            gifted_coupon.gift_viewed_at = datetime.utcnow()
+            db.session.commit()
         return {
             "greeting": time_of_day_greeting(),
             "product_image_url": product_image_url,
@@ -156,6 +160,7 @@ def create_app():
             "payment_account_name": app.config["PAYMENT_ACCOUNT_NAME"],
             "paystack_enabled": app.config["PAYSTACK_ENABLED"],
             "paystack_public_key": app.config["PAYSTACK_PUBLIC_KEY"],
+            "vapid_public_key": app.config.get("VAPID_PUBLIC_KEY", ""),
             "shop_is_open": shop_settings.is_open if shop_settings else app.config["SHOP_OPEN_DEFAULT"],
             "shop_closed_message": shop_settings.closed_message if shop_settings else app.config["SHOP_CLOSED_MESSAGE"],
             "current_customer": signed_customer,
