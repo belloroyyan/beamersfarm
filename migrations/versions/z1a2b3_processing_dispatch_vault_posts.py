@@ -9,7 +9,10 @@ down_revision="y0z1a2"
 branch_labels=None
 depends_on=None
 def upgrade():
-    op.add_column("products",sa.Column("processing_options",sa.Text(),nullable=False,server_default=""))
+    # MySQL forbids DEFAULT on TEXT columns: add nullable, backfill, then make NOT NULL.
+    op.add_column("products",sa.Column("processing_options",sa.Text(),nullable=True))
+    op.execute("UPDATE products SET processing_options = '' WHERE processing_options IS NULL")
+    op.alter_column("products","processing_options",existing_type=sa.Text(),nullable=False)
     op.add_column("order_items",sa.Column("processing_method",sa.String(120),nullable=False,server_default=""))
     op.add_column("drop_shares",sa.Column("access_token",sa.String(80),nullable=True))
     op.add_column("drop_shares",sa.Column("one_time",sa.Boolean(),nullable=False,server_default=sa.false()))

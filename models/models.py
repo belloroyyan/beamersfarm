@@ -37,7 +37,7 @@ class Product(db.Model):
     recommended = db.Column(db.Boolean, nullable=False, default=False)
     low_stock_threshold = db.Column(db.Numeric(12, 3), nullable=False, default=Decimal("5.000"), server_default="5.000")
     minimum_order_quantity = db.Column(db.Numeric(12, 3), nullable=False, default=Decimal("1.000"), server_default="1.000")
-    processing_options = db.Column(db.Text, nullable=False, default="", server_default="")
+    processing_options = db.Column(db.Text, nullable=False, default="")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     order_items = db.relationship("OrderItem", back_populates="product")
