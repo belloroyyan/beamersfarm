@@ -8,7 +8,6 @@
   <div class="partner-ad-copy">
     <p class="partner-ad-category" title="{{ listing.category }} · {{ listing.supplier_name }}">{{ listing.category }} <span aria-hidden="true">·</span> {{ listing.supplier_name }}</p>
     <h3><a href="{{ url_for('shop.partner_offer', listing_id=listing.id) }}">{{ listing.name }}</a></h3>
-    <p class="partner-ad-description">{{ listing.description|truncate(150 if compact else 120) }}</p>
     <div class="partner-ad-footer">
       <div class="partner-ad-price">
         {% if listing.price is not none %}<strong>{{ format_currency(listing.price) }}</strong>{% else %}<strong>{{ listing.price_note or 'Contact supplier for current price' }}</strong>{% endif %}
