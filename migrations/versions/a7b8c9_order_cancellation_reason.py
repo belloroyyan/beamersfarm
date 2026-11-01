@@ -1,13 +1,13 @@
 """optional cancellation reason on orders
 
 Revision ID: a7b8c9
-Revises: z1a2b3
+Revises: a2b3c4
 """
 from alembic import op
 import sqlalchemy as sa
 
 revision = "a7b8c9"
-down_revision = "z1a2b3"
+down_revision = "a2b3c4"
 branch_labels = None
 depends_on = None
 
