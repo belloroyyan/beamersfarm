@@ -23,10 +23,6 @@
    style.css declares `@layer editorial, original, refinement;` first. For !important
    declarations the EARLIEST layer wins, so only !important rules belong in this block. */
 @layer editorial {
-  /* Buttons, links and form controls stay square; cards, panels, popups and badges keep their rounded corners. */
-  button, .button, a.button, .back-link, .copy-reference-button, .table-link, .main-nav a, .nav-more > summary,
-  .menu-toggle, .header-cart, .tour-toggle, .owner-actions-menu > summary, .community-icon-action, .community-tabs a, .community-notification-link,
-  input:not([type="radio"]):not([type="checkbox"]), select, textarea, input[type="file"]::file-selector-button { border-radius: 0 !important; }
   /* Close "×" buttons in popups remain square like other buttons. */
 
   /* Desktop dropdown links: dark ink on the paper panel (style.css forces white) */
@@ -422,9 +418,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--ed-ink); ou
 .product-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 
 /* Notification prompt: floating card, bottom-left */
-.site-notification-prompt {
-  position: fixed; left: 16px; bottom: 16px; z-index: 90; width: min(380px, calc(100vw - 32px));
-  display: grid; gap: 10px; padding: 20px 52px 20px 20px; border-radius: 12px;
+.site-notification-prompt { display: none; }
+.site-notification-prompt.is-visible {
+  display: grid; position: fixed; left: 16px; bottom: 16px; z-index: 90; width: min(380px, calc(100vw - 32px));
+  gap: 10px; padding: 20px 52px 20px 20px; border-radius: 12px;
   background: var(--ed-card); color: var(--ed-ink-deep); border: 1px solid var(--ed-ink); border-left: 6px solid var(--ed-accent-deep);
   box-shadow: 0 18px 40px rgba(22, 41, 31, .22) !important;
 }
@@ -460,3 +457,15 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--ed-ink); ou
 .stock-badge, .vault-count, .status-pill, .shop-status, .community-special-badge, .community-considering-badge,
 .community-staff-badge { border-radius: 999px; }
 .product-art { border-radius: 12px 12px 0 0; }
+
+/* Buttons, links and fields are rounded again */
+.button, a.button, button.button, .back-link, .copy-reference-button, .table-link, .header-cart, .tour-toggle, .menu-toggle,
+.owner-actions-menu > summary, .community-icon-action, .community-notification-link, .community-fab, .cart-float,
+.update-popup-close, .community-dialog-close, .partner-link-close, .site-tour-close, .coupon-gift-close,
+.customer-notice-popup > form > button, .site-notification-prompt [data-site-notifications-dismiss],
+.site-notification-prompt .button, .customer-notice-popup .notification-related-link, .vault-action { border-radius: 10px; }
+input:not([type="radio"]):not([type="checkbox"]), select, textarea { border-radius: 10px; }
+.site-header .main-nav > a, .site-header .nav-more > summary, .site-header .nav-more-menu a { border-radius: 8px; }
+@media (max-width: 1040px) { .site-header .main-nav > a, .site-header .main-nav > details > .nav-more-menu > a { border-radius: 0; } }
+.community-search > div { gap: 8px; }
+.community-search input { border-right: 1px solid var(--ed-ink); }
