@@ -9,6 +9,9 @@
         <summary><span>Actions</span><svg class="owner-actions-caret" aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></summary>
         <nav class="owner-actions-panel" aria-label="Owner actions">
           <p class="owner-actions-title">Management shortcuts</p><label class="actions-search"><span class="sr-only">Search actions</span><input type="search" placeholder="Search actions…" data-actions-search></label>
+          <a href="{{ url_for('admin.sales_report') }}"><span>Sales report</span><span aria-hidden="true">→</span></a>
+          <a href="{{ url_for('admin.order_summary') }}"><span>Order summary</span><span aria-hidden="true">→</span></a>
+          <a href="{{ url_for('admin.inventory_summary') }}"><span>Inventory summary</span><span aria-hidden="true">→</span></a>
           <a href="{{ url_for('admin.products') }}"><span>Manage products</span><span aria-hidden="true">→</span></a>
           <a href="{{ url_for('admin.partner_ads') }}"><span>Partner advertisements</span><span aria-hidden="true">→</span></a>
           <a href="{{ url_for('admin.order_success_recommendations') }}"><span>Order-success recommendations</span><span aria-hidden="true">→</span></a>

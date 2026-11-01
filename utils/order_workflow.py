@@ -13,6 +13,16 @@ ORDER_STATUSES = [
     "Received", "Confirmed", "Preparing", "Out for delivery", "Ready for pickup",
     "Delivered", "Picked up", "Cancelled",
 ]
+CANCEL_REASONS = [
+    "Customer changed their mind",
+    "Customer requested cancellation",
+    "Payment not received",
+    "Out of stock",
+    "Delivery address or zone problem",
+    "Customer unreachable",
+    "Duplicate order",
+    "Other",
+]
 PAYMENT_REQUIRED_STATUSES = {
     "Confirmed", "Preparing", "Out for delivery", "Ready for pickup", "Delivered", "Picked up",
 }
@@ -22,7 +32,7 @@ PICKUP_ONLY_STATUSES = {"Ready for pickup", "Picked up"}
 
 def update_order_status(
     order, new_status, *, verify_payment=False, actor="owner", actor_name=None,
-    verification_reference="",
+    verification_reference="", cancel_reason="",
 ):
     """Return (ok, message); commit a valid status/payment transition and send alerts."""
     if new_status not in ORDER_STATUSES:
@@ -93,6 +103,10 @@ def update_order_status(
 
     if status_changed:
         order.status = new_status
+        if new_status == "Cancelled":
+            order.cancellation_reason = cancel_reason if cancel_reason in CANCEL_REASONS else None
+        elif previous_status == "Cancelled":
+            order.cancellation_reason = None
     if status_changed and previous_status != "Confirmed" and new_status == "Confirmed" and order.whatsapp_opt_in:
         existing = OrderNotification.query.filter_by(
             order_id=order.id,

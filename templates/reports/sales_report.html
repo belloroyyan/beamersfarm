@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Sales Report · Beamers Farm{% endblock %}
+{% block content %}
+<div class="admin-shell"><div class="container">
+  <div class="admin-topbar compact-topbar inventory-topbar">
+    <div><a class="back-link" href="{{ nav.home() }}">← Back to {{ nav.desk|lower }}</a><p class="eyebrow">{{ nav.desk }} / reports</p><h1>Sales report.</h1><p class="form-note">Choose any timeline to see gross and net revenue, delivery fees and cancelled value.</p></div>
+    <div class="receipt-toolbar-inline">{% if nav.has_orders %}<a class="button button-outline" href="{{ nav.orders(period=report.period, start_date=report.start_date, end_date=report.end_date) }}">Order summary</a>{% endif %}{% if nav.has_inventory %}<a class="button button-outline" href="{{ nav.inventory(period=report.period, start_date=report.start_date, end_date=report.end_date) }}">Inventory summary</a>{% endif %}<button class="button button-outline" type="button" data-share>Share</button><button class="button button-dark" type="button" data-print>Print / Save as PDF</button></div>
+  </div>
+  <section class="admin-panel inventory-filter-panel">
+    <form method="get" action="{{ nav.sales() }}" class="inventory-filter-form">
+      <label>Timeline<select name="period">{% for value, label in [('today','Today'),('7d','Last 7 days'),('30d','Last 30 days'),('month','This month'),('year','This year'),('all','All time'),('custom','Custom range')] %}<option value="{{ value }}" {% if report.period == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label>Start date<input type="date" name="start_date" value="{{ report.start_date or '' }}"></label>
+      <label>End date<input type="date" name="end_date" value="{{ report.end_date or '' }}"></label>
+      <button class="button button-dark" type="submit">Generate report</button>
+    </form>
+    <p class="form-note">Pick “Custom range” to set exact start and end dates. Dates use Osogbo local time.</p>
+  </section>
+
+  <article class="print-receipt sales-report">
+    <div class="inventory-watermark" aria-hidden="true">BEAMERS FARM · SALES REPORT</div>
+    {% set cover_title = "Sales Report" %}
+    {% set cover_lines = [("Gross revenue " ~ format_currency(data.gross)), ("Net revenue " ~ format_currency(data.net)), ("Delivery fees collected " ~ format_currency(data.fees)), ("Cancelled orders " ~ format_currency(data.cancelled))] %}
+    {% include "reports/_cover.html" %}
+
+    <section class="print-receipt-section report-figures">
+      <h2>Headline figures</h2>
+      <div class="report-kpis">
+        <div><span>Total gross revenue</span><strong>{{ format_currency(data.gross) }}</strong><small>All non-cancelled orders, including delivery fees</small></div>
+        <div><span>Total net revenue</span><strong>{{ format_currency(data.net) }}</strong><small>Successful deliveries and pickups only, excluding delivery fees · {{ data.orders_successful }} order(s)</small></div>
+        <div><span>Total delivery fees collected</span><strong>{{ format_currency(data.fees) }}</strong><small>Verified payments on non-cancelled orders</small></div>
+        <div><span>Total value of cancelled orders</span><strong>{{ format_currency(data.cancelled) }}</strong><small>{{ data.orders_cancelled }} cancelled order(s)</small></div>
+      </div>
+      <p class="form-note">{{ data.orders_placed }} order(s) placed · {{ data.orders_live }} not cancelled · average order value {{ format_currency(data.average_order) }}.</p>
+    </section>
+
+    <section class="print-receipt-section"><h2>Orders by status</h2>
+      {% if data.by_status %}<div class="order-table-wrap"><table class="order-table"><thead><tr><th>Status</th><th>Orders</th><th>Value</th></tr></thead><tbody>{% for r in data.by_status %}<tr><td><span class="status-pill status-{{ r.status|lower|replace(' ', '-') }}">{{ r.status }}</span></td><td>{{ r.count }}</td><td>{{ format_currency(r.value) }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="form-note">No orders in this timeline.</p>{% endif %}
+    </section>
+
+    <section class="print-receipt-section"><h2>Daily timeline</h2>
+      {% if data.timeline %}<div class="order-table-wrap"><table class="order-table"><thead><tr><th>Date</th><th>Orders</th><th>Gross</th><th>Net</th><th>Delivery fees</th><th>Cancelled</th></tr></thead><tbody>{% for d in data.timeline %}<tr><td>{{ d.date.strftime('%a %d %b %Y') }}</td><td>{{ d.orders }}</td><td>{{ format_currency(d.gross) }}</td><td>{{ format_currency(d.net) }}</td><td>{{ format_currency(d.fees) }}</td><td>{{ format_currency(d.cancelled) }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="form-note">Nothing to show.</p>{% endif %}
+    </section>
+
+    <section class="print-receipt-section"><h2>Products sold (successful orders)</h2>
+      {% if data.products %}<div class="order-table-wrap"><table class="order-table"><thead><tr><th>Product</th><th>Units</th><th>Sales</th></tr></thead><tbody>{% for r in data.products %}<tr><td>{{ r.name }}</td><td>{{ format_quantity(r.units) }}</td><td>{{ format_currency(r.sales) }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="form-note">No successful deliveries or pickups yet.</p>{% endif %}
+    </section>
+
+    {% if data.by_channel %}<section class="print-receipt-section"><h2>Sales channels (non-cancelled)</h2><div class="order-table-wrap"><table class="order-table"><thead><tr><th>Channel</th><th>Orders</th><th>Value</th></tr></thead><tbody>{% for r in data.by_channel %}<tr><td>{{ 'Farm counter' if r.channel == 'in_person' else 'Website' }}</td><td>{{ r.count }}</td><td>{{ format_currency(r.value) }}</td></tr>{% endfor %}</tbody></table></div></section>{% endif %}
+
+    <section class="print-receipt-section report-definitions"><h2>How these figures are calculated</h2>
+      <p><strong>Gross revenue</strong>: every order that was not cancelled (items and delivery fees, after discounts).</p>
+      <p><strong>Net revenue</strong>: orders marked Delivered or Picked up, excluding delivery fees.</p>
+      <p><strong>Delivery fees collected</strong>: fees on non-cancelled orders whose payment has been verified.</p>
+      <p><strong>Cancelled value</strong>: total value of orders marked Cancelled.</p>
+    </section>
+    <footer class="print-receipt-footer"><span>Beamers Farm · Sales Report</span><span>Generated {{ generated_at|local_time("%d %b %Y · %H:%M") }} WAT</span></footer>
+  </article>
+</div></div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/receipt-print.js') }}" defer></script>{% endblock %}

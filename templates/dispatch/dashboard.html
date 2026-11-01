@@ -48,7 +48,7 @@
               {% for order in orders %}
                 <tr>
                   <td><strong>#{{ order.public_id[:8] }}</strong><small>Record ID #{{ order.id }}</small></td>
-                  <td>{% if order.dispatch_batch %}<strong>Batch #{{ order.dispatch_batch.id }}</strong><small>{{ order.dispatch_batch.window_start|local_time("%d %b · %H:%M") }} – {{ order.dispatch_batch.window_end|local_time("%H:%M") }}</small>{% else %}<small>No batch</small>{% endif %}</td>
+                  <td>{% if order.dispatch_batch %}<strong>Batch #{{ order.dispatch_batch.id }}</strong><small>{% set eta = order|delivery_eta %}{{ ("Est. delivery " ~ eta) if eta else "Batch closed" }}</small>{% else %}<small>No batch</small>{% endif %}</td>
                   <td><strong>{{ order.customer_name }}</strong><small>{{ order.phone }}</small></td>
                   <td>{{ order.created_at|local_time("%d %b %Y · %H:%M") }}</td>
                   <td>{{ order.items|length }} item{{ '' if order.items|length == 1 else 's' }}</td>

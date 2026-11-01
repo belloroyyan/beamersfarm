@@ -26,6 +26,7 @@ from utils.order_workflow import ORDER_STATUSES, update_order_status
 from utils.order_settlement import save_order_weights
 from utils.inventory_pdf import build_inventory_pdf
 from utils.inventory_reports import build_inventory_report
+from utils.sales_report import build_sales_summary, filter_orders_by_text
 from utils.order_search import order_search_filter
 from utils.dispatch_batches import assign_dispatch_batch
 from utils.salesperson_permissions import PERMISSION_DEFINITIONS, PERMISSION_GROUPS, get_salesperson_permissions, serialize_salesperson_permissions
@@ -64,6 +65,19 @@ def _inventory_report_from_request():
     except ValueError as error:
         flash(str(error), "error")
         return build_inventory_report(period="30d", search=request.args.get("q", ""))
+
+
+def _owner_nav():
+    return {
+        "home": lambda: url_for("admin.dashboard"),
+        "inventory": lambda **kw: url_for("admin.inventory_summary", **kw),
+        "pdf": lambda **kw: url_for("admin.inventory_summary_pdf", **kw),
+        "orders": lambda **kw: url_for("admin.order_summary", **kw),
+        "sales": lambda **kw: url_for("admin.sales_report", **kw),
+        "order": lambda ref: url_for("admin.order_detail", order_ref=ref),
+        "has_inventory": True, "has_orders": True, "has_sales": True, "has_pdf": True,
+        "desk": "Owner desk", "copy_label": "Owner copy",
+    }
 
 
 def parse_product_price_stock(form):
@@ -322,7 +336,7 @@ def in_person_order():
 @admin_required
 def inventory_summary():
     report = _inventory_report_from_request()
-    return render_template("admin/inventory.html", report=report)
+    return render_template("admin/inventory.html", report=report, nav=_owner_nav(), generated_at=datetime.now(ZoneInfo("Africa/Lagos")))
 
 
 @admin_bp.get("/inventory.pdf")
@@ -384,6 +398,17 @@ def order_summary():
         end_date=report["end_date"],
         search_query=query_text,
         generated_at=datetime.now(ZoneInfo("Africa/Lagos")),
+        nav=_owner_nav(), show_customer=True,
+    )
+
+
+@admin_bp.get("/reports/sales")
+@admin_required
+def sales_report():
+    report = _inventory_report_from_request()
+    return render_template(
+        "reports/sales_report.html", report=report, data=build_sales_summary(report["orders"]),
+        nav=_owner_nav(), show_customer=True, generated_at=datetime.now(ZoneInfo("Africa/Lagos")),
     )
 
 
@@ -425,6 +450,7 @@ def order_detail(order_ref):
             verify_payment=verify_payment,
             actor="owner",
             actor_name="Owner",
+            cancel_reason=request.form.get("cancel_reason", ""),
         )
         if ok and order.customer_id and old_status != order.status:
             add_customer_notice(order.customer_id, "Order status updated", f"Your order {order.public_id} is now {order.status}.", kind="order", related_url=url_for("shop.order_success", order_ref=order.public_id, token=order.public_token))

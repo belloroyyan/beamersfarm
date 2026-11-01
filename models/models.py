@@ -299,6 +299,7 @@ class Order(db.Model):
     fulfillment_type = db.Column(db.String(20), nullable=False, default="delivery", server_default="delivery")
     delivery_zone_name = db.Column(db.String(100), nullable=False, default="Pre-zone delivery", server_default="Pre-zone delivery")
     dispatch_batch_id = db.Column(db.Integer, db.ForeignKey("dispatch_batches.id", ondelete="SET NULL"), nullable=True, index=True)
+    cancellation_reason = db.Column(db.String(160), nullable=True)
     weighing_completed_at = db.Column(db.DateTime, nullable=True)
     weighing_recorded_by = db.Column(db.String(120), nullable=True)
     subtotal = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))

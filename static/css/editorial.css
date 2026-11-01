@@ -74,7 +74,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--ed-ink); ou
 .product-card, .partner-ad-card, .package-shop-card, .form-card, .admin-panel, .auth-card,
 .summary-card, .help-card, .update-card, .receipt-card, .payment-card,
 .cart-lines, .shop-control, .community-insight-card, .community-post, .order-notification-card,
-.print-receipt, .customer-form-card, .admin-record, .success-recommendations .product-card {
+.customer-form-card, .admin-record, .success-recommendations .product-card {
   background: var(--ed-card); border: 1px solid var(--ed-rule); box-shadow: none !important;
 }
 .product-card:hover { transform: none; border-color: var(--ed-ink); box-shadow: none !important; }
@@ -359,8 +359,9 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--ed-ink); ou
 /* =========================================================================
    Delivery estimate, receipts, success page
    ========================================================================= */
-.delivery-estimate { text-align: left; background: var(--ed-card); border: 1px solid var(--ed-ink); border-left: 6px solid var(--ed-accent-deep); padding: 22px 24px; margin: 0 0 26px; }
-.delivery-estimate .eyebrow { margin-bottom: 8px; }
+.delivery-estimate { text-align: center; background: var(--ed-card); border: 1px solid var(--ed-ink); border-left: 6px solid var(--ed-accent-deep); padding: 22px 24px; margin: 0 0 26px; text-align: center; }
+.delivery-estimate .eyebrow { margin-bottom: 8px; justify-content: center; }
+.delivery-estimate { border-left-width: 1px; border-top: 6px solid var(--ed-accent-deep); }
 .delivery-estimate h2 { font-size: clamp(1.5rem, 4.4vw, 2.1rem); margin: 0 0 10px; }
 .delivery-estimate p { margin: 0 0 10px; color: var(--ed-muted); font-size: .92rem; line-height: 1.6; }
 .delivery-estimate small { color: var(--ed-muted); font-size: .76rem; line-height: 1.5; }
@@ -469,3 +470,66 @@ input:not([type="radio"]):not([type="checkbox"]), select, textarea { border-radi
 @media (max-width: 1040px) { .site-header .main-nav > a, .site-header .main-nav > details > .nav-more-menu > a { border-radius: 0; } }
 .community-search > div { gap: 8px; }
 .community-search input { border-right: 1px solid var(--ed-ink); }
+
+
+/* =========================================================================
+   Reports, receipts and watermark
+   ========================================================================= */
+.print-receipt, .order-summary-report, .inventory-report, .sales-report {
+  background-color: #fff; background-image: url('../images/receipt-watermark-tile.svg'); background-repeat: repeat; background-size: 240px 240px;
+  border: 1px solid var(--ed-rule); border-radius: 12px; position: relative; isolation: isolate; overflow: hidden;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.sales-report > *:not(.inventory-watermark) { position: relative; z-index: 1; }
+.inventory-watermark { position: absolute; z-index: 0; top: 40%; left: 4%; right: 4%; text-align: center; transform: rotate(-18deg); pointer-events: none; font-family: var(--ed-serif); font-size: clamp(1.4rem, 5vw, 3rem); font-weight: 700; letter-spacing: .2em; color: rgba(35, 56, 47, .06); }
+
+.report-cover { padding: 36px 28px 30px; margin-bottom: 26px; border-bottom: 1px solid var(--ed-ink); text-align: left; }
+.report-cover-logo { width: 64px; height: 64px; object-fit: contain; margin-bottom: 14px; }
+.report-cover-title { font-size: clamp(2rem, 6vw, 3.6rem); margin: 6px 0 4px; letter-spacing: -.03em; }
+.report-cover-period { font-size: 1.05rem; color: var(--ed-muted); margin: 0 0 18px; }
+.report-cover-points { margin: 0 0 18px; padding: 0; list-style: none; display: grid; gap: 6px; }
+.report-cover-points li { padding: 8px 0; border-top: 1px solid var(--ed-rule); font-weight: 600; }
+.report-cover-note { font-size: .8rem; line-height: 1.6; color: var(--ed-muted); max-width: 62ch; }
+
+.report-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin: 12px 0 14px; }
+.report-kpis > div { border: 1px solid var(--ed-ink); border-top: 4px solid var(--ed-ink); padding: 16px; background: rgba(255, 255, 255, .85); border-radius: 10px; }
+.report-kpis span { display: block; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ed-accent-deep); }
+.report-kpis strong { display: block; font-family: var(--ed-serif); font-size: 1.7rem; margin: 6px 0; overflow-wrap: anywhere; }
+.report-kpis small { color: var(--ed-muted); line-height: 1.45; display: block; }
+.report-definitions p { margin: 4px 0; font-size: .85rem; color: var(--ed-muted); }
+.cancel-reason-field[hidden] { display: none; }
+.cancel-reason-field { display: grid; gap: 6px; margin-top: 10px; }
+
+/* Print: only the report, cover page first, no blank leading page */
+@media print {
+  @page { margin: 12mm; }
+  .site-header, .site-footer, .cart-float, .site-notification-prompt, .customer-notice-popup, .update-popup, .site-tour, .flash-stack,
+  .admin-shell > .container > :not(.print-receipt):not(.order-summary-report):not(.inventory-report):not(.sales-report) { display: none !important; }
+  body { margin: 0 !important; padding: 0 !important; }
+  .admin-shell, .admin-shell > .container { padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: none !important; }
+  .print-receipt, .order-summary-report, .inventory-report, .sales-report { position: static !important; width: 100% !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important; }
+  .inventory-watermark { position: fixed !important; top: 42% !important; }
+  .report-cover { min-height: 150mm; max-height: 170mm; overflow: hidden; display: flex; flex-direction: column; justify-content: center; page-break-after: always; break-after: page; border-bottom: 0; }
+  .order-summary-report .print-receipt-header, .inventory-report .print-receipt-header { display: none !important; }
+  .report-kpis > div { break-inside: avoid; }
+  .report-figures { break-inside: avoid; }
+}
+
+/* =========================================================================
+   Order stream, batch settings
+   ========================================================================= */
+.dispatch-settings-form {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; gap: 14px 16px; align-items: end;
+  margin: 18px 0; padding: 20px; background: var(--ed-card); border: 1px solid var(--ed-rule); border-top: 3px solid var(--ed-ink); border-radius: 12px;
+}
+.dispatch-settings-form::before { content: "Dispatch batching"; grid-column: 1 / -1; font-family: var(--ed-serif); font-size: 1.2rem; font-weight: 600; }
+.dispatch-settings-form label { display: grid; gap: 6px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ed-muted); }
+.dispatch-settings-form input { width: 100%; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--ed-ink-deep); }
+@media (max-width: 700px) {
+  .dispatch-settings-form { grid-template-columns: 1fr; padding: 16px; }
+  .dispatch-settings-form .button { width: 100%; }
+  .live-stream-list { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--ed-rule); border-radius: 10px; background: var(--ed-card); }
+  .live-stream-row, .live-stream-row:hover { grid-template-columns: 56px minmax(170px, 1fr) 120px 110px 200px 70px !important; min-width: 760px; padding: 14px 16px; white-space: nowrap; }
+  .live-stream-row > .status-pill, .live-stream-row > strong:last-of-type, .live-stream-row > span:last-child { grid-column: auto !important; }
+  .live-stream-row small { white-space: normal; }
+}

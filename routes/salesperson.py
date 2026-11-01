@@ -14,6 +14,9 @@ from utils.push_subscriptions import delete_staff_push_subscription, save_staff_
 from utils.salesperson_permissions import get_salesperson_permissions, salesperson_has_permission
 from utils.web_push import web_push_is_configured
 from utils.in_person_orders import create_in_person_order
+from utils.inventory_reports import build_inventory_report
+from utils.sales_report import build_sales_summary, filter_orders_by_text
+from zoneinfo import ZoneInfo
 
 salesperson_bp = Blueprint("salesperson", __name__, url_prefix="/sales")
 
@@ -140,6 +143,7 @@ def order_detail(account, order_ref):
             actor="salesperson",
             actor_name=account.display_name,
             verification_reference=request.form.get("verification_reference", ""),
+            cancel_reason=request.form.get("cancel_reason", ""),
         )
         flash(message, "success" if ok else "error")
         return redirect(url_for("salesperson.order_detail", order_ref=order.public_id))
@@ -310,3 +314,63 @@ def in_person_order(account):
 def inventory(account):
     products = Product.query.filter_by(active=True).order_by(Product.name.asc()).all()
     return render_template("salesperson/inventory.html", account=account, products=products)
+
+
+def _sales_nav(account):
+    perms = get_salesperson_permissions(account)
+    return {
+        "home": lambda: url_for("salesperson.dashboard"),
+        "inventory": lambda **kw: url_for("salesperson.inventory_report", **kw),
+        "pdf": lambda **kw: "#",
+        "orders": lambda **kw: url_for("salesperson.order_summary_report", **kw),
+        "sales": lambda **kw: url_for("salesperson.sales_report", **kw),
+        "order": lambda ref: url_for("salesperson.order_detail", order_ref=ref),
+        "has_inventory": perms["generate_inventory_summary"], "has_orders": perms["generate_order_summary"],
+        "has_sales": perms["generate_sales_report"], "has_pdf": False,
+        "desk": "Sales desk", "copy_label": f"{account.display_name} copy",
+    }
+
+
+def _period_report():
+    try:
+        return build_inventory_report(
+            period=request.args.get("period", "30d"), search=request.args.get("q", ""),
+            start_raw=request.args.get("start_date", ""), end_raw=request.args.get("end_date", ""),
+            low_stock=request.args.get("low_stock") == "1",
+        )
+    except ValueError as error:
+        flash(str(error), "error")
+        return build_inventory_report(period="30d", search=request.args.get("q", ""))
+
+
+def _now_local():
+    return datetime.now(ZoneInfo("Africa/Lagos"))
+
+
+@salesperson_bp.get("/reports/sales")
+@salesperson_required
+@permission_required("generate_sales_report")
+def sales_report(account):
+    report = _period_report()
+    return render_template("reports/sales_report.html", report=report, data=build_sales_summary(report["orders"]),
+                           nav=_sales_nav(account), show_customer=salesperson_has_permission(account, "view_customer_details"),
+                           generated_at=_now_local())
+
+
+@salesperson_bp.get("/reports/orders")
+@salesperson_required
+@permission_required("generate_order_summary")
+def order_summary_report(account):
+    report = _period_report()
+    text = request.args.get("q", "").strip()[:120]
+    return render_template("admin/order_summary.html", orders=filter_orders_by_text(report["orders"], text),
+                           period=report["period"], period_label=report["period_label"], start_date=report["start_date"],
+                           end_date=report["end_date"], search_query=text, generated_at=_now_local(),
+                           nav=_sales_nav(account), show_customer=salesperson_has_permission(account, "view_customer_details"))
+
+
+@salesperson_bp.get("/reports/inventory")
+@salesperson_required
+@permission_required("generate_inventory_summary")
+def inventory_report(account):
+    return render_template("admin/inventory.html", report=_period_report(), nav=_sales_nav(account), generated_at=_now_local())

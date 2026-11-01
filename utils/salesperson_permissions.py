@@ -19,6 +19,10 @@ PERMISSION_DEFINITIONS = [
     # Counter and stock
     ("record_in_person_orders", "Record cash/POS orders at the farm counter", False),
     ("view_inventory", "View product stock summary", False),
+    # Reports
+    ("generate_sales_report", "Generate sales reports for a chosen timeline", False),
+    ("generate_inventory_summary", "Generate inventory summaries", False),
+    ("generate_order_summary", "Generate order summaries", False),
     # Alerts
     ("receive_order_alerts", "Receive new-order push alerts while the shop is open", True),
 ]
@@ -29,6 +33,7 @@ PERMISSION_GROUPS = [
                     "record_weigh_ins", "print_customer_receipts", "view_customer_settlement"]),
     ("Customer care", ["view_complaints", "manage_complaints", "manage_community"]),
     ("Counter and stock", ["record_in_person_orders", "view_inventory"]),
+    ("Reports", ["generate_sales_report", "generate_inventory_summary", "generate_order_summary"]),
     ("Alerts", ["receive_order_alerts"]),
 ]
 

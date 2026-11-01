@@ -124,6 +124,11 @@ def create_app():
     app.jinja_env.filters["community_linkify"] = community_linkify
     app.jinja_env.filters["local_time"] = local_time
 
+    from utils.order_workflow import CANCEL_REASONS
+    from utils.dispatch_batches import delivery_estimate as _delivery_estimate
+    app.jinja_env.globals["cancel_reasons"] = CANCEL_REASONS
+    app.jinja_env.filters["delivery_eta"] = lambda order: (_delivery_estimate(order) or {}).get("text")
+
     @app.context_processor
     def inject_helpers():
         shop_settings = ShopSettings.query.get(1)
