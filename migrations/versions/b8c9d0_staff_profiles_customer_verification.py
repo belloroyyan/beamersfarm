@@ -79,14 +79,38 @@ def upgrade():
     )
     _create_index_if_missing("ix_customer_notes_customer_id", "customer_notes", ["customer_id"])
 
+    # MySQL does not permit DEFAULT values on TEXT columns. Add these as
+    # nullable first, backfill existing rows, then enforce NOT NULL without
+    # defining a database-level default. The ORM supplies the empty-string
+    # Python default for new records.
     for column in (
         sa.Column("phone", sa.String(40), nullable=False, server_default=""),
         sa.Column("email", sa.String(160), nullable=False, server_default=""),
-        sa.Column("socials", sa.Text(), nullable=False, server_default=""),
-        sa.Column("address", sa.Text(), nullable=False, server_default=""),
         sa.Column("profile_updated_at", sa.DateTime(), nullable=True),
     ):
         _add_column_if_missing("salesperson_accounts", column)
+
+    for text_column in ("socials", "address"):
+        inspector = _inspector()
+        if "salesperson_accounts" in inspector.get_table_names():
+            existing = {item["name"]: item for item in inspector.get_columns("salesperson_accounts")}
+            if text_column not in existing:
+                op.add_column("salesperson_accounts", sa.Column(text_column, sa.Text(), nullable=True))
+                op.execute(sa.text(
+                    f"UPDATE salesperson_accounts SET {text_column} = '' WHERE {text_column} IS NULL"
+                ))
+                op.alter_column(
+                    "salesperson_accounts", text_column,
+                    existing_type=sa.Text(), nullable=False,
+                )
+            elif existing[text_column].get("nullable", True):
+                op.execute(sa.text(
+                    f"UPDATE salesperson_accounts SET {text_column} = '' WHERE {text_column} IS NULL"
+                ))
+                op.alter_column(
+                    "salesperson_accounts", text_column,
+                    existing_type=sa.Text(), nullable=False,
+                )
 
     _create_table_if_missing(
         "staff_action_logs",
