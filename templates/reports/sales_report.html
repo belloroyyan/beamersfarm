@@ -18,12 +18,9 @@
 
   <article class="print-receipt sales-report">
     <div class="inventory-watermark" aria-hidden="true">BEAMERS FARM · SALES REPORT</div>
+    {% set cover_title = "Sales Report" %}
+    {% set cover_lines = [("Gross revenue " ~ format_currency(data.gross)), ("Net revenue " ~ format_currency(data.net)), ("Delivery fees collected " ~ format_currency(data.fees)), ("Cancelled orders " ~ format_currency(data.cancelled))] %}
     {% include "reports/_cover.html" %}
-    {% set section_number = "01" %}
-    {% set section_title = "Sales Report" %}
-    {% set section_lead = "A financial view of trading activity, revenue performance and the value of completed business during the selected period." %}
-    {% set section_description = "This section brings together order values, revenue by status, sales over time, product performance and channel activity. Gross revenue includes non-cancelled orders and delivery fees; net revenue reflects successful deliveries and pickups and excludes delivery fees. The definitions alongside the figures explain the basis used for each measure." %}
-    {% include "reports/_section_intro.html" %}
 
     <section class="print-receipt-section report-figures">
       <h2>Headline figures</h2>

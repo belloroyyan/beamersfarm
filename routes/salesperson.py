@@ -361,7 +361,7 @@ def sales_report(account):
     report = _period_report()
     return render_template("reports/sales_report.html", report=report, data=build_sales_summary(report["orders"]),
                            nav=_sales_nav(account), show_customer=salesperson_has_permission(account, "view_customer_details"),
-                           generated_at=_now_local(), prepared_by=account.display_name)
+                           generated_at=_now_local())
 
 
 @salesperson_bp.get("/reports/orders")
@@ -373,16 +373,14 @@ def order_summary_report(account):
     return render_template("admin/order_summary.html", orders=filter_orders_by_text(report["orders"], text),
                            period=report["period"], period_label=report["period_label"], start_date=report["start_date"],
                            end_date=report["end_date"], search_query=text, generated_at=_now_local(),
-                           nav=_sales_nav(account), show_customer=salesperson_has_permission(account, "view_customer_details"),
-                           prepared_by=account.display_name)
+                           nav=_sales_nav(account), show_customer=salesperson_has_permission(account, "view_customer_details"))
 
 
 @salesperson_bp.get("/reports/inventory")
 @salesperson_required
 @permission_required("generate_inventory_summary")
 def inventory_report(account):
-    return render_template("admin/inventory.html", report=_period_report(), nav=_sales_nav(account),
-                           generated_at=_now_local(), prepared_by=account.display_name)
+    return render_template("admin/inventory.html", report=_period_report(), nav=_sales_nav(account), generated_at=_now_local())
 
 @salesperson_bp.route("/profile", methods=["GET", "POST"])
 @salesperson_required

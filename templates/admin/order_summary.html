@@ -22,17 +22,13 @@
 
     <article class="print-receipt order-summary-report">
       <div class="inventory-watermark" aria-hidden="true">BEAMERS FARM · ORDER SUMMARY</div>
-      {% include "reports/_cover.html" %}
-      {% set section_number = "02" %}
-      {% set section_title = "Order Summary" %}
-      {% set section_lead = "A record-level view of orders received by Beamers Farm and the fulfilment and payment status of each transaction." %}
-      {% set section_description = "This section lists matching orders for the selected reporting period and any applied search. Each record brings together the order reference, customer and fulfilment details (subject to staff permissions), ordered items, total, payment verification and current order status. Cancelled orders and farm-counter transactions are identified separately." %}
-      {% include "reports/_section_intro.html" %}
       <header class="print-receipt-header">
         <img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farm" loading="lazy" decoding="async">
         <div><p class="eyebrow">Private · {{ nav.copy_label }}</p><h1>Order Summary</h1><p>{{ period_label }}{% if search_query %} · Search: {{ search_query }}{% endif %}</p></div>
         <span class="status-pill status-confirmed">{{ orders|length }} orders</span>
       </header>
+      {% set cover_title = "Order Summary" %}{% set cover_lines = [(orders|length ~ " order(s) in this report"), (orders|selectattr("status","equalto","Cancelled")|list|length ~ " cancelled"), (orders|selectattr("order_channel","equalto","in_person")|list|length ~ " farm-counter sale(s)")] %}
+      {% include "reports/_cover.html" %}
       {% if orders %}
         <section class="print-receipt-section">
           <div class="order-table-wrap">

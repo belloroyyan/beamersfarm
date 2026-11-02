@@ -1,27 +1,8 @@
-{% set cover_period = (report.start_date ~ " to " ~ report.end_date) if report is defined and report and report.start_date and report.end_date else ((start_date ~ " to " ~ end_date) if start_date is defined and start_date and end_date is defined and end_date else (report.period_label if report is defined and report else period_label|default("All available records"))) %}
-<section class="report-cover report-overall-cover" aria-label="Beamers Farm operations report cover">
-  <div class="report-cover-brand-panel">
-    <div class="report-cover-wordmark"><span>BEAMERS</span><small>F A R M S</small></div>
-    <p class="report-cover-kicker">OPERATIONS REPORT</p>
-    <h1>From farm<br>operations to<br>customer delivery.</h1>
-    <p class="report-cover-description">A detailed review of the systems, people and processes behind every order.</p>
-    <p class="report-cover-promise">FRESH <i>•</i> CLEAN <i>•</i> HYGIENICALLY PACKAGED</p>
-  </div>
-  <div class="report-cover-content">
-    <p class="report-cover-overline">BEAMERS FARM&nbsp; / &nbsp;INTERNAL BUSINESS REVIEW</p>
-    <h2>Operations<br>&amp; Performance</h2>
-    <p class="report-cover-summary">A comprehensive report on the day-to-day running of Beamers Farm — from stock and fulfilment to service quality and growth.</p>
-    <div class="report-cover-topics">
-      <div class="report-cover-topic"><b>01</b><strong>INVENTORY &amp; STOCK</strong><span>Product availability, stock control and replenishment discipline.</span></div>
-      <div class="report-cover-topic"><b>02</b><strong>ORDERS &amp; FULFILMENT</strong><span>Order flow, payment confirmation, picking, packing and dispatch.</span></div>
-      <div class="report-cover-topic"><b>03</b><strong>CUSTOMER EXPERIENCE</strong><span>Delivery, collection, feedback and customer support.</span></div>
-      <div class="report-cover-topic"><b>04</b><strong>PEOPLE &amp; PERFORMANCE</strong><span>Roles, operating routines, controls and improvement priorities.</span></div>
-    </div>
-    <div class="report-cover-meta">
-      <span><strong>REPORTING PERIOD</strong><em>{{ cover_period }}</em></span>
-      <span><strong>PREPARED BY</strong><em>{{ prepared_by|default('Owner') }}</em></span>
-      <span><strong>DATE</strong><em>{{ generated_at|local_time('%d %B %Y') }}</em></span>
-    </div>
-    <p class="report-cover-location">OSOGBO, NIGERIA&nbsp; • &nbsp;BEAMERSFARM.UP.RAILWAY.APP</p>
-  </div>
+<section class="report-cover">
+  <img class="report-cover-logo" src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farm">
+  <p class="eyebrow">Beamers Farm · {{ nav.desk }}</p>
+  <h2 class="report-cover-title">{{ cover_title }}</h2>
+  <p class="report-cover-period">{{ report.period_label if report is defined and report else period_label }}{% if (report.start_date if report is defined and report else start_date) %} · {{ report.start_date if report is defined and report else start_date }} to {{ report.end_date if report is defined and report else end_date }}{% endif %}</p>
+  <ul class="report-cover-points">{% for line in cover_lines %}<li>{{ line }}</li>{% endfor %}</ul>
+  <p class="report-cover-note">Prepared on {{ generated_at|local_time("%d %B %Y at %H:%M") }} WAT for internal use. Figures reflect orders placed within the selected timeline, using Osogbo local dates. Customer and payment details are confidential.</p>
 </section>
