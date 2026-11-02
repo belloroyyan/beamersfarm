@@ -39,7 +39,7 @@
     <div><span class="trust-number">03</span><strong>Pay your way</strong><small>Opay transfer or secure online payment</small></div>
   </div>
 </section>
-{% if pinned_gallery %}<section class="container pinned-gallery-summary" aria-labelledby="pinned-gallery-heading"><div class="pinned-gallery-media">{% if pinned_gallery.media_type == "video" %}<video controls preload="metadata" src="{{ gallery_image_url(pinned_gallery.image) }}"></video>{% else %}<img src="{{ gallery_image_url(pinned_gallery.image) }}" alt="{{ pinned_gallery.title }}" loading="lazy">{% endif %}</div><div><p class="eyebrow">Pinned from the farm gallery</p><h2 id="pinned-gallery-heading">{{ pinned_gallery.title }}</h2><p>{{ pinned_gallery.description }}</p><a class="button button-outline" href="{{ url_for('shop.gallery') }}">Explore the gallery ▧</a></div></section>{% endif %}
+{% if pinned_gallery %}<section class="container pinned-gallery-summary" aria-labelledby="pinned-gallery-heading"><div class="pinned-gallery-media">{% if pinned_gallery.media_type == "video" %}<video controls preload="metadata" src="{{ gallery_image_url(pinned_gallery.image) }}"></video>{% else %}<img src="{{ gallery_image_url(pinned_gallery.image) }}" alt="{{ pinned_gallery.title }}" loading="lazy">{% endif %}</div><a class="pinned-gallery-open" href="{{ url_for('shop.gallery') }}" aria-label="Explore the farm gallery">Explore gallery →</a></section>{% endif %}
 <section class="container section" id="products">
   <div class="section-heading"><div><p class="eyebrow">Beamers Farm quick menu</p><h2>Popular picks</h2></div><span class="section-note">Handpicked by the shop</span></div>
   {% if products %}

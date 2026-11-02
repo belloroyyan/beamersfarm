@@ -1,12 +1,12 @@
 from functools import wraps
 
-from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, send_file, session, url_for
 from sqlalchemy import or_
 from sqlalchemy.orm import selectinload
 
 from datetime import datetime
 
-from models import Complaint, CustomerNotice, Order, Product, SalespersonAccount, ShopSettings, db
+from models import Complaint, CustomerNotice, Order, Product, SalespersonAccount, StaffActionLog, ShopSettings, db
 from utils.order_workflow import ORDER_STATUSES, update_order_status
 from utils.order_settlement import save_order_weights
 from utils.order_search import order_search_filter
@@ -47,6 +47,10 @@ def permission_required(permission):
         return wrapped
     return decorate
 
+
+
+def log_staff_action(account, action, detail=""):
+    db.session.add(StaffActionLog(salesperson_account_id=account.id, action=action[:160], detail=detail[:500]))
 
 def find_order(order_ref):
     order = Order.query.filter_by(public_id=order_ref).first()
@@ -145,6 +149,9 @@ def order_detail(account, order_ref):
             verification_reference=request.form.get("verification_reference", ""),
             cancel_reason=request.form.get("cancel_reason", ""),
         )
+        if ok:
+            log_staff_action(account, "Updated order status", f"Order #{order.public_id}: {order.status}")
+            db.session.commit()
         flash(message, "success" if ok else "error")
         return redirect(url_for("salesperson.order_detail", order_ref=order.public_id))
     return render_template(
@@ -374,3 +381,28 @@ def order_summary_report(account):
 @permission_required("generate_inventory_summary")
 def inventory_report(account):
     return render_template("admin/inventory.html", report=_period_report(), nav=_sales_nav(account), generated_at=_now_local())
+
+@salesperson_bp.route("/profile", methods=["GET", "POST"])
+@salesperson_required
+def profile(account):
+    if request.method == "POST":
+        account.phone = request.form.get("phone", "").strip()[:40]
+        account.email = request.form.get("email", "").strip().lower()[:160]
+        account.socials = request.form.get("socials", "").strip()[:2000]
+        account.address = request.form.get("address", "").strip()[:1000]
+        account.profile_updated_at = datetime.utcnow()
+        log_staff_action(account, "Updated own staff profile", "Contact and profile details saved")
+        db.session.commit()
+        flash("Your staff profile was saved. You can complete the remaining fields later.", "success")
+        return redirect(url_for("salesperson.profile"))
+    return render_template("salesperson/profile.html", account=account)
+
+@salesperson_bp.get("/staff-manual")
+@salesperson_required
+def staff_manual(account):
+    return render_template("staff_manual.html", manual_role="Salesperson")
+
+@salesperson_bp.get("/staff-manual/download")
+@salesperson_required
+def staff_manual_download(account):
+    return send_file(current_app.root_path + "/static/staff-manual.md", as_attachment=True, download_name="Beamers-Farm-Staff-Digital-Wiki.md", mimetype="text/markdown")

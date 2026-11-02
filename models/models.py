@@ -215,6 +215,8 @@ class Customer(db.Model):
     active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
     community_profile_public = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     community_posting_blocked = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    email_verified = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    email_verified_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     deleted_at = db.Column(db.DateTime, nullable=True)
@@ -223,6 +225,33 @@ class Customer(db.Model):
     wholesale_orders = db.relationship("WholesaleOrder", back_populates="customer")
     abandoned_carts = db.relationship("AbandonedCart", back_populates="customer", cascade="all, delete-orphan")
 
+
+class CustomerEmailVerification(db.Model):
+    __tablename__ = "customer_email_verifications"
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True)
+    token = db.Column(db.String(96), unique=True, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    customer = db.relationship("Customer")
+
+class CustomerNote(db.Model):
+    __tablename__ = "customer_notes"
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True)
+    body = db.Column(db.Text, nullable=False)
+    created_by = db.Column(db.String(120), nullable=False, default="Beamers Farm Owner")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    customer = db.relationship("Customer")
+
+class StaffActionLog(db.Model):
+    __tablename__ = "staff_action_logs"
+    id = db.Column(db.Integer, primary_key=True)
+    salesperson_account_id = db.Column(db.Integer, db.ForeignKey("salesperson_accounts.id", ondelete="CASCADE"), nullable=False, index=True)
+    action = db.Column(db.String(160), nullable=False)
+    detail = db.Column(db.String(500), nullable=False, default="")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    account = db.relationship("SalespersonAccount")
 
 class AbandonedCart(db.Model):
     __tablename__ = "abandoned_carts"
@@ -629,6 +658,11 @@ class SalespersonAccount(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
     permissions_json = db.Column(db.Text, nullable=False, default="{}")
+    phone = db.Column(db.String(40), nullable=False, default="")
+    email = db.Column(db.String(160), nullable=False, default="")
+    socials = db.Column(db.Text, nullable=False, default="")
+    address = db.Column(db.Text, nullable=False, default="")
+    profile_updated_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     disabled_at = db.Column(db.DateTime, nullable=True)
 

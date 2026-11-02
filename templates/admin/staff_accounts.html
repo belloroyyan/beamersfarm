@@ -8,7 +8,7 @@
         <a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a>
         <p class="eyebrow">Owner settings</p>
         <h1>Staff access.</h1>
-        <p class="form-note">Create an individual account for each salesperson and control exactly what they can do. Each salesperson’s Actions menu shows only what you allow here. Deactivation blocks access on their next request; accounts are retained for accountability.</p>
+        <p class="form-note"><a class="table-link" href="{{ url_for('admin.staff_report') }}">Generate staff report →</a><br>Create an individual account for each salesperson and control exactly what they can do. Each salesperson’s Actions menu shows only what you allow here. Deactivation blocks access on their next request; accounts are retained for accountability.</p>
       </div>
     </div>
 
@@ -49,7 +49,7 @@
                     <button class="button button-dark" type="submit">Save permissions</button>
                   </form>
                 </details>
-                <div class="staff-account-actions">
+                <details class="staff-profile-details"><summary>Staff profile</summary><form method="post" class="staff-profile-form"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="account_id" value="{{ account.id }}"><input type="hidden" name="action" value="save_profile"><div class="field-grid"><label>Phone<input name="phone" value="{{ account.phone }}"></label><label>Email<input type="email" name="email" value="{{ account.email }}"></label></div><label>Socials<textarea name="socials" rows="2">{{ account.socials }}</textarea></label><label>Address<textarea name="address" rows="2">{{ account.address }}</textarea></label><button class="button button-outline" type="submit">Save profile</button></form></details><div class="staff-account-actions">
                   <form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="account_id" value="{{ account.id }}"><input type="hidden" name="action" value="{{ 'deactivate' if account.active else 'activate' }}"><button class="button {% if account.active %}button-outline{% else %}button-lime{% endif %}" type="submit">{{ 'Revoke access' if account.active else 'Reactivate account' }}</button></form>
                   <form method="post" class="staff-reset-form"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="account_id" value="{{ account.id }}"><input type="hidden" name="action" value="reset_password"><label>New password<input type="password" name="password" minlength="12" maxlength="256" autocomplete="new-password" required></label><label>Confirm<input type="password" name="confirm_password" minlength="12" maxlength="256" autocomplete="new-password" required></label><button class="button button-dark" type="submit">Reset password</button></form>
                 </div>

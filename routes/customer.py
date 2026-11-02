@@ -1,12 +1,13 @@
 import hmac
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import urlparse
 
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import Coupon, Customer, CustomerNotice, CustomerPushSubscription, Order, Product, ShopSettings, db
+from models import Coupon, Customer, CustomerEmailVerification, CustomerNotice, CustomerPushSubscription, Order, Product, ShopSettings, db
 from utils.helpers import format_quantity, parse_quantity, product_uses_requested_kg
 from utils.notifications import normalize_nigerian_phone
 from utils.push_subscriptions import valid_push_endpoint
@@ -76,6 +77,7 @@ def register():
             customer = Customer(
                 name=name, phone=normalized_phone, email=email,
                 password_hash=generate_password_hash(password),
+                email_verified=False,
             )
             db.session.add(customer)
             db.session.commit()
@@ -149,7 +151,11 @@ def save_settings():
     if email and Customer.query.filter(Customer.id != customer.id, Customer.email == email).first():
         flash("That email address is already connected to another account.", "error")
         return redirect(url_for("customer.account"))
+    email_changed = customer.email != email
     customer.name, customer.phone, customer.email, customer.address = name, phone, email, address
+    if email_changed:
+        customer.email_verified = False
+        customer.email_verified_at = None
     customer.push_notifications_enabled = request.form.get("push_notifications") == "yes"
     customer.whatsapp_notifications_enabled = request.form.get("whatsapp_notifications") == "yes"
     customer.community_profile_public = request.form.get("community_profile_public") == "yes"
@@ -323,3 +329,31 @@ def save_account_push_subscription():
     customer.push_notifications_enabled = True
     db.session.commit()
     return jsonify(enabled=True, message="Customer notifications are enabled for updates, gallery posts, community notices, coupons, and order changes."), 201
+
+@customer_bp.post("/send-verification")
+@account_required
+def send_verification():
+    customer = current_customer()
+    if not customer.email:
+        flash("Add an email address first so we can verify it.", "error")
+        return redirect(url_for("customer.account"))
+    token = secrets.token_urlsafe(48)
+    db.session.query(CustomerEmailVerification).filter_by(customer_id=customer.id).delete()
+    db.session.add(CustomerEmailVerification(customer_id=customer.id, token=token, expires_at=datetime.utcnow() + timedelta(hours=24)))
+    db.session.commit()
+    flash("A verification link is ready. Open it below to confirm this email address.", "success")
+    return redirect(url_for("customer.account", verification_token=token))
+
+@customer_bp.get("/verify-email/<token>")
+def verify_email(token):
+    item = CustomerEmailVerification.query.filter_by(token=token).first()
+    if not item or item.expires_at < datetime.utcnow():
+        flash("That email verification link has expired. Request a new one from your account.", "error")
+        return redirect(url_for("customer.account"))
+    item.customer.email_verified = True
+    item.customer.email_verified_at = datetime.utcnow()
+    db.session.delete(item)
+    db.session.commit()
+    session["customer_id"] = item.customer_id
+    flash("Email verified. Your customer account is now verified.", "success")
+    return redirect(url_for("customer.account"))

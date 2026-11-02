@@ -156,6 +156,13 @@ function initModalHelpers() {
   document.querySelectorAll("[data-open-customer-modal]").forEach((button) => button.addEventListener("click", () => document.getElementById(button.dataset.openCustomerModal)?.showModal()));
   document.querySelectorAll("[data-close-customer-modal]").forEach((button) => button.addEventListener("click", () => button.closest("dialog")?.close()));
   document.querySelectorAll(".customer-modal").forEach((dialog) => dialog.addEventListener("click", (e) => { if (e.target === dialog) dialog.close(); }));
+  document.querySelectorAll(".customer-profile-modal").forEach((dialog) => {
+    dialog.querySelectorAll("[data-profile-tab]").forEach((tab) => tab.addEventListener("click", () => {
+      const target = tab.dataset.profileTab;
+      dialog.querySelectorAll("[data-profile-tab]").forEach((item) => item.classList.toggle("is-active", item === tab));
+      dialog.querySelectorAll(".customer-profile-pane").forEach((pane) => pane.classList.toggle("is-active", pane.id === target));
+    }));
+  });
   document.addEventListener("input", (e) => {
     if (!e.target.matches("[data-actions-search]")) return;
     const q = e.target.value.toLowerCase();

@@ -1,6 +1,6 @@
 from .models import (
     CommunityPost, CommunityComment, CommunityReaction, CommunityReport, CommunityBlock,
-    CommunityNotification, CustomerNotice, SiteOverlaySeen, AbandonedCart, AnalyticsEvent,
+    CommunityNotification, CustomerNotice, CustomerEmailVerification, CustomerNote, StaffActionLog, SiteOverlaySeen, AbandonedCart, AnalyticsEvent,
     Coupon, Complaint, PrivacyRule, Customer, CustomerPushSubscription, DeliveryZone,
     GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, DispatchBatch, PartnerAdInvite,
     PartnerListing, Product, ProductPackage, ProductPackageItem, DropShare, Review,
@@ -10,7 +10,7 @@ from .models import (
 
 __all__ = [
     "CommunityPost", "CommunityComment", "CommunityReaction", "CommunityReport", "CommunityBlock",
-    "CommunityNotification", "CustomerNotice", "db", "AbandonedCart", "AnalyticsEvent", "Coupon",
+    "CommunityNotification", "CustomerNotice", "CustomerEmailVerification", "CustomerNote", "StaffActionLog", "db", "AbandonedCart", "AnalyticsEvent", "Coupon",
     "PrivacyRule", "Product", "ProductPackage", "ProductPackageItem", "DropShare", "Order", "OrderItem",
     "OrderNotification", "OrderFinancialRecord", "DispatchBatch", "DeliveryZone", "SalespersonAccount", "ShopSettings",
     "Complaint", "Review", "ShopUpdate", "GalleryImage", "PartnerListing", "PartnerAdInvite",
