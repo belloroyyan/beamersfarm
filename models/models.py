@@ -219,6 +219,7 @@ class Customer(db.Model):
     email_verified_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_login_at = db.Column(db.DateTime, nullable=True, index=True)
     deleted_at = db.Column(db.DateTime, nullable=True)
 
     orders = db.relationship("Order", back_populates="customer")

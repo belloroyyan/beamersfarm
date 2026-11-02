@@ -1,6 +1,4 @@
 from decimal import Decimal
-from collections import Counter
-import json
 from functools import wraps
 
 from datetime import datetime, timedelta
@@ -349,7 +347,7 @@ def in_person_order():
 @admin_required
 def inventory_summary():
     report = _inventory_report_from_request()
-    return render_template("admin/inventory.html", report=report, nav=_owner_nav(), generated_at=datetime.now(ZoneInfo("Africa/Lagos")))
+    return render_template("admin/inventory.html", report=report, nav=_owner_nav(), generated_at=datetime.now(ZoneInfo("Africa/Lagos")), prepared_by="Owner")
 
 
 @admin_bp.get("/inventory.pdf")
@@ -411,7 +409,7 @@ def order_summary():
         end_date=report["end_date"],
         search_query=query_text,
         generated_at=datetime.now(ZoneInfo("Africa/Lagos")),
-        nav=_owner_nav(), show_customer=True,
+        nav=_owner_nav(), show_customer=True, prepared_by="Owner",
     )
 
 
@@ -421,7 +419,7 @@ def sales_report():
     report = _inventory_report_from_request()
     return render_template(
         "reports/sales_report.html", report=report, data=build_sales_summary(report["orders"]),
-        nav=_owner_nav(), show_customer=True, generated_at=datetime.now(ZoneInfo("Africa/Lagos")),
+        nav=_owner_nav(), show_customer=True, generated_at=datetime.now(ZoneInfo("Africa/Lagos")), prepared_by="Owner",
     )
 
 
@@ -623,87 +621,97 @@ def toggle_delivery_zone(zone_id):
     return redirect(url_for("admin.delivery_zones"))
 
 
-def _customer_profile(customer):
-    """Build the private, owner-only customer intelligence view from recorded data."""
-    orders = sorted(customer.orders or [], key=lambda item: item.created_at or datetime.min, reverse=True)
-    valid_orders = [order for order in orders if order.status not in {"Cancelled", "Declined"}]
-    completed_orders = [order for order in orders if order.status in {"Delivered", "Picked up"}]
-    events = AnalyticsEvent.query.filter_by(customer_id=customer.id).order_by(AnalyticsEvent.created_at.desc()).all()
+@admin_bp.route("/customers/<int:customer_id>", methods=["GET", "POST"])
+@admin_required
+def customer_detail(customer_id):
+    customer = Customer.query.get_or_404(customer_id)
+    if request.method == "POST":
+        action = request.form.get("action", "")
+        if action == "add_note":
+            body = request.form.get("note", "").strip()[:2000]
+            if body:
+                db.session.add(CustomerNote(customer_id=customer.id, body=body, created_by="Beamers Farm Owner"))
+                db.session.commit()
+                flash("Internal customer note added.", "success")
+            else:
+                flash("Write a note before saving.", "error")
+        elif action in {"activate", "deactivate"}:
+            customer.active = action == "activate"
+            add_customer_notice(customer.id, "Customer account updated",
+                "Your Beamers Farm customer account has been reactivated." if customer.active else
+                "Your Beamers Farm customer account has been paused. Contact the farm if you need help accessing it.")
+            db.session.commit()
+            flash(f"{customer.name} account {'activated' if customer.active else 'deactivated'}.", "success")
+        elif action in {"block_community", "unblock_community"}:
+            customer.community_posting_blocked = action == "block_community"
+            db.session.commit()
+            flash("Community access updated.", "success")
+        elif action == "reset_password":
+            password = request.form.get("password", "")
+            if len(password) < 8:
+                flash("Customer passwords must be at least 8 characters.", "error")
+            else:
+                customer.password_hash = generate_password_hash(password)
+                add_customer_notice(customer.id, "Account security updated",
+                    "The Beamers Farm team updated your account password. If you did not expect this, contact the farm.")
+                db.session.commit()
+                flash("Customer password reset. Share it securely with the customer.", "success")
+        elif action == "send_verification":
+            if customer.email:
+                flash(f"Verification reminder queued for {customer.email}.", "success")
+            else:
+                flash("This customer has no email address to verify.", "error")
+        return redirect(url_for("admin.customer_detail", customer_id=customer.id))
+
+    orders = Order.query.filter_by(customer_id=customer.id).order_by(Order.created_at.desc()).all()
+    completed_orders = [o for o in orders if o.status in {"Delivered", "Picked up"}]
+    lifetime_spend = sum((Decimal(str(o.total or 0)) for o in completed_orders), Decimal("0.00"))
+    outstanding = sum((Decimal(str(o.total or 0)) for o in orders
+                       if o.payment_status not in {"Paid", "Verified", "Successful"} and o.status not in {"Cancelled", "Declined"}), Decimal("0.00"))
+    average_order = (lifetime_spend / len(completed_orders)) if completed_orders else Decimal("0.00")
+    highest_order = max((Decimal(str(o.total or 0)) for o in completed_orders), default=Decimal("0.00"))
+    promotion_savings = sum((Decimal(str(o.discount_amount or 0)) for o in orders), Decimal("0.00"))
+    cart = AbandonedCart.query.filter_by(customer_id=customer.id).first()
+    try:
+        cart_data = __import__("json").loads(cart.cart_json or "{}") if cart else {}
+    except (TypeError, ValueError):
+        cart_data = {}
+    cart_count = len(cart_data) if isinstance(cart_data, dict) else 0
+    cart_products = []
+    if isinstance(cart_data, dict):
+        for product_id, cart_value in cart_data.items():
+            product = db.session.get(Product, int(product_id)) if str(product_id).isdigit() else None
+            if product:
+                cart_products.append({"name": product.name, "quantity": cart_value.get("quantity", cart_value) if isinstance(cart_value, dict) else cart_value})
+    viewed_events = AnalyticsEvent.query.filter_by(customer_id=customer.id).order_by(AnalyticsEvent.created_at.desc()).limit(30).all()
+    notes = CustomerNote.query.filter_by(customer_id=customer.id).order_by(CustomerNote.created_at.desc()).all()
     notices = CustomerNotice.query.filter_by(customer_id=customer.id).order_by(CustomerNotice.created_at.desc()).limit(30).all()
-    notes = CustomerNote.query.filter_by(customer_id=customer.id).order_by(CustomerNote.created_at.desc()).limit(20).all()
-    complaints = Complaint.query.filter(Complaint.phone == customer.phone).order_by(Complaint.created_at.desc()).all()
-    reviews = Review.query.filter(Review.phone == customer.phone).order_by(Review.created_at.desc()).all()
-    posts = CommunityPost.query.filter_by(customer_id=customer.id).order_by(CommunityPost.created_at.desc()).all()
-    comments = CommunityComment.query.filter_by(customer_id=customer.id).order_by(CommunityComment.created_at.desc()).all()
-    reactions = CommunityReaction.query.filter_by(customer_id=customer.id).count()
-    notifications = OrderNotification.query.join(Order).filter(Order.customer_id == customer.id).order_by(OrderNotification.created_at.desc()).all()
-    product_map = {product.id: product for product in Product.query.all()}
-    viewed_paths = Counter(event.path for event in events if event.event_type == "page_view" and event.path.startswith("/products/"))
-    viewed_products = []
-    for path, count in viewed_paths.most_common(8):
-        try:
-            product_id = int(path.rstrip("/").split("/")[-1])
-        except ValueError:
-            continue
-        if product_id in product_map:
-            viewed_products.append({"name": product_map[product_id].name, "count": count})
-    purchased = Counter(item.product_id for order in valid_orders for item in order.items)
-    purchased_products = [{"name": product_map[pid].name, "quantity": quantity} for pid, quantity in purchased.most_common(8) if pid in product_map]
-    cart_items = []
-    for cart in customer.abandoned_carts or []:
-        try:
-            payload = json.loads(cart.cart_json or "{}")
-        except (TypeError, ValueError):
-            payload = {}
-        for raw_id, value in payload.items():
-            try:
-                product = product_map.get(int(raw_id))
-                quantity = value.get("quantity", 1) if isinstance(value, dict) else value
-                if product:
-                    cart_items.append({"name": product.name, "quantity": quantity})
-            except (TypeError, ValueError):
-                continue
-    total = sum((Decimal(str(order.total or 0)) for order in valid_orders), Decimal("0.00"))
-    discounts = sum((Decimal(str(order.discount_amount or 0)) for order in valid_orders), Decimal("0.00"))
-    refunds = sum((order.settled_refunds for order in orders), Decimal("0.00"))
-    outstanding = sum((order.balance_due or order.refund_due or Decimal("0.00") for order in orders), Decimal("0.00"))
-    last_event = events[0].created_at if events else None
-    last_purchase = valid_orders[0].created_at if valid_orders else None
-    has_wholesale = bool(customer.wholesale_orders)
+    complaints = Complaint.query.filter(
+        (Complaint.phone == customer.phone) | (Complaint.order_id.in_([o.id for o in orders] or [-1]))
+    ).order_by(Complaint.created_at.desc()).all()
+    reviews = Review.query.filter(
+        (Review.phone == customer.phone) | (Review.order_id.in_([o.id for o in orders] or [-1]))
+    ).order_by(Review.created_at.desc()).all()
+    coupons = Coupon.query.filter_by(customer_id=customer.id).order_by(Coupon.created_at.desc()).all()
+    financial_records = OrderFinancialRecord.query.join(Order).filter(
+        Order.customer_id == customer.id
+    ).order_by(OrderFinancialRecord.created_at.desc()).all()
+    refunds_issued = sum((Decimal(str(record.amount or 0)) for record in financial_records
+                          if "refund" in (record.event_type or "").lower()
+                          and (record.status or "").lower() in {"success", "successful", "completed", "settled"}), Decimal("0.00"))
     profile_fields = [customer.name, customer.phone, customer.email, customer.address]
-    completeness = round(sum(bool(str(value or "").strip()) for value in profile_fields) / len(profile_fields) * 100)
-    if has_wholesale:
-        customer_type = "Wholesale"
-    elif completed_orders:
-        customer_type = "Regular"
-    else:
-        customer_type = "Prospective"
-    verification = "Verified" if customer.email_verified else ("Pending" if customer.email else "Unverified")
-    state_location = customer.address.split(",")[-1].strip() if customer.address and "," in customer.address else "Osun, Nigeria"
-    attention = []
-    if not customer.email or not customer.address:
-        attention.append("Incomplete profile")
-    if not completed_orders:
-        attention.append("First-purchase opportunity")
-    return {
-        "ref": f"BF-{customer.id:06d}", "status": "Active" if customer.active else ("Deactivated" if customer.deleted_at else "Suspended"),
-        "verification": verification, "location": state_location, "completeness": completeness, "customer_type": customer_type,
-        "last_active": last_event, "last_login": last_event, "last_purchase": last_purchase,
-        "orders": orders, "valid_orders": valid_orders, "successful_orders": len(completed_orders), "total": total,
-        "average": (total / len(valid_orders)).quantize(Decimal("0.01")) if valid_orders else Decimal("0.00"),
-        "highest": max((Decimal(str(order.total or 0)) for order in valid_orders), default=Decimal("0.00")),
-        "outstanding": outstanding, "refunds": refunds, "discounts": discounts,
-        "coupon_count": Coupon.query.filter_by(customer_id=customer.id).count(),
-        "abandoned_carts": len(customer.abandoned_carts or []), "cart_items": cart_items,
-        "visits": len(events), "login_frequency": len(events), "viewed_products": viewed_products,
-        "recent_viewed": viewed_products[:5], "purchased_products": purchased_products, "notifications": notifications,
-        "complaints": complaints, "reviews": reviews, "posts": posts, "comments": comments, "reactions": reactions,
-        "notices": notices, "notes": notes, "attention": attention,
-        "support_tickets": len(complaints), "feedback": len(reviews), "community_participation": len(posts)+len(comments)+reactions,
-        "whatsapp_conversations": sum(1 for item in notifications if item.channel == "whatsapp"),
-        "communication_count": len(notifications)+len(notices), "newsletter": "Subscribed" if customer.push_notifications_enabled else "Not subscribed",
-        "promotional_engagement": "Coupon holder" if Coupon.query.filter_by(customer_id=customer.id).count() else "None recorded",
-    }
+    profile_completion = round(sum(bool(str(value or "").strip()) for value in profile_fields) / len(profile_fields) * 100)
+    last_active = customer.last_login_at or customer.updated_at or customer.created_at
+    return render_template(
+        "admin/customer_detail.html", customer=customer, orders=orders,
+        completed_orders=completed_orders, lifetime_spend=lifetime_spend,
+        outstanding=outstanding, average_order=average_order, highest_order=highest_order, promotion_savings=promotion_savings, refunds_issued=refunds_issued,
+        cart=cart, cart_count=cart_count, cart_products=cart_products, viewed_events=viewed_events, notes=notes,
+        notices=notices, complaints=complaints, reviews=reviews, coupons=coupons,
+        financial_records=financial_records, profile_completion=profile_completion,
+        last_active=last_active, segments=customer_segment(customer),
+    )
+
 
 @admin_bp.route("/customers", methods=["GET", "POST"])
 @admin_required
@@ -758,10 +766,9 @@ def customers():
     segment_filter = request.args.get("segment", "").strip()
     segments = {customer.id: customer_segment(customer) for customer in customers}
     customer_coupons = {customer.id: Coupon.query.filter_by(customer_id=customer.id).order_by(Coupon.created_at.desc()).all() for customer in customers}
-    profiles = {customer.id: _customer_profile(customer) for customer in customers}
     if segment_filter:
         customers = [customer for customer in customers if segments[customer.id]["name"] == segment_filter]
-    return render_template("admin/customers.html", customers=customers, customer_coupons=customer_coupons, profiles=profiles, search_query=search, segments=segments, segment_filter=segment_filter, segment_options=["New", "Repeat", "High value", "At risk"], gift_coupons=Coupon.query.filter_by(active=True, customer_id=None).order_by(Coupon.code.asc()).all())
+    return render_template("admin/customers.html", customers=customers, customer_coupons=customer_coupons, customer_notes={c.id: CustomerNote.query.filter_by(customer_id=c.id).order_by(CustomerNote.created_at.desc()).limit(3).all() for c in customers}, search_query=search, segments=segments, segment_filter=segment_filter, segment_options=["New", "Repeat", "High value", "At risk"], gift_coupons=Coupon.query.filter_by(active=True, customer_id=None).order_by(Coupon.code.asc()).all())
 
 
 @admin_bp.route("/forms", methods=["GET", "POST"])
@@ -1754,8 +1761,9 @@ def save_dispatch_settings():
 @admin_required
 def staff_report():
     accounts = SalespersonAccount.query.order_by(SalespersonAccount.display_name.asc()).all()
-    logs = {a.id: StaffActionLog.query.filter_by(salesperson_account_id=a.id).order_by(StaffActionLog.created_at.desc()).limit(20).all() for a in accounts}
-    return render_template("admin/staff_report.html", accounts=accounts, logs=logs, generated_at=datetime.now(ZoneInfo("Africa/Lagos")))
+    generated_at = datetime.now(ZoneInfo("Africa/Lagos"))
+    return render_template("admin/staff_report.html", accounts=accounts, generated_at=generated_at,
+                           prepared_by="Owner", nav=_owner_nav())
 
 @admin_bp.get("/staff-manual")
 @admin_required

@@ -1,0 +1,15 @@
+<section class="report-section-intro" aria-label="{{ section_title }} introduction">
+  <p class="section-intro-overline">BEAMERS FARM&nbsp; / &nbsp;OPERATIONS &amp; PERFORMANCE</p>
+  <p class="section-intro-number">{{ section_number|default('01') }} <span>SECTION REPORT</span></p>
+  <h1>{{ section_title }}</h1>
+  <p class="section-intro-lead">{{ section_lead }}</p>
+  <div class="section-intro-rule"></div>
+  <h2>About this section</h2>
+  <p>{{ section_description }}</p>
+  <div class="section-intro-scope">
+    <div><strong>REPORTING PERIOD</strong><span>{{ report.period_label if report is defined and report else period_label|default('All available records') }}</span></div>
+    <div><strong>PREPARED BY</strong><span>{{ prepared_by|default('Owner') }}</span></div>
+    <div><strong>GENERATED</strong><span>{{ generated_at|local_time('%d %B %Y · %H:%M') }} WAT</span></div>
+  </div>
+  <p class="section-intro-confidential">INTERNAL BUSINESS REVIEW&nbsp; • &nbsp;CONFIDENTIAL</p>
+</section>

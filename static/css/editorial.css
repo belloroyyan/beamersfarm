@@ -510,6 +510,10 @@ input:not([type="radio"]):not([type="checkbox"]), select, textarea { border-radi
   .print-receipt, .order-summary-report, .inventory-report, .sales-report { position: static !important; width: 100% !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important; }
   .inventory-watermark { position: fixed !important; top: 42% !important; }
   .report-cover { min-height: 150mm; max-height: 170mm; overflow: hidden; display: flex; flex-direction: column; justify-content: center; page-break-after: always; break-after: page; border-bottom: 0; }
+  body:not(.print-with-cover) .report-cover { display: none !important; }
+  .report-cover-meta { margin-top: auto; padding-top: 18px; border-top: 1px solid var(--ed-ink); display: grid; grid-template-columns: 1.3fr 1fr .8fr; gap: 12px; font-size: 9pt; }
+  .report-cover-meta span { display: grid; gap: 4px; }
+  .report-cover-meta strong { font-size: 7pt; letter-spacing: .1em; }
   .order-summary-report .print-receipt-header, .inventory-report .print-receipt-header { display: none !important; }
   .report-kpis > div { break-inside: avoid; }
   .report-figures { break-inside: avoid; }
@@ -532,4 +536,278 @@ input:not([type="radio"]):not([type="checkbox"]), select, textarea { border-radi
   .live-stream-row, .live-stream-row:hover { grid-template-columns: 56px minmax(170px, 1fr) 120px 110px 200px 70px !important; min-width: 760px; padding: 14px 16px; white-space: nowrap; }
   .live-stream-row > .status-pill, .live-stream-row > strong:last-of-type, .live-stream-row > span:last-child { grid-column: auto !important; }
   .live-stream-row small { white-space: normal; }
+}
+
+
+/* Clear, button-like disclosure controls for staff and customer admin details. */
+.staff-profile-details > summary,
+.attached-coupons > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 10px 13px;
+  border: 1px solid var(--ed-rule, #d9e1d8);
+  border-radius: 9px;
+  background: var(--ed-card, #f7f8f4);
+  color: var(--ed-ink, #24372e);
+  font-size: .82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.staff-profile-details > summary::-webkit-details-marker,
+.attached-coupons > summary::-webkit-details-marker { display: none; }
+.staff-profile-details > summary::after,
+.attached-coupons > summary::after {
+  content: "";
+  width: 8px; height: 8px;
+  flex: 0 0 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform .18s ease;
+}
+.staff-profile-details[open] > summary::after,
+.attached-coupons[open] > summary::after { transform: rotate(225deg) translate(-1px, -1px); }
+.staff-profile-details > summary:hover,
+.attached-coupons > summary:hover,
+.staff-profile-details[open] > summary,
+.attached-coupons[open] > summary {
+  background: #edf2e9;
+  border-color: #aab9a8;
+  box-shadow: 0 3px 10px rgba(25, 45, 33, .07);
+}
+.staff-profile-details > summary:focus-visible,
+.attached-coupons > summary:focus-visible { outline: 3px solid rgba(50, 93, 70, .25); outline-offset: 2px; }
+.attached-coupons > span { display: block; padding: 7px 10px; border-bottom: 1px solid var(--ed-rule, #e4e9e2); font-size: .78rem; }
+@media print {
+  .staff-report-card { break-inside: avoid; }
+}
+
+
+/* Beamers Farm editorial report system: overall cover + per-section introductions */
+.report-overall-cover {
+  display:grid; grid-template-columns: 39% 61%; width:100%; min-height:620px;
+  margin:0 0 28px; padding:0; overflow:hidden; background:#fff;
+  color:#182c22; border:0; border-radius:0; text-align:left;
+  font-family:Georgia,"Times New Roman",serif;
+}
+.report-cover-brand-panel {
+  position:relative; display:flex; flex-direction:column; min-height:620px;
+  padding:48px 34px 34px; color:#fff; background:#072b1d;
+  border-right:7px solid #d55236;
+}
+.report-cover-wordmark {display:flex; flex-direction:column; gap:2px; width:max-content; margin-bottom:auto; font-family:Arial,sans-serif; letter-spacing:.16em}
+.report-cover-wordmark span {font-size:30px; font-weight:800; letter-spacing:.13em}
+.report-cover-wordmark small {font-size:12px; letter-spacing:.42em; padding-left:3px}
+.report-cover-kicker {margin:46px 0 14px; font:700 11px/1.3 Arial,sans-serif; letter-spacing:.18em}
+.report-cover-brand-panel h1 {margin:0; max-width:9ch; color:#fff; font-size:clamp(34px,4vw,58px); line-height:1.02; letter-spacing:-.045em; font-weight:500}
+.report-cover-description {margin:36px 0 0; max-width:34ch; color:#e0e9e2; font:15px/1.55 Arial,sans-serif}
+.report-cover-promise {margin:auto 0 0; color:#fff; font:700 9px/1.4 Arial,sans-serif; letter-spacing:.13em}
+.report-cover-promise i {color:#d55236; font-style:normal; padding:0 3px}
+.report-cover-content {display:flex; flex-direction:column; padding:48px 48px 25px; min-width:0}
+.report-cover-overline {margin:0 0 38px; font:700 10px/1.4 Arial,sans-serif; letter-spacing:.16em; color:#4e6257}
+.report-cover-content h2 {margin:0; color:#092d1e; font-size:clamp(38px,4.5vw,62px); line-height:.98; letter-spacing:-.04em; font-weight:500}
+.report-cover-summary {max-width:62ch; margin:22px 0 28px; color:#45574d; font:14px/1.6 Arial,sans-serif}
+.report-cover-topics {display:grid; grid-template-columns:1fr 1fr; gap:22px 26px; margin:0 0 28px}
+.report-cover-topic {position:relative; display:flex; flex-direction:column; gap:6px; min-height:76px; padding-left:15px; font-family:Arial,sans-serif}
+.report-cover-topic:before {content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:#d55236}
+.report-cover-topic b {font-size:12px; color:#d55236; letter-spacing:.08em}
+.report-cover-topic strong {font-size:10px; letter-spacing:.08em; color:#1d3528}
+.report-cover-topic span {font-size:11px; line-height:1.45; color:#5a6b60}
+.report-cover-meta {display:grid; grid-template-columns:1.25fr 1fr .8fr; gap:12px; margin-top:auto; padding:14px 15px; background:#e2eae0; font-family:Arial,sans-serif}
+.report-cover-meta span {display:flex; flex-direction:column; gap:5px; min-width:0}
+.report-cover-meta strong {font-size:8px; letter-spacing:.08em; color:#294535}
+.report-cover-meta em {font-size:10px; font-style:normal; color:#24392c; overflow-wrap:anywhere}
+.report-cover-location {margin:12px 0 0; color:#637267; font:8px/1.4 Arial,sans-serif; letter-spacing:.12em}
+.report-section-intro {
+  display:flex; flex-direction:column; justify-content:center; min-height:590px;
+  margin:0 0 28px; padding:58px 7%; background:#f5f6f1; color:#1c3025;
+  border-left:5px solid #d55236; text-align:left; break-after:page; page-break-after:always;
+}
+.section-intro-overline {margin:0 0 72px; font:700 10px/1.4 Arial,sans-serif; letter-spacing:.16em; color:#65766a}
+.section-intro-number {margin:0 0 14px; color:#d55236; font:700 12px/1.4 Arial,sans-serif; letter-spacing:.12em}
+.section-intro-number span {padding-left:10px; color:#6b796f; font-size:9px}
+.report-section-intro h1 {margin:0; color:#082d1e; font-size:clamp(42px,6vw,72px); line-height:1; letter-spacing:-.045em}
+.section-intro-lead {max-width:760px; margin:24px 0 34px; color:#34483b; font:19px/1.5 Georgia,serif}
+.section-intro-rule {width:64px; height:3px; margin-bottom:24px; background:#d55236}
+.report-section-intro h2 {margin:0 0 10px; color:#173a29; font:700 11px/1.4 Arial,sans-serif; letter-spacing:.12em; text-transform:uppercase}
+.report-section-intro>p:not(.section-intro-overline):not(.section-intro-number):not(.section-intro-lead):not(.section-intro-confidential) {max-width:760px; margin:0; color:#59695e; font:14px/1.75 Arial,sans-serif}
+.section-intro-scope {display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-top:54px; padding-top:17px; border-top:1px solid #cbd4ca; font-family:Arial,sans-serif}
+.section-intro-scope div {display:flex; flex-direction:column; gap:7px; min-width:0}
+.section-intro-scope strong {font-size:8px; letter-spacing:.1em; color:#52665a}
+.section-intro-scope span {font-size:11px; color:#20392b; overflow-wrap:anywhere}
+.section-intro-confidential {margin:40px 0 0; color:#7a887e; font:8px/1.4 Arial,sans-serif; letter-spacing:.14em}
+
+@media(max-width:760px) {
+  .report-overall-cover {grid-template-columns:1fr; min-height:0}
+  .report-cover-brand-panel {min-height:500px; padding:32px 25px}
+  .report-cover-content {padding:32px 25px 22px}
+  .report-cover-topics {gap:18px 14px}
+  .report-cover-meta {grid-template-columns:1fr; gap:10px}
+  .report-section-intro {min-height:520px; padding:36px 25px}
+  .section-intro-overline {margin-bottom:50px}
+  .section-intro-scope {grid-template-columns:1fr; gap:12px; margin-top:36px}
+}
+@media print {
+  @page report-cover-page {size:A4 landscape; margin:0}
+  .report-overall-cover {page:report-cover-page; display:grid!important; width:297mm!important; height:210mm!important; min-height:210mm!important; margin:0!important; break-after:page; page-break-after:always; border:0!important; -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important}
+  .report-cover-brand-panel {min-height:210mm!important; padding:16mm 11mm 11mm!important; -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important}
+  .report-cover-content {padding:16mm 15mm 8mm!important}
+  .report-cover-content h2 {font-size:39pt!important}
+  .report-cover-brand-panel h1 {font-size:35pt!important}
+  .report-cover-summary {font-size:10pt!important; margin:7mm 0 8mm!important}
+  .report-cover-topics {gap:5mm 7mm!important; margin-bottom:6mm!important}
+  .report-cover-topic {min-height:19mm!important}
+  .report-cover-topic strong {font-size:8pt!important}
+  .report-cover-topic span {font-size:8pt!important}
+  .report-cover-meta {padding:4mm!important}
+  .report-section-intro {min-height:180mm!important; margin:0!important; padding:18mm 20mm!important; break-after:page; page-break-after:always; -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important}
+  .report-section-intro h1 {font-size:42pt!important}
+  .section-intro-lead {font-size:14pt!important}
+  .section-intro-scope {margin-top:18mm!important}
+  body:not(.print-with-cover) .report-overall-cover {display:none!important}
+}
+
+
+/* Print reliability: keep the overall cover and each section opener on one
+   complete A4 landscape sheet. These rules intentionally override the older
+   generic .report-cover print sizing above. */
+@media print {
+  /* Keep the full-bleed cover and section openers, but give all ordinary
+     report pages a printer-safe inset. */
+  @page {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+  @page report-cover-page {
+    size: A4 landscape;
+    /* Keep the cover inside the same printable box as the default page.
+       This avoids a second sheet in browsers that don't apply named-page
+       margins consistently. */
+    margin: 12mm;
+  }
+  @page report-section-page {
+    size: A4 landscape;
+    margin: 0;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-receipt {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .report-overall-cover,
+  body.print-with-cover .report-overall-cover {
+    display: grid !important;
+    grid-template-columns: 39% 61% !important;
+    width: 273mm !important;
+    min-width: 273mm !important;
+    max-width: 273mm !important;
+    height: 186mm !important;
+    min-height: 186mm !important;
+    max-height: 186mm !important;
+    box-sizing: border-box !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    position: relative !important;
+    page: report-cover-page !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: page !important;
+    page-break-after: always !important;
+    border: 0 !important;
+  }
+
+  .report-overall-cover .report-cover-brand-panel,
+  .report-overall-cover .report-cover-content {
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-height: 186mm !important;
+    overflow: hidden !important;
+  }
+
+  .report-overall-cover .report-cover-brand-panel {
+    height: 186mm !important;
+    padding: 11mm 9mm 8mm !important;
+  }
+
+  .report-overall-cover .report-cover-content {
+    height: 186mm !important;
+    padding: 10mm 12mm 6mm !important;
+  }
+
+  .report-cover-kicker { margin: 34mm 0 4mm !important; }
+  .report-cover-brand-panel h1 { font-size: 31pt !important; line-height: 1.03 !important; }
+  .report-cover-description { margin-top: 13mm !important; font-size: 10pt !important; }
+  .report-cover-overline { margin-bottom: 9mm !important; font-size: 8pt !important; }
+  .report-cover-content h2 { font-size: 34pt !important; line-height: 1 !important; }
+  .report-cover-summary { margin: 5mm 0 6mm !important; font-size: 9pt !important; line-height: 1.4 !important; }
+  .report-cover-topics { gap: 4mm 6mm !important; margin: 0 0 5mm !important; }
+  .report-cover-topic { min-height: 17mm !important; gap: 3px !important; }
+  .report-cover-topic b { font-size: 9pt !important; }
+  .report-cover-topic strong { font-size: 7.5pt !important; }
+  .report-cover-topic span { font-size: 7.5pt !important; line-height: 1.3 !important; }
+  .report-cover-meta { margin-top: auto !important; padding: 3mm 4mm !important; gap: 3mm !important; }
+  .report-cover-meta strong { font-size: 6.5pt !important; }
+  .report-cover-meta em { font-size: 8pt !important; }
+  .report-cover-location { margin-top: 3mm !important; font-size: 6.5pt !important; }
+
+  body:not(.print-with-cover) .report-overall-cover,
+  body:not(.print-with-cover) .report-cover {
+    display: none !important;
+  }
+
+  .report-section-intro {
+    page: report-section-page !important;
+    display: flex !important;
+    flex-direction: column !important;
+    box-sizing: border-box !important;
+    width: 297mm !important;
+    min-width: 297mm !important;
+    max-width: 297mm !important;
+    height: 210mm !important;
+    min-height: 210mm !important;
+    max-height: 210mm !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 13mm 22mm !important;
+    justify-content: center !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+
+  .section-intro-overline { margin-bottom: 12mm !important; }
+  .section-intro-number { margin-bottom: 3mm !important; }
+  .report-section-intro h1 { font-size: 36pt !important; line-height: 1 !important; }
+  .section-intro-lead { margin: 5mm 0 6mm !important; font-size: 12pt !important; line-height: 1.35 !important; }
+  .section-intro-rule { margin-bottom: 5mm !important; }
+  .report-section-intro>p:not(.section-intro-overline):not(.section-intro-number):not(.section-intro-lead):not(.section-intro-confidential) {
+    font-size: 10pt !important;
+    line-height: 1.5 !important;
+  }
+  .section-intro-scope { margin-top: 7mm !important; padding-top: 4mm !important; gap: 10mm !important; }
+  .section-intro-scope div { gap: 4px !important; }
+  .section-intro-confidential { margin-top: 5mm !important; }
+
+  .report-overall-cover *,
+  .report-section-intro * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 }

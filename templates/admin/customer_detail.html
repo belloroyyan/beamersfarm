@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}{{ customer.name }} · Customer profile{% endblock %}
+{% block content %}
+<div class="admin-shell"><div class="container">
+  <div class="admin-topbar">
+    <div>
+      <a class="back-link" href="{{ url_for('admin.customers') }}">← Back to customer accounts</a>
+      <p class="eyebrow">Owner desk / customer intelligence</p>
+      <h1>{{ customer.name }}.</h1>
+      <p class="form-note">Customer #BF-{{ "%05d"|format(customer.id) }} · {{ customer.address.split(',')[-1].strip() if customer.address and ',' in customer.address else "Location not specified" }}</p>
+    </div>
+  </div>
+
+  <section class="admin-panel" style="padding:0;overflow:hidden">
+    <div style="padding:22px;background:#103e2e;color:#fff">
+      <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <strong>CUSTOMER PROFILE</strong>
+        <span class="status-pill {{ 'status-confirmed' if customer.email_verified else 'status-received' }}">{{ "Verified" if customer.email_verified else "Unverified" }}</span>
+      </div>
+      <h2 style="margin:12px 0 4px">{{ customer.name }}</h2>
+      <p style="margin:0">{{ customer.phone }} · Joined {{ customer.created_at|local_time("%d %b %Y") }}</p>
+      <p style="margin:10px 0 0">
+        <span class="status-pill {{ 'status-delivered' if customer.active else 'status-cancelled' }}">{{ "Active account" if customer.active else "Deactivated" }}</span>
+        <span class="status-pill">{{ segments.name }} customer</span>
+        {% if profile_completion < 100 %}<span class="status-pill status-received">Incomplete profile</span>{% endif %}
+      </p>
+    </div>
+    <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:1px;background:var(--line,#ddd)">
+      <div style="padding:18px;background:var(--surface,#fff)"><strong>{{ completed_orders|length }}</strong><p class="form-note">Completed orders</p></div>
+      <div style="padding:18px;background:var(--surface,#fff)"><strong>{{ format_currency(lifetime_spend) }}</strong><p class="form-note">Lifetime spend</p></div>
+      <div style="padding:18px;background:var(--surface,#fff)"><strong>{{ format_currency(average_order) }}</strong><p class="form-note">Average order value</p></div>
+      <div style="padding:18px;background:var(--surface,#fff)"><strong>{{ format_currency(outstanding) }}</strong><p class="form-note">Unpaid order value</p></div>
+      <div style="padding:18px;background:var(--surface,#fff)"><strong>{{ cart_count }}</strong><p class="form-note">Saved cart items</p></div>
+    </div>
+  </section>
+
+  <nav class="admin-panel" style="display:flex;gap:8px;flex-wrap:wrap">
+    <a class="button button-outline" href="#overview">Overview</a><a class="button button-outline" href="#orders">Orders</a>
+    <a class="button button-outline" href="#shopping">Shopping</a><a class="button button-outline" href="#activity">Activity</a>
+    <a class="button button-outline" href="#messages">Messages</a><a class="button button-outline" href="#insights">Insights</a>
+  </nav>
+
+  <section id="overview" class="admin-panel">
+    <h2>Contact information</h2>
+    <p><strong>Phone:</strong> {{ customer.phone }}</p>
+    <p><strong>Email:</strong> {{ customer.email or "Missing" }}</p>
+    <p><strong>Delivery address:</strong> {{ customer.address or "Missing — delivery details required" }}</p>
+    <p><strong>Last sign-in:</strong> {{ customer.last_login_at|local_time("%d %b %Y, %I:%M %p") if customer.last_login_at else "Not yet recorded" }}</p>
+    <p><strong>Last profile update:</strong> {{ customer.updated_at|local_time("%d %b %Y, %I:%M %p") }}</p>
+    <hr>
+    <h3>Account health</h3>
+    <p><strong>Profile completion:</strong> {{ profile_completion }}%</p>
+    <div style="height:8px;background:var(--line,#ddd);border-radius:10px;overflow:hidden"><div style="height:100%;width:{{ profile_completion }}%;background:#16834c"></div></div>
+    <p><strong>Email verification:</strong> {{ "Verified" if customer.email_verified else ("Pending — no email supplied" if not customer.email else "Unverified") }}</p>
+    <p><strong>Delivery readiness:</strong> {{ "Ready" if customer.address else "Not ready — address missing" }}</p>
+    <p><strong>WhatsApp notifications:</strong> {{ "Enabled" if customer.whatsapp_notifications_enabled else "Off" }}</p>
+    <p><strong>Push notifications:</strong> {{ "Enabled" if customer.push_notifications_enabled else "Off" }}</p>
+    <p><strong>Community profile:</strong> {{ "Public" if customer.community_profile_public else "Private" }} · Posting {{ "restricted" if customer.community_posting_blocked else "allowed" }}</p>
+  </section>
+
+  <section id="orders" class="admin-panel">
+    <h2>Order history</h2>
+    <p class="form-note">Completed-order spend counts orders marked Delivered or Picked up. Outstanding value is the total of non-cancelled orders not marked Paid, Verified, or Successful; it is not a reconciliation of partial payments.</p>
+    {% for order in orders %}
+      <article class="admin-record" style="margin:10px 0">
+        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <strong>Order #{{ order.id }} · {{ format_currency(order.total) }}</strong>
+          <span class="status-pill">{{ order.status }} · {{ order.payment_status }}</span>
+        </div>
+        <small>{{ order.created_at|local_time("%d %b %Y, %I:%M %p") }} · {{ order.order_channel|replace("_"," ")|title }}</small>
+        <p>{{ order.address or "No address recorded" }}</p>
+        {% for item in order.items %}<small>{{ item.product_name }} × {{ item.quantity }}{% if not loop.last %} · {% endif %}</small>{% endfor %}
+        <p><a href="{{ url_for('admin.order_summary', q=order.public_id) }}">Open order record →</a></p>
+      </article>
+    {% else %}<p class="form-note">No orders are linked to this account yet.</p>{% endfor %}
+    <h3>Payment and adjustment records</h3>
+    {% for record in financial_records %}
+      <p>{{ record.event_type|title }} · {{ format_currency(record.amount) }} · {{ record.status|title }} · {{ record.created_at|local_time("%d %b %Y") }}</p>
+    {% else %}<p class="form-note">No separate financial adjustments recorded.</p>{% endfor %}
+  </section>
+
+  <section id="shopping" class="admin-panel">
+    <h2>Shopping behaviour</h2>
+    <h3>Current / abandoned cart</h3>
+    {% if cart_products %}
+      {% for item in cart_products %}<p>{{ item.name }} · {{ item.quantity }}</p>{% endfor %}
+      <small>Last cart activity: {{ cart.last_activity_at|local_time("%d %b %Y, %I:%M %p") }}</small>
+    {% else %}<p class="form-note">No saved cart items found.</p>{% endif %}
+    <h3>Recently viewed pages</h3>
+    {% for event in viewed_events %}
+      <p><small>{{ event.created_at|local_time("%d %b %Y, %I:%M %p") }} · {{ event.event_type|replace("_"," ")|title }} · {{ event.path }}</small></p>
+    {% else %}<p class="form-note">No customer-linked browsing events are available.</p>{% endfor %}
+    <h3>Purchasing preferences</h3>
+    {% set purchased = [] %}
+    {% for order in orders %}{% for item in order.items %}{% if item.product_name not in purchased %}{% set _ = purchased.append(item.product_name) %}{% endif %}{% endfor %}{% endfor %}
+    <p>{{ purchased|join(", ") if purchased else "No purchase history to infer preferences from." }}</p>
+    <p class="form-note">Wishlist, cart-removal events, and category preferences are not currently captured by the application.</p>
+  </section>
+
+  <section id="activity" class="admin-panel">
+    <h2>Engagement and support activity</h2>
+    <p><strong>Reviews submitted:</strong> {{ reviews|length }}</p>
+    {% for review in reviews %}<article class="admin-record"><strong>{{ review.title }}</strong> · {{ review.rating }}/5 · {{ review.status }}<p>{{ review.body }}</p><small>{{ review.created_at|local_time("%d %b %Y") }}</small></article>{% else %}<p class="form-note">No reviews linked to this customer.</p>{% endfor %}
+    <h3>Support tickets / complaints</h3>
+    {% for complaint in complaints %}<article class="admin-record"><strong>{{ complaint.subject }}</strong> · {{ complaint.status }}<p>{{ complaint.description }}</p><small>{{ complaint.created_at|local_time("%d %b %Y") }}</small></article>{% else %}<p class="form-note">No support complaints linked to this customer.</p>{% endfor %}
+  </section>
+
+  <section id="messages" class="admin-panel">
+    <h2>Messages and internal notes</h2>
+    <p class="form-note">This section shows notices and support history stored in Beamers Farm. External WhatsApp and email conversations are not automatically imported.</p>
+    <h3>Account notices</h3>
+    {% for notice in notices %}<article class="admin-record"><strong>{{ notice.title }}</strong><p>{{ notice.message }}</p><small>{{ notice.created_at|local_time("%d %b %Y, %I:%M %p") }} · {{ notice.kind }}</small></article>{% else %}<p class="form-note">No account notices recorded.</p>{% endfor %}
+    <h3>Administrator notes</h3>
+    <form method="post" class="stacked-form">
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="add_note">
+      <label for="customer-note">Add private note</label><textarea id="customer-note" name="note" maxlength="2000" rows="3" placeholder="Record a useful customer-care detail..." required></textarea>
+      <button class="button button-dark" type="submit">Save internal note</button>
+    </form>
+    {% for note in notes %}<article class="admin-record"><p>{{ note.body }}</p><small>{{ note.created_by }} · {{ note.created_at|local_time("%d %b %Y, %I:%M %p") }}</small></article>{% else %}<p class="form-note">No administrator notes yet.</p>{% endfor %}
+    <h3>Contact customer</h3>
+    <p><a class="button button-outline" href="https://wa.me/{{ customer.phone|replace('+','') }}" target="_blank" rel="noopener">Open WhatsApp chat</a>
+    {% if customer.email %}<a class="button button-outline" href="mailto:{{ customer.email }}">Compose email</a>{% endif %}</p>
+  </section>
+
+  <section id="insights" class="admin-panel">
+    <h2>Customer intelligence</h2>
+    {% if not customer.email or not customer.address %}
+      <p><strong>Attention · Incomplete profile</strong></p><p>Customer has not supplied {{ "an email address" if not customer.email else "" }}{% if not customer.email and not customer.address %} or {% endif %}{{ "a delivery address" if not customer.address else "" }}.</p>
+      <p><strong>Suggested action:</strong> Ask the customer to complete their contact and delivery details.</p>
+    {% endif %}
+    {% if not completed_orders %}
+      <p><strong>Opportunity · First-purchase opportunity</strong></p><p>Customer has registered but has no completed purchases.</p>
+      <p><strong>Suggested action:</strong> Introduce available products and offer help with the first order.</p>
+    {% elif segments.name == "At risk" %}
+      <p><strong>Attention · Customer may be inactive</strong></p><p>No recent order has been recorded for {{ segments.days_since }} days.</p>
+      <p><strong>Suggested action:</strong> Send a considerate check-in or relevant product update.</p>
+    {% elif segments.name == "High value" %}
+      <p><strong>Opportunity · High-value customer</strong></p><p>This customer has a repeat purchase history and substantial completed spend.</p>
+      <p><strong>Suggested action:</strong> Consider a loyalty thank-you or early notice of relevant offers.</p>
+    {% else %}
+      <p><strong>Customer segment:</strong> {{ segments.name }}</p><p>Use the order history and support records above to guide the next customer-care interaction.</p>
+    {% endif %}
+    <p><strong>Highest completed order:</strong> {{ format_currency(highest_order) }}</p>
+    <p><strong>Promotion savings recorded:</strong> {{ format_currency(promotion_savings) }}</p>
+    <p><strong>Refunds issued:</strong> {{ format_currency(refunds_issued) }}</p>
+    <p><strong>Coupons attached:</strong> {{ coupons|length }}</p>
+    {% for coupon in coupons %}<p>{{ coupon.code }} · {{ coupon.value }}{% if coupon.discount_type == "percent" %}%{% endif %} · {{ "Active" if coupon.active else "Paused" }}</p>{% else %}<p class="form-note">No coupons attached.</p>{% endfor %}
+  </section>
+
+  <section class="admin-panel">
+    <h2>Administrator actions</h2>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <a class="button button-outline" href="{{ url_for('admin.order_summary', q=customer.phone) }}">View all orders</a>
+      {% if customer.email and not customer.email_verified %}
+      <form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="send_verification"><button class="button button-outline">Verification reminder</button></form>
+      {% endif %}
+      <form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="{{ 'deactivate' if customer.active else 'activate' }}"><button class="button button-outline">{{ "Deactivate account" if customer.active else "Reactivate account" }}</button></form>
+      <form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="{{ 'block_community' if not customer.community_posting_blocked else 'unblock_community' }}"><button class="button button-outline">{{ "Restrict community posting" if not customer.community_posting_blocked else "Restore community posting" }}</button></form>
+    </div>
+    <details style="margin-top:16px"><summary>Reset customer password</summary>
+      <form method="post" class="stacked-form"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="reset_password">
+      <label>Temporary password<input type="password" name="password" minlength="8" autocomplete="new-password" required></label><button class="button button-dark">Reset password</button></form>
+    </details>
+  </section>
+</div></div>
+{% endblock %}

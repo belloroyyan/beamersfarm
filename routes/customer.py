@@ -78,6 +78,7 @@ def register():
                 name=name, phone=normalized_phone, email=email,
                 password_hash=generate_password_hash(password),
                 email_verified=False,
+                last_login_at=datetime.utcnow(),
             )
             db.session.add(customer)
             db.session.commit()
@@ -103,6 +104,8 @@ def login():
             flash("The phone/email or password is not correct.", "error")
         else:
             customer = matching_customer
+            customer.last_login_at = datetime.utcnow()
+            db.session.commit()
             session["customer_id"] = customer.id
             flash(f"Welcome back, {customer.name.split()[0]}.", "success")
             return redirect(safe_next(next_url))

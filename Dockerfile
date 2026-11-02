@@ -13,4 +13,4 @@ COPY . .
 RUN mkdir -p instance
 
 EXPOSE 3000
-CMD sh -c 'flask --app app db upgrade && python -m scripts.seed && exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 --error-logfile - app:app'
+CMD sh -c 'flask --app app db upgrade && python -m scripts.seed && exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 --access-logfile - --error-logfile - app:app'

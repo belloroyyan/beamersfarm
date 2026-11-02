@@ -32,8 +32,12 @@
   </div>
 
   <article class="print-receipt inventory-report">
-  {% set cover_title = "Inventory Summary" %}{% set cover_lines = [(report.period_label), ("Stock position and sales movement for the selected period")] %}
   {% include "reports/_cover.html" %}
+    {% set section_number = "03" %}
+    {% set section_title = "Inventory Summary" %}
+    {% set section_lead = "A view of current product availability alongside stock reservations, verified sales and recorded inventory movement." %}
+    {% set section_description = "This section presents the current stock position and activity associated with orders placed in the selected period. It distinguishes verified sales from unverified reservations and cancelled units, and identifies active, archived or removed catalogue records. The explanatory note accompanying the inventory table defines how units, requested weight, sales and refunds are counted." %}
+    {% include "reports/_section_intro.html" %}
     <div class="inventory-watermark" aria-hidden="true">BEAMERS FARM · INVENTORY REPORT</div>
     <header class="print-receipt-header"><img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farm" loading="lazy" decoding="async"><div><p class="eyebrow">Private · {{ nav.copy_label }}</p><h1>Inventory summary</h1><p>{{ report.period_label }}{% if report.search_query %} · Product filter: {{ report.search_query }}{% endif %}</p></div><span class="status-pill status-confirmed">{{ report.rows|length }} product lines</span></header>
     <div class="inventory-report-note"><strong>How to read this report.</strong> Current stock is counted in physical sale units. “Verified units” and gross item sales are non-cancelled orders with payment verified during orders placed in the selected period; requested kg is the customer's combined size on verified lines. Gross item sales are before recorded refunds and exclude delivery fees. Unverified orders reserve stock but are not counted as sales. Cancelled orders are excluded and their stock is restored.</div>
