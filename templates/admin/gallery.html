@@ -15,7 +15,9 @@
         </article>{% endfor %}
       </div>{% else %}<div class="empty-state compact"><h3>{{ 'No matching gallery images.' if search_query else 'Your gallery is empty.' }}</h3><p>{{ 'Try a different title or ID.' if search_query else 'Add a photo with the form to begin.' }}</p></div>{% endif %}
     </section>
-    <section class="admin-panel add-product-panel gallery-add-panel"><p class="eyebrow">New gallery photo</p><h2>Add media</h2><p class="form-note">Use a photo you have permission to publish. Accepted: JPG, PNG, WEBP (8 MB) or MP4, WEBM, MOV (80 MB).</p>
+    <div class="owner-new-button"><button class="button button-lime" type="button" data-open-admin-dialog="gallery-create-dialog">New Gallery item</button></div>
+    <dialog class="admin-panel add-product-panel gallery-add-panel" data-admin-dialog="gallery-create-dialog" aria-labelledby="gallery-create-title"><p class="eyebrow">New gallery photo</p><h2 id="gallery-create-title">Add media</h2><p class="form-note">Use a photo you have permission to publish. Accepted: JPG, PNG, WEBP (8 MB) or MP4, WEBM, MOV (80 MB).</p>
+      <button class="admin-dialog-x" type="button" data-admin-dialog-close aria-label="Close">×</button>
       <form method="post" enctype="multipart/form-data">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
         <label>Title<input type="text" name="title" maxlength="120" required placeholder="e.g. Fresh stock at the farm"></label>
@@ -23,9 +25,10 @@
         <label>Photo<input type="file" name="image" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime" required></label>
         <label>Display order<input type="number" name="sort_order" step="1" value="0"><small class="field-help">Lower numbers appear first.</small></label>
         <label class="catalog-setting-toggle"><input type="checkbox" name="active" value="yes" checked><span><strong>Publish on the public gallery</strong><small>Uncheck to save the media as hidden.</small></span></label><label class="catalog-setting-toggle"><input type="checkbox" name="pinned" value="yes"><span><strong>Pin a short summary on the homepage</strong><small>Only one gallery item is pinned at a time.</small></span></label>
-        <button class="button button-lime button-full" type="submit">Add gallery media <span>+</span></button>
+        <button class="button button-outline" type="button" data-admin-dialog-close>Cancel</button>
+      <button class="button button-lime button-full" type="submit">Add gallery media <span>+</span></button>
       </form>
-    </section>
+    </dialog>
   </div>
 </div></div>
 {% endblock %}

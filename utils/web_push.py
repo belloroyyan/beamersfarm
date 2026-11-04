@@ -140,7 +140,7 @@ def send_customer_abandoned_cart_push(customer, cart_total=None):
         db.session.rollback()
         logger.exception("Could not read abandoned-cart subscriptions for customer %s.", customer.id)
         return {**empty, "configured": True, "failed": 1}
-    return _send_to_subscriptions(subscriptions, "Your Beamers Farm cart is waiting", "You left items in your cart. Come back when you are ready to complete your order.", "/cart", "customer")
+    return _send_to_subscriptions(subscriptions, "Your Beamers Farms cart is waiting", "You left items in your cart. Come back when you are ready to complete your order.", "/cart", "customer")
 
 
 def send_dispatch_assignment_push():
@@ -175,4 +175,4 @@ def send_customer_community_reply_push(customer, post):
     except SQLAlchemyError:
         db.session.rollback(); logger.exception("Could not read community subscriptions for customer %s", customer.id)
         return {**empty, "configured": True, "failed": 1}
-    return _send_to_subscriptions(subscriptions, "Beamers Farm replied", "The Beamers Farm team replied to your community post.", "/community", "customer community")
+    return _send_to_subscriptions(subscriptions, "Beamers Farms replied", "The Beamers Farms team replied to your community post.", "/community", "customer community")

@@ -15,7 +15,8 @@ from utils.web_push import send_customer_community_reply_push
 
 community_bp = Blueprint("community", __name__, url_prefix="/community")
 CATEGORIES = ["Everything", "Order help", "Little notes", "Ideas & feedback"]
-SPECIAL_CATEGORY = "From Beamers Farm"
+SPECIAL_CATEGORY = "From Beamers Farms"
+SPECIAL_CATEGORIES = (SPECIAL_CATEGORY, SPECIAL_CATEGORY[:-1])  # Keep recognizing posts saved under the former category value.
 REPORT_REASONS = ["Spam", "Abusive or hateful", "Inappropriate content", "Something else"]
 
 
@@ -74,7 +75,7 @@ def _community_author_names(posts, comments):
 
     post_names = {post.id: visible_name(post.customer_id) for post in posts}
     comment_names = {
-        comment.id: ("Beamers Farm team" if comment.is_staff else visible_name(comment.customer_id))
+        comment.id: ("Beamers Farms team" if comment.is_staff else visible_name(comment.customer_id))
         for thread in comments.values() for comment in thread
     }
     return post_names, comment_names
@@ -106,7 +107,7 @@ def feed():
     else:
         query = CommunityPost.query.filter_by(status="published")
         if category in CATEGORIES[1:]:
-            query = query.filter(or_(CommunityPost.category == category, CommunityPost.category == SPECIAL_CATEGORY))
+            query = query.filter(or_(CommunityPost.category == category, CommunityPost.category.in_(SPECIAL_CATEGORIES)))
         if search_query:
             pattern = f"%{search_query}%"
             matching_comment_post_ids = db.session.query(CommunityComment.post_id).filter(
@@ -116,7 +117,6 @@ def feed():
             query = query.filter(or_(CommunityPost.body.ilike(pattern), CommunityPost.id.in_(matching_comment_post_ids)))
         posts = query.order_by(CommunityPost.created_at.desc()).limit(100).all()
         posts = [post for post in posts if post.customer_id not in blocked]
-        posts.sort(key=lambda post: post.category != SPECIAL_CATEGORY)  # special posts stay pinned on top
 
     comments = {}
     reactions = {}
@@ -125,12 +125,12 @@ def feed():
         reactions[post.id] = CommunityReaction.query.filter_by(post_id=post.id).count()
     post_authors, comment_authors = _community_author_names(posts, comments)
     for post in posts:
-        if post.category == SPECIAL_CATEGORY:
-            post_authors[post.id] = "Beamers Farm"
+        if post.category in SPECIAL_CATEGORIES:
+            post_authors[post.id] = "Beamers Farms"
     unread = CommunityNotification.query.filter_by(customer_id=customer.id, read_at=None).count() if customer else 0
     settings = ShopSettings.query.get(1)
 
-    popular_posts = sorted(posts, key=lambda post: (reactions.get(post.id, 0) + len(comments.get(post.id, [])), post.created_at), reverse=True)[:3]
+    popular_posts = sorted(posts, key=lambda post: (reactions.get(post.id, 0) + len(comments.get(post.id, [])), post.created_at), reverse=True)[:1]
     recently_answered = []
     for post in posts:
         staff_replies = [comment for comment in comments.get(post.id, []) if comment.is_staff]
@@ -148,7 +148,7 @@ def feed():
 
     considered_suggestions = CommunityPost.query.filter_by(
         status="published", considering=True, category="Ideas & feedback"
-    ).order_by(CommunityPost.updated_at.desc()).limit(4).all()
+    ).order_by(CommunityPost.updated_at.desc()).limit(1).all()
     considered_names, _ = _community_author_names(considered_suggestions, {})
 
     return render_template(
@@ -166,8 +166,8 @@ def feed():
         post_authors=post_authors,
         comment_authors=comment_authors,
         popular_posts=popular_posts,
-        recently_answered=recently_answered[:4],
-        product_mentions=product_mentions[:5],
+        recently_answered=recently_answered[:1],
+        product_mentions=product_mentions[:1],
         considered_suggestions=considered_suggestions,
         considered_names=considered_names,
         community_image_url=community_image_url,
@@ -175,7 +175,7 @@ def feed():
         community_closed_message=settings.community_closed_message if settings else "The community is currently closed.",
         community_blocked=bool(customer and customer.community_posting_blocked),
         is_owner=is_owner(),
-        special_category=SPECIAL_CATEGORY,
+        special_categories=SPECIAL_CATEGORIES,
     )
 
 
@@ -221,9 +221,9 @@ def special_post():
     if error:
         flash(error, "error")
         return redirect(url_for("community.feed"))
-    db.session.add(CommunityPost(customer_id=None, author_name="Beamers Farm", category=SPECIAL_CATEGORY, body=body, image=image))
+    db.session.add(CommunityPost(customer_id=None, author_name="Beamers Farms", category=SPECIAL_CATEGORY, body=body, image=image))
     db.session.commit()
-    flash("Your special post is live at the top of the community.", "success")
+    flash("Your official Beamers Farms post is live in the community feed.", "success")
     return redirect(url_for("community.feed"))
 
 
@@ -232,7 +232,7 @@ def special_post_delete(post_id):
     if not is_owner():
         abort(403)
     post = CommunityPost.query.get_or_404(post_id)
-    if post.category != SPECIAL_CATEGORY:
+    if post.category not in SPECIAL_CATEGORIES:
         abort(404)
     post.status = "deleted"
     db.session.commit()
@@ -382,10 +382,10 @@ def staff_reply(post_id):
     body = request.form.get("body", "").strip()
     if not body or len(body) > 2000:
         return redirect(url_for("community.support"))
-    db.session.add(CommunityComment(post_id=post.id, author_name="Beamers Farm team", body=body, is_staff=True))
+    db.session.add(CommunityComment(post_id=post.id, author_name="Beamers Farms team", body=body, is_staff=True))
     if post.customer_id:
-        db.session.add(CommunityNotification(customer_id=post.customer_id, post_id=post.id, message="Beamers Farm replied to your community post."))
-        db.session.add(CustomerNotice(customer_id=post.customer_id, title="A community reply from Beamers Farm", message="The Beamers Farm team replied to your community conversation.", kind="community"))
+        db.session.add(CommunityNotification(customer_id=post.customer_id, post_id=post.id, message="Beamers Farms replied to your community post."))
+        db.session.add(CustomerNotice(customer_id=post.customer_id, title="A community reply from Beamers Farms", message="The Beamers Farms team replied to your community conversation.", kind="community"))
     db.session.commit()
     if post.customer_id:
         customer = db.session.get(Customer, post.customer_id)
@@ -414,7 +414,7 @@ def support():
     reports = CommunityReport.query.filter_by(status="open").order_by(CommunityReport.created_at.desc()).all()
     comments = {post.id: CommunityComment.query.filter_by(post_id=post.id, status="published").all() for post in posts}
     author_names = {post.id: (db.session.get(Customer, post.customer_id).name if post.customer_id and db.session.get(Customer, post.customer_id) else "Community member") for post in posts}
-    author_names.update({comment.id: (db.session.get(Customer, comment.customer_id).name if comment.customer_id and db.session.get(Customer, comment.customer_id) else ("Beamers Farm team" if comment.is_staff else "Community member")) for thread in comments.values() for comment in thread})
+    author_names.update({comment.id: (db.session.get(Customer, comment.customer_id).name if comment.customer_id and db.session.get(Customer, comment.customer_id) else ("Beamers Farms team" if comment.is_staff else "Community member")) for thread in comments.values() for comment in thread})
     return render_template("admin/community_support.html", unanswered=unanswered, reports=reports, comments=comments, author_names=author_names, community_settings=settings, suggestions=[post for post in posts if post.category == "Ideas & feedback"])
 
 
@@ -426,7 +426,7 @@ def toggle_suggestion_considering(post_id):
     post.considering = not post.considering
     post.updated_at = datetime.utcnow()
     if post.customer_id:
-        message = "Beamers Farm is considering your suggestion." if post.considering else "Beamers Farm updated the review status of your suggestion."
+        message = "Beamers Farms is considering your suggestion." if post.considering else "Beamers Farms updated the review status of your suggestion."
         db.session.add(CustomerNotice(customer_id=post.customer_id, title="Suggestion status updated", message=message, kind="community"))
     db.session.commit()
     flash("Suggestion status updated.", "success")
@@ -452,7 +452,7 @@ def moderate_report(report_id):
             comment.status = "hidden"
             affected_customer_id = comment.customer_id
     if affected_customer_id:
-        db.session.add(CustomerNotice(customer_id=affected_customer_id, title="A community post was moderated", message="The Beamers Farm team reviewed community content connected to your account. Please keep future posts respectful and helpful.", kind="community"))
+        db.session.add(CustomerNotice(customer_id=affected_customer_id, title="A community post was moderated", message="The Beamers Farms team reviewed community content connected to your account. Please keep future posts respectful and helpful.", kind="community"))
     db.session.commit()
     return redirect(url_for("community.support"))
 

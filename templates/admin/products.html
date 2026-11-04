@@ -1,11 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Products · Beamers Farm{% endblock %}
+{% block title %}Products · Beamers Farms{% endblock %}
 {% block content %}
 <div class="admin-shell"><div class="container">
   <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / catalog</p><h1>Products &amp; stock</h1></div><div class="admin-actions"><a class="button button-outline light-outline" href="{{ url_for('admin.partner_ads') }}">Manage partner ads</a><a class="button button-outline light-outline" href="{{ url_for('shop.index') }}">View shop ↗</a></div></div>
+  <div class="owner-new-button"><button class="button button-lime" type="button" data-open-admin-dialog="product-create-dialog">New Product</button></div>
   <div class="product-admin-grid">
     <section class="admin-panel">
-      <div class="panel-heading"><div><p class="eyebrow">Current catalog</p><h2>Prices and availability</h2><p class="form-note">These are Beamers Farm products. Stock is counted in physical sale units. Use Partner advertisements for independent suppliers and offers that are not sold or fulfilled by Beamers Farm.</p></div></div>
+      <div class="panel-heading"><div><p class="eyebrow">Current catalog</p><h2>Prices and availability</h2><p class="form-note">These are Beamers Farms products. Stock is counted in physical sale units. Use Partner advertisements for independent suppliers and offers that are not sold or fulfilled by Beamers Farms.</p></div></div>
       <form method="get" class="record-search" role="search"><label>Search products<input type="search" name="q" maxlength="120" value="{{ search_query }}" placeholder="Product name or ID"></label><button class="button button-dark" type="submit">Search</button>{% if search_query %}<a class="table-link" href="{{ url_for('admin.products') }}">Clear</a>{% endif %}</form>
       <div class="admin-product-list">
         {% for product in products %}
@@ -18,8 +19,9 @@
         {% endfor %}
       </div>
     </section>
-    <section class="admin-panel add-product-panel">
-      <p class="eyebrow">Add a product</p><h2>New stock line</h2>
+    <dialog class="admin-panel add-product-panel" data-admin-dialog="product-create-dialog" aria-labelledby="product-create-title">
+      <p class="eyebrow">Add a product</p><h2 id="product-create-title">New stock line</h2>
+      <button class="admin-dialog-x" type="button" data-admin-dialog-close aria-label="Close">×</button>
       <form method="post" enctype="multipart/form-data">
         <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
         <label>Product name<input type="text" name="name" placeholder="e.g. Chicken Wings" required></label>
@@ -30,9 +32,10 @@ Marinate"></textarea><small class="field-help">One method per line. Customers ca
         <label>Stock on hand<input id="new-product-stock" data-stock-quantity type="number" name="stock" min="0" step="1" placeholder="12" required><small class="field-help">Available sale quantity.</small></label><label>Minimum order quantity<input type="number" name="minimum_order_quantity" min="0.001" step="0.001" value="1" required><small class="field-help">Customers must order at least this amount.</small></label><label>Low-stock alert at<input type="number" name="low_stock_threshold" min="0" step="0.001" value="5"><small class="field-help">Notify the owner when stock reaches this level.</small></label>
         <label class="catalog-setting-toggle"><input type="checkbox" name="allow_fractional_quantity" value="yes" data-fractional-quantity-toggle><span><strong>Allow fractional quantities</strong><small>Enable partial orders (for example, 0.5 or 1.25), up to three decimal places.</small></span></label>
         <label>Product image <small class="field-help">Optional · JPG, PNG, or WEBP · max 8 MB</small><input type="file" name="image" accept="image/jpeg,image/png,image/webp"></label>
-        <button class="button button-lime button-full" type="submit">Add product <span>+</span></button>
+        <button class="button button-outline" type="button" data-admin-dialog-close>Cancel</button>
+      <button class="button button-lime button-full" type="submit">Add product <span>+</span></button>
       </form>
-    </section>
+    </dialog>
   </div>
 </div></div>
 {% endblock %}

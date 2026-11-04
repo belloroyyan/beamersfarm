@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Order desk · Beamers Farm{% endblock %}
+{% block title %}Order desk · Beamers Farms{% endblock %}
 {% block content %}
 <div class="admin-shell"><div class="container">
   <div class="admin-topbar">
@@ -10,6 +10,7 @@
         <nav class="owner-actions-panel" aria-label="Owner actions">
           <p class="owner-actions-title">Management shortcuts</p><label class="actions-search"><span class="sr-only">Search actions</span><input type="search" placeholder="Search actions…" data-actions-search></label>
           <a href="{{ url_for('admin.sales_report') }}"><span>Sales report</span><span aria-hidden="true">→</span></a>
+          <a href="{{ url_for('admin.customer_messages') }}"><span>Message customers</span><span aria-hidden="true">→</span></a>
           <a href="{{ url_for('admin.order_summary') }}"><span>Order summary</span><span aria-hidden="true">→</span></a>
           <a href="{{ url_for('admin.inventory_summary') }}"><span>Inventory summary</span><span aria-hidden="true">→</span></a>
           <a href="{{ url_for('admin.products') }}"><span>Manage products</span><span aria-hidden="true">→</span></a>

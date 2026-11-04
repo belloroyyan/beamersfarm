@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Secure drop · Beamers Farm{% endblock %}
+{% block title %}Secure drop · Beamers Farms{% endblock %}
 {% block content %}
 <div class="container page-shell secure-drop-shell">
   <div class="page-heading">
@@ -70,7 +70,7 @@
 {% if created_link %}
 <dialog class="community-post-dialog drop-dialog" data-drop-created aria-labelledby="drop-created-title">
   <div class="community-dialog-head"><div><p class="eyebrow">Vault key ready</p><h2 id="drop-created-title">Asset stored securely.</h2></div><button type="button" class="community-dialog-close" data-close-drop-dialog aria-label="Close">×</button></div>
-  <p class="community-dialog-note">This one-time link expires {{ created_until|local_time("%d %b %Y · %H:%M") }} and stops working once opened. Share it only with the intended Beamers Farm teammate.</p>
+  <p class="community-dialog-note">This one-time link expires {{ created_until|local_time("%d %b %Y · %H:%M") }} and stops working once opened. Share it only with the intended Beamers Farms teammate.</p>
   <label for="drop-link">One-time link</label>
   <input id="drop-link" value="{{ created_link }}" readonly data-drop-link>
   <div class="community-dialog-actions"><button class="button button-outline" type="button" data-close-drop-dialog>Done</button><button class="button button-lime" type="button" data-copy-drop-link>Copy link</button></div>

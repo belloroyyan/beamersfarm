@@ -1,15 +1,36 @@
+# Python
 __pycache__/
 *.py[cod]
 .venv/
 venv/
 .env
+.env.*
 instance/database.db*
 instance/vapid_private.pem
+instance/*
+!instance/.gitkeep
+*.sqlite
+*.sqlite3
+*.db
 .pytest_cache/
-.DS_Store
+.mypy_cache/
+.ruff_cache/
+.coverage
+
+# Web starter / build outputs
+node_modules/
+dist/
+
+# Local customer uploads; keep folders present
 static/uploads/products/*
 !static/uploads/products/.gitkeep
 static/uploads/partners/*
 !static/uploads/partners/.gitkeep
 static/uploads/gallery/*
 !static/uploads/gallery/.gitkeep
+static/uploads/updates/*
+!static/uploads/updates/.gitkeep
+static/uploads/community/*
+!static/uploads/community/.gitkeep
+
+.DS_Store

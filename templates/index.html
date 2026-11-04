@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% from "macros/update_sharing.html" import update_share_buttons %}
 {% from "macros/partner_ad_card.html" import partner_ad_card with context %}
-{% block title %}{{ page_title|default("Beamers Farm") }}{% endblock %}
-{% block structured_data %}<script type="application/ld+json">{{ {"@context":"https://schema.org", "@type":"LocalBusiness", "@id":canonical_url ~ "#business", "name":"Beamers Farm", "url":canonical_url, "logo":social_image, "image":social_image, "description":"Fresh, clean, hygienically packaged frozen chicken in Osogbo, Nigeria.", "telephone":"+2348062074302", "address":{"@type":"PostalAddress","streetAddress":"Elapop Estate, Oke Baale","addressLocality":"Osogbo","addressRegion":"Osun State","addressCountry":"NG"}, "areaServed":"Osogbo"}|tojson }}</script>{% endblock %}
+{% block title %}{{ page_title|default("Beamers Farms") }}{% endblock %}
+{% block structured_data %}<script type="application/ld+json">{{ {"@context":"https://schema.org", "@type":"LocalBusiness", "@id":canonical_url ~ "#business", "name":"Beamers Farms", "url":canonical_url, "logo":social_image, "image":social_image, "description":"Fresh, clean, hygienically packaged frozen chicken in Osogbo, Nigeria.", "telephone":"+2348062074302", "address":{"@type":"PostalAddress","streetAddress":"Elapop Estate, Oke Baale","addressLocality":"Osogbo","addressRegion":"Osun State","addressCountry":"NG"}, "areaServed":"Osogbo"}|tojson }}</script>{% endblock %}
 {% block content %}
 {% if not shop_is_open %}<div class="container shop-notice"><strong>Orders are currently closed.</strong><span>{{ shop_closed_message }}</span></div>{% endif %}
 {% if latest_update %}
@@ -22,13 +22,13 @@
 {% if latest_gallery %}<div class="gallery-update-strip"><p class="eyebrow">New in the farm journal</p><strong>{{ latest_gallery.title }}</strong><a class="table-link" href="{{ url_for('shop.gallery') }}">View the new gallery image →</a></div>{% endif %}
 <section class="hero container">
   <div class="hero-copy">
-    <p class="eyebrow">{{ greeting }}, welcome to Beamers Farm · Osogbo delivery or farm pickup</p>
+    <p class="eyebrow">{{ greeting }}, welcome to Beamers Farms · Osogbo delivery or farm pickup</p>
     <h1>Good food starts with <em>good chicken.</em></h1>
     <p class="hero-lede">Your trusted local source for fresh, clean, and hygienically packaged frozen chicken, whole birds, and delicious parts. Choose a delivery zone across Osogbo or collect your order from our farm.</p>
-    <a class="button button-dark" href="#products">Shop Beamers Farm <span>↓</span></a>
+    <a class="button button-dark" href="#products">Shop Beamers Farms <span>↓</span></a>
   </div>
   <div class="hero-card hero-image-card">
-    <img src="{{ url_for('static', filename='images/full-dressed-chicken-hero.jpg') }}" alt="A fully dressed chicken prepared by Beamers Farm" fetchpriority="high">
+    <img src="{{ url_for('static', filename='images/full-dressed-chicken-hero.jpg') }}" alt="A fully dressed chicken prepared by Beamers Farms" fetchpriority="high">
     <div class="hero-card-overlay"><span>PACKED WITH CARE</span><strong>Clean portions. Fair prices.</strong></div>
   </div>
 </section>
@@ -41,7 +41,7 @@
 </section>
 {% if pinned_gallery %}<section class="container pinned-gallery-summary" aria-labelledby="pinned-gallery-heading"><div class="pinned-gallery-media">{% if pinned_gallery.media_type == "video" %}<video controls preload="metadata" src="{{ gallery_image_url(pinned_gallery.image) }}"></video>{% else %}<img src="{{ gallery_image_url(pinned_gallery.image) }}" alt="{{ pinned_gallery.title }}" loading="lazy">{% endif %}</div><a class="pinned-gallery-open" href="{{ url_for('shop.gallery') }}" aria-label="Explore the farm gallery">Explore gallery →</a></section>{% endif %}
 <section class="container section" id="products">
-  <div class="section-heading"><div><p class="eyebrow">Beamers Farm quick menu</p><h2>Popular picks</h2></div><span class="section-note">Handpicked by the shop</span></div>
+  <div class="section-heading"><div><p class="eyebrow">Beamers Farms quick menu</p><h2>Popular picks</h2></div><span class="section-note">Handpicked by the shop</span></div>
   {% if products %}
     <div class="product-grid">
       {% for product in products %}
@@ -59,16 +59,16 @@
     </div>
     <div class="section-cta"><a class="button button-dark" href="{{ url_for('shop.products') }}">See the full menu ({{ total_products }} products) <span>→</span></a></div>
   {% else %}
-    <div class="empty-state"><h3>We are restocking soon.</h3><p>Message Beamers Farm on WhatsApp and we will let you know what is available.</p></div>
+    <div class="empty-state"><h3>We are restocking soon.</h3><p>Message Beamers Farms on WhatsApp and we will let you know what is available.</p></div>
   {% endif %}
 </section>
 {% if partner_ads %}
 <section class="container section partner-offers-section" id="partner-offers" aria-labelledby="partner-offers-heading">
-  <div class="section-heading"><div><p class="eyebrow">Independent local suppliers</p><h2 id="partner-offers-heading">Partner offers</h2><p class="section-intro">Advertisements from independent suppliers. These offers are not Beamers Farm products or part of our checkout.</p></div><span class="section-note">{{ partner_ads|length }} listings</span></div>
+  <div class="section-heading"><div><p class="eyebrow">Independent local suppliers</p><h2 id="partner-offers-heading">Partner offers</h2><p class="section-intro">Advertisements from independent suppliers. These offers are not Beamers Farms products or part of our checkout.</p></div><span class="section-note">{{ partner_ads|length }} listings</span></div>
   <div class="partner-ad-grid">{% for listing in partner_ads %}{{ partner_ad_card(listing) }}{% endfor %}</div>
 </section>
 {% endif %}
-<section class="container note-panel"><div><p class="eyebrow">Made for Osogbo kitchens</p><h2>Freshness, hygiene, affordability, and portions that fit your table.</h2></div><p>From everyday family meals to restaurant prep and catering orders, Beamers Farm keeps frozen chicken simple, clean, and convenient. Need help choosing? <a class="note-link" href="https://wa.me/2348062074302" target="_blank" rel="noopener">Chat with us on WhatsApp.</a></p></section>
+<section class="container note-panel"><div><p class="eyebrow">Made for Osogbo kitchens</p><h2>Freshness, hygiene, affordability, and portions that fit your table.</h2></div><p>From everyday family meals to restaurant prep and catering orders, Beamers Farms keeps frozen chicken simple, clean, and convenient. Need help choosing? <a class="note-link" href="https://wa.me/2348062074302" target="_blank" rel="noopener">Chat with us on WhatsApp.</a></p></section>
 {% if cart_count %}<a class="cart-float" href="{{ url_for('shop.cart') }}">View cart <span class="cart-count">{{ format_quantity(cart_count) }}</span></a>{% endif %}
 {% endblock %}
 {% block scripts %}{% if latest_update %}<script src="{{ url_for('static', filename='js/update-sharing.js') }}" defer></script>{% endif %}{% endblock %}

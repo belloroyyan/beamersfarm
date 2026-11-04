@@ -19,7 +19,7 @@
   document.querySelectorAll("[data-update-share]").forEach((card) => {
     const url = card.dataset.shareUrl;
     const imageUrl = card.dataset.shareImage;
-    const title = card.dataset.shareTitle || "Beamers Farm update";
+    const title = card.dataset.shareTitle || "Beamers Farms update";
     const text = `${card.dataset.shareText || title}\n${url}`;
     const status = card.querySelector("[data-share-status]");
 

@@ -1,7 +1,7 @@
 """Harden order privacy and integrity constraints
 
 Revision ID: 091ae9e801ad
-Revises: 
+Revises:
 Create Date: 2026-09-29 10:04:40.675763
 
 """

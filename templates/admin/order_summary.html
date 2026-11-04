@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Order Summary · Beamers Farm{% endblock %}
+{% block title %}Order Summary · Beamers Farms{% endblock %}
 {% block content %}
 <div class="admin-shell">
   <div class="container">
@@ -21,9 +21,9 @@
     </section>
 
     <article class="print-receipt order-summary-report">
-      <div class="inventory-watermark" aria-hidden="true">BEAMERS FARM · ORDER SUMMARY</div>
+      <div class="inventory-watermark" aria-hidden="true">Beamers Farms · ORDER SUMMARY</div>
       <header class="print-receipt-header">
-        <img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farm" loading="lazy" decoding="async">
+        <img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farms" loading="lazy" decoding="async">
         <div><p class="eyebrow">Private · {{ nav.copy_label }}</p><h1>Order Summary</h1><p>{{ period_label }}{% if search_query %} · Search: {{ search_query }}{% endif %}</p></div>
         <span class="status-pill status-confirmed">{{ orders|length }} orders</span>
       </header>
@@ -53,7 +53,7 @@
         <div class="empty-state compact"><h3>No matching orders.</h3><p>Try a different date range or search term.</p></div>
       {% endif %}
       <div class="inventory-period-footnote"><span>{{ orders|length }} order record(s)</span><span>{{ orders|selectattr('order_channel', 'equalto', 'in_person')|list|length }} farm-counter sale(s)</span><span>{{ period_label }}</span><span>{{ nav.copy_label }} · customer/payment details are confidential</span></div>
-      <footer class="print-receipt-footer"><span>Beamers Farm · Order Summary</span><span>Generated {{ generated_at|local_time("%d %b %Y · %H:%M") }} WAT</span></footer>
+      <footer class="print-receipt-footer"><span>Beamers Farms · Order Summary</span><span>Generated {{ generated_at|local_time("%d %b %Y · %H:%M") }} WAT</span></footer>
     </article>
   </div>
 </div>

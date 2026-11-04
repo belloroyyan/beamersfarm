@@ -3,7 +3,10 @@
 {% block title %}Updates · Owner desk{% endblock %}
 {% block content %}<div class="admin-shell"><div class="container">
 <div class="admin-topbar"><div><p class="eyebrow">Owner desk / updates</p><h1>Post an update</h1></div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to overview</a></div>
-<section class="admin-panel">
+<div class="owner-new-button"><button class="button button-lime" type="button" data-open-admin-dialog="update-create-dialog">New Update</button></div>
+<dialog class="admin-panel" data-admin-dialog="update-create-dialog" aria-labelledby="update-create-title" {% if request.method == 'POST' %}open{% endif %}>
+  <h2 id="update-create-title">Post an update</h2>
+  <button class="admin-dialog-x" type="button" data-admin-dialog-close aria-label="Close">×</button>
   <form method="post" enctype="multipart/form-data" class="update-form">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
     <label>Topic<input type="text" name="topic" maxlength="160" required value="{{ request.form.get('topic', '') }}" placeholder="e.g. Fresh stock arriving Friday"></label>
@@ -13,9 +16,10 @@
       <label>Posted by<input type="text" name="posted_by" maxlength="80" value="{{ request.form.get('posted_by', 'Admin') }}"></label>
     </div>
     <p class="form-note">The date is added automatically. Published updates can be shared with a branded image preview or downloaded as a PNG.</p>
-    <button class="button button-lime" type="submit">Post update <span>→</span></button>
-  </form>
-</section>
+    <button class="button button-outline" type="button" data-admin-dialog-close>Cancel</button>
+      <button class="button button-lime" type="submit">Post update <span>→</span></button>
+    </form>
+</dialog>
 <section class="admin-panel">
   <div class="panel-heading"><div><p class="eyebrow">Published</p><h2>Previous updates</h2></div><a class="table-link" href="{{ url_for('shop.updates') }}">View public page →</a></div>
   <form method="get" class="record-search" role="search"><label>Search updates<input type="search" name="q" maxlength="120" value="{{ search_query }}" placeholder="Update ID, topic, message, poster"></label><button class="button button-dark" type="submit">Search</button>{% if search_query %}<a class="table-link" href="{{ url_for('admin.updates') }}">Clear</a>{% endif %}</form>

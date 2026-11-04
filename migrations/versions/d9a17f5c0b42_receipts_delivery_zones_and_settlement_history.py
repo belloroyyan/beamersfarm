@@ -84,7 +84,7 @@ def upgrade():
             },
             {
                 "name": "Farm pickup (Elapop Estate)",
-                "description": "Collect your order from Beamers Farm; no delivery fee.",
+                "description": "Collect your order from Beamers Farms; no delivery fee.",
                 "fee": 0.00,
                 "is_pickup": True,
                 "active": True,

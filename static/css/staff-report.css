@@ -1,0 +1,86 @@
+/* Styles for the staff report and staff-profile disclosure only. */
+.staff-report-page .staff-report-topbar{align-items:flex-end}
+.staff-report-page .staff-report-topbar>.button{flex:0 0 auto}
+.staff-report-page .staff-report{display:grid;gap:24px;max-width:960px;margin:0 auto;padding:30px;background:#f8faf7;border:1px solid #e2e9e1;border-radius:16px;box-shadow:0 16px 42px rgba(35,56,47,.07);color:#23382f}
+.staff-report-page .staff-report-card{min-width:0;padding:30px;border:1px solid #e3e9e2;border-radius:12px;background:#fff;box-shadow:0 5px 18px rgba(35,56,47,.035)}
+.staff-report-page .staff-report-identity{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding-bottom:22px;border-bottom:2px solid #e9eee8}
+.staff-report-page .staff-report-person{min-width:0}
+.staff-report-page .staff-report-kicker{margin:0 0 7px;color:#748176;font-size:.67rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.staff-report-page .staff-report-identity h2{margin:0;color:#23382f;font-family:'Fraunces',Georgia,serif;font-size:clamp(1.8rem,4vw,2.6rem);font-weight:600;letter-spacing:-.035em;line-height:1.08;overflow-wrap:anywhere}
+.staff-report-page .staff-report-username{margin:8px 0 0;color:#627167;font-size:.93rem;font-weight:600}
+.staff-report-page .staff-report-identity>.status-pill{flex:0 0 auto;margin-top:4px;padding:7px 12px;font-size:.7rem;letter-spacing:.04em}
+.staff-report-page .staff-report-section{margin-top:25px}
+.staff-report-page .staff-report-section-heading{margin-bottom:13px}
+.staff-report-page .staff-report-section-heading .staff-report-kicker{margin-bottom:4px}
+.staff-report-page .staff-report-section-heading h3{margin:0;color:#23382f;font-family:'Fraunces',Georgia,serif;font-size:1.22rem;font-weight:600;letter-spacing:-.015em}
+.staff-report-page .staff-report-grid,.staff-report-page .staff-report-date-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0}
+.staff-report-page .staff-report-grid>div,.staff-report-page .staff-report-date-grid>div{min-width:0;padding:12px 14px;border:1px solid #e8eee7;border-radius:8px;background:#f7f9f6}
+.staff-report-page .staff-report-grid dt,.staff-report-page .staff-report-date-grid dt{margin:0;color:#748176;font-size:.65rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase}
+.staff-report-page .staff-report-grid dd,.staff-report-page .staff-report-date-grid dd{margin:6px 0 0;color:#34483d;font-size:.87rem;line-height:1.5;white-space:pre-line;overflow-wrap:anywhere}
+.staff-report-page .staff-report-date-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.staff-report-page .staff-report-actions{padding-top:20px;border-top:1px solid #e8eee7}
+.staff-report-page .staff-report-actions-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:14px}
+.staff-report-page .staff-report-optional-note{padding:5px 9px;border:1px solid #dce6d7;border-radius:999px;color:#65735f;background:#f6f9f2;font-size:.64rem;font-weight:700;white-space:nowrap}
+.staff-report-page .staff-action-list{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.staff-report-page .staff-action-list li{display:grid;gap:4px;min-width:0;padding:11px 13px;border:1px solid #e6ece5;border-left:3px solid #9cb95a;border-radius:0 7px 7px 0;background:#f8faf7;color:#46574d;font-size:.83rem;line-height:1.45;overflow-wrap:anywhere}
+.staff-report-page .staff-action-list li strong{color:#273c31;font-size:.86rem}
+.staff-report-page .staff-action-list li small{color:#758176;font-size:.7rem}
+.staff-report-page .staff-action-list li.staff-report-no-actions{display:block;color:#748176;font-style:italic}
+.staff-report-page .staff-report-footer{padding-top:14px;border-top:1px solid #e2e9e1;color:#758176;font-size:.7rem}
+.staff-report-page.staff-report-hide-actions .staff-report-actions{display:none!important}
+.staff-report-print-dialog{width:min(92vw,510px);max-width:none;padding:0;border:0;border-radius:14px;background:transparent;color:#23382f;box-shadow:0 24px 70px rgba(15,28,21,.28)}
+.staff-report-print-dialog::backdrop{background:rgba(20,34,27,.56);backdrop-filter:blur(2px)}
+.staff-report-print-card{display:grid;gap:10px;padding:28px;background:#fff;border:1px solid #e3e9e2;border-radius:14px}
+.staff-report-print-card .staff-report-kicker{margin:0}
+.staff-report-print-card h2{margin:0;color:#23382f;font-family:'Fraunces',Georgia,serif;font-size:1.65rem;line-height:1.15}
+.staff-report-print-card>p:not(.staff-report-kicker){margin:0;color:#627167;font-size:.9rem;line-height:1.6}
+.staff-report-print-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:9px}
+.staff-report-print-actions .button{min-height:44px}
+.staff-report-print-cancel{justify-self:start;margin-top:3px;padding:5px 0;border:0;background:none;color:#627167;font:inherit;font-size:.83rem;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.staff-report-print-dialog :focus-visible,.staff-profile-details>summary:focus-visible{outline:3px solid #8cae48;outline-offset:3px}
+.staff-profile-details{margin:14px 0 4px;padding:0;border:1px solid #dfe7dc;border-radius:9px;background:#f8faf6;overflow:hidden;transition:border-color .16s ease,box-shadow .16s ease}
+.staff-profile-details>summary{position:relative;display:flex;align-items:center;min-height:48px;padding:12px 42px 12px 15px;color:#293e32;font-size:.86rem;font-weight:800;line-height:1.3;list-style:none;cursor:pointer;user-select:none;transition:background-color .16s ease,color .16s ease}
+.staff-profile-details>summary::-webkit-details-marker{display:none}
+.staff-profile-details>summary::after{position:absolute;right:16px;top:50%;width:9px;height:9px;border-right:2px solid #58723d;border-bottom:2px solid #58723d;content:"";transform:translateY(-68%) rotate(45deg);transition:transform .16s ease}
+.staff-profile-details>summary:hover{background:#f0f5eb}
+.staff-profile-details[open]{border-color:#b9caab;box-shadow:0 5px 16px rgba(35,56,47,.06)}
+.staff-profile-details[open]>summary{border-bottom:1px solid #e2e9df;background:#f1f6ed;color:#23382f}
+.staff-profile-details[open]>summary::after{transform:translateY(-25%) rotate(225deg)}
+.staff-profile-details .staff-profile-form{margin:0;padding:15px}
+@media(max-width:640px){
+  .staff-report-page .staff-report-topbar{align-items:stretch}
+  .staff-report-page .staff-report-topbar>.button{width:100%}
+  .staff-report-page .staff-report{gap:15px;padding:13px;border-radius:12px}
+  .staff-report-page .staff-report-card{padding:19px 16px}
+  .staff-report-page .staff-report-identity{gap:10px}
+  .staff-report-page .staff-report-identity>.status-pill{padding:6px 9px}
+  .staff-report-page .staff-report-grid,.staff-report-page .staff-report-date-grid{grid-template-columns:1fr}
+  .staff-report-page .staff-report-footer{align-items:flex-start;flex-direction:column}
+  .staff-report-print-card{padding:22px}
+  .staff-report-print-actions{display:grid}
+  .staff-report-print-actions .button{width:100%}
+}
+@media print{
+  @page{size:auto;margin:15mm}
+  html,body{background:#fff!important}
+  body *{visibility:hidden!important}
+  .staff-report-page .staff-report,.staff-report-page .staff-report *{visibility:visible!important}
+  .staff-report-page{padding:0!important;background:#fff!important}
+  .staff-report-page>.container{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
+  .staff-report-page .staff-report-topbar,.staff-report-print-dialog{display:none!important}
+  .staff-report-page .staff-report{position:absolute!important;inset:0 auto auto 0!important;display:block!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;background:#fff!important;box-shadow:none!important}
+  .staff-report-page .staff-report-card{break-inside:auto;page-break-inside:auto;margin:0 0 10mm!important;padding:0 0 7mm!important;border:0!important;border-bottom:1px solid #d7dfd6!important;border-radius:0!important;background:#fff!important;box-shadow:none!important}
+  .staff-report-page .staff-report-card+.staff-report-card{break-before:page;page-break-before:always}
+  .staff-report-page .staff-report-identity,.staff-report-page .staff-report-section-heading,.staff-report-page .staff-report-grid>div,.staff-report-page .staff-report-date-grid>div,.staff-report-page .staff-action-list li{break-inside:avoid;page-break-inside:avoid}
+  .staff-report-page .staff-report-identity{padding-bottom:5mm}
+  .staff-report-page .staff-report-identity h2{font-size:24pt}
+  .staff-report-page .staff-report-section{margin-top:6mm}
+  .staff-report-page .staff-report-section-heading h3{font-size:13pt}
+  .staff-report-page .staff-report-grid,.staff-report-page .staff-report-date-grid{gap:3mm}
+  .staff-report-page .staff-report-grid>div,.staff-report-page .staff-report-date-grid>div{padding:3mm;background:#f7f9f6!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .staff-report-page .staff-report-grid dd,.staff-report-page .staff-report-date-grid dd{font-size:9.5pt}
+  .staff-report-page .staff-action-list{gap:2mm}
+  .staff-report-page .staff-action-list li{padding:2.5mm 3mm;font-size:9pt}
+  .staff-report-page.staff-report-hide-actions .staff-report-actions{display:none!important}
+  .staff-report-page .staff-report-footer{margin-top:5mm;padding-top:3mm;font-size:8pt}
+}

@@ -107,7 +107,7 @@
 
   <section id="messages" class="admin-panel">
     <h2>Messages and internal notes</h2>
-    <p class="form-note">This section shows notices and support history stored in Beamers Farm. External WhatsApp and email conversations are not automatically imported.</p>
+    <p class="form-note">This section shows notices and support history stored in Beamers Farms. External WhatsApp and email conversations are not automatically imported.</p>
     <h3>Account notices</h3>
     {% for notice in notices %}<article class="admin-record"><strong>{{ notice.title }}</strong><p>{{ notice.message }}</p><small>{{ notice.created_at|local_time("%d %b %Y, %I:%M %p") }} · {{ notice.kind }}</small></article>{% else %}<p class="form-note">No account notices recorded.</p>{% endfor %}
     <h3>Administrator notes</h3>

@@ -14,7 +14,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import AbandonedCart, AnalyticsEvent, Coupon, Complaint, PrivacyRule, Customer, CustomerNotice, CustomerNote, CustomerPushSubscription, DeliveryZone, DropShare, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, DispatchBatch, PartnerListing, Product, ProductPackage, ProductPackageItem, Review, SalespersonAccount, StaffActionLog, ShopSettings, ShopUpdate, StaffPushSubscription, WholesaleOrder, WholesaleOrderItem, PartnerAdInvite, SiteOverlaySeen, CommunityPost, CommunityComment, CommunityReaction, CommunityReport, CommunityBlock, CommunityNotification, db, order_customer_push_subscriptions
+from models import AbandonedCart, AnalyticsEvent, Coupon, Complaint, PrivacyRule, Customer, CustomerNotice, CustomerNote, CustomerPushSubscription, CustomerMessageCampaign, CustomerMessageDelivery, DeliveryZone, DropShare, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, DispatchBatch, PartnerListing, Product, ProductPackage, ProductPackageItem, Review, SalespersonAccount, StaffActionLog, ShopSettings, ShopUpdate, StaffPushSubscription, WholesaleOrder, WholesaleOrderItem, PartnerAdInvite, SiteOverlaySeen, CommunityPost, CommunityComment, CommunityReaction, CommunityReport, CommunityBlock, CommunityNotification, db, order_customer_push_subscriptions
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.product_images import save_product_image
 from utils.gallery import delete_gallery_image, save_gallery_image, save_gallery_media, gallery_media_type
@@ -136,7 +136,7 @@ def authenticate_salesperson(username, password):
 
 
 def add_customer_notice(customer_id, title, message, kind="account", related_url=None):
-    db.session.add(CustomerNotice(customer_id=customer_id, title=title[:140], message=message[:700], kind=kind[:32], related_url=related_url, created_by="Beamers Farm Owner"))
+    db.session.add(CustomerNotice(customer_id=customer_id, title=title[:140], message=message[:700], kind=kind[:32], related_url=related_url, created_by="Beamers Farms Owner"))
 
 
 @admin_bp.route("/login", methods=["GET", "POST"])
@@ -694,6 +694,7 @@ def _customer_profile(customer):
         "highest": max((Decimal(str(order.total or 0)) for order in valid_orders), default=Decimal("0.00")),
         "outstanding": outstanding, "refunds": refunds, "discounts": discounts,
         "coupon_count": Coupon.query.filter_by(customer_id=customer.id).count(),
+        "attached_coupons": Coupon.query.filter_by(customer_id=customer.id).order_by(Coupon.created_at.desc()).all(),
         "abandoned_carts": len(customer.abandoned_carts or []), "cart_items": cart_items,
         "visits": len(events), "login_frequency": len(events), "viewed_products": viewed_products,
         "recent_viewed": viewed_products[:5], "purchased_products": purchased_products, "notifications": notifications,
@@ -715,7 +716,7 @@ def customers():
             flash("Customer account not found.", "error")
         elif action in {"activate", "deactivate"}:
             customer.active = action == "activate"
-            add_customer_notice(customer.id, "Customer account updated", "Your Beamers Farm customer account has been reactivated." if customer.active else "Your Beamers Farm customer account has been paused. Contact the farm if you need help accessing it.")
+            add_customer_notice(customer.id, "Customer account updated", "Your Beamers Farms customer account has been reactivated." if customer.active else "Your Beamers Farms customer account has been paused. Contact the farm if you need help accessing it.")
             db.session.commit()
             flash(f"{customer.name} account {'activated' if customer.active else 'deactivated'}.", "success")
         elif action in {"block_community", "unblock_community"}:
@@ -728,7 +729,7 @@ def customers():
             coupon = db.session.get(Coupon, int(request.form.get("coupon_id", "0") or 0))
             if not coupon or not coupon.active or coupon.customer_id: flash("Choose an active, unassigned coupon to gift.", "error")
             else:
-                coupon.customer_id = customer.id; coupon.gift_message = request.form.get("gift_message", "").strip()[:500]; coupon.gifted_at = datetime.utcnow(); add_customer_notice(customer.id, "A coupon gift from Beamers Farm", coupon.gift_message or f"Coupon {coupon.code} has been added to your account.", kind="coupon"); db.session.commit(); flash(f"Coupon {coupon.code} gifted to {customer.name}.", "success")
+                coupon.customer_id = customer.id; coupon.gift_message = request.form.get("gift_message", "").strip()[:500]; coupon.gifted_at = datetime.utcnow(); add_customer_notice(customer.id, "A coupon gift from Beamers Farms", coupon.gift_message or f"Coupon {coupon.code} has been added to your account.", kind="coupon"); db.session.commit(); flash(f"Coupon {coupon.code} gifted to {customer.name}.", "success")
         elif action == "send_verification":
             if customer.email:
                 flash(f"Verification reminder queued for {customer.email}.", "success")
@@ -737,7 +738,7 @@ def customers():
         elif action == "add_note":
             note = request.form.get("note", "").strip()[:2000]
             if note:
-                db.session.add(CustomerNote(customer_id=customer.id, body=note, created_by="Beamers Farm Owner"))
+                db.session.add(CustomerNote(customer_id=customer.id, body=note, created_by="Beamers Farms Owner"))
                 db.session.commit()
                 flash("Customer note added.", "success")
         elif action == "reset_password":
@@ -746,7 +747,7 @@ def customers():
                 flash("Customer passwords must be at least 8 characters.", "error")
             else:
                 customer.password_hash = generate_password_hash(password)
-                add_customer_notice(customer.id, "Account security updated", "The Beamers Farm team updated your account password. If you did not expect this, contact the farm.")
+                add_customer_notice(customer.id, "Account security updated", "The Beamers Farms team updated your account password. If you did not expect this, contact the farm.")
                 db.session.commit()
                 flash("Customer password reset. Share it securely with the customer.", "success")
         return redirect(url_for("admin.customers"))
@@ -1188,7 +1189,9 @@ def partner_ad_invites():
         invite = PartnerAdInvite(token_hash=hashlib.sha256(token.encode()).hexdigest(), expires_at=datetime.utcnow()+timedelta(hours=24), created_by="Owner")
         db.session.add(invite)
         db.session.commit()
-        flash(url_for("shop.partner_advertisement_form", token=token, _external=True), "partner-form-link")
+        invite_path = url_for("shop.partner_advertisement_form", token=token)
+        public_origin = (current_app.config.get("PUBLIC_ORIGIN") or "").rstrip("/")
+        flash(f"{public_origin}{invite_path}" if public_origin else invite_path, "partner-form-link")
         return redirect(url_for("admin.partner_ad_invites"))
     active_invites = PartnerAdInvite.query.filter(PartnerAdInvite.used_at.is_(None), PartnerAdInvite.expires_at > datetime.utcnow()).order_by(PartnerAdInvite.expires_at.asc()).all()
     return render_template("admin/partner_ad_invites.html", invites=active_invites)
@@ -1209,7 +1212,7 @@ def partner_ads():
         values["image"] = image_path
         db.session.add(PartnerListing(**values))
         db.session.commit()
-        flash("Independent supplier advertisement added. It is not part of Beamers Farm stock or checkout.", "success")
+        flash("Independent supplier advertisement added. It is not part of Beamers Farms stock or checkout.", "success")
         return redirect(url_for("admin.partner_ads"))
 
     search_query = request.args.get("q", "").strip()[:120]
@@ -1428,50 +1431,246 @@ def delete_update(update_id):
     return redirect(url_for("admin.updates"))
 
 
+@admin_bp.route("/customer-messages", methods=["GET", "POST"])
+@admin_required
+def customer_messages():
+    from services.customer_campaigns import campaign_channel_readiness, deliver_customer_campaign
+    if not session.get("admin_logged_in") and session.get("staff_role") != "owner":
+        from flask import abort
+        abort(403)
+
+    readiness = campaign_channel_readiness()
+    if request.method == "POST":
+        channels = list(dict.fromkeys(
+            channel for channel in request.form.getlist("channels")
+            if channel in {"push", "whatsapp", "email"}
+        ))
+        title = request.form.get("title", "").strip()
+        body = request.form.get("body", "").strip()
+        if not channels:
+            flash("Choose at least one delivery channel.", "error")
+            return redirect(url_for("admin.customer_messages"))
+        if not body or len(body) > 3000 or len(title) > 160:
+            flash("Enter a message body of 1–3,000 characters and keep its title under 160 characters.", "error")
+            return redirect(url_for("admin.customer_messages"))
+        if "whatsapp" in channels and len((f"{title}\n\n" if title else "") + body) > 1024:
+            flash("For WhatsApp template delivery, keep the title and body together under 1,024 characters.", "error")
+            return redirect(url_for("admin.customer_messages"))
+        if request.form.get("confirm_send") != "yes":
+            flash("Confirm that this message should be sent now to customers reachable on the selected channels.", "error")
+            return redirect(url_for("admin.customer_messages"))
+        unavailable = [readiness[channel].get("reason") for channel in channels if not readiness[channel].get("ready")]
+        if unavailable:
+            flash("A selected delivery channel is not configured: " + " ".join(unavailable), "error")
+            return redirect(url_for("admin.customer_messages"))
+
+        uploads = [upload for upload in request.files.getlist("attachments") if upload and upload.filename]
+        if uploads and "email" not in channels:
+            flash("Email attachments can only be sent when Email is selected.", "error")
+            return redirect(url_for("admin.customer_messages"))
+        if len(uploads) > 10:
+            flash("Attach no more than 10 files to one message.", "error")
+            return redirect(url_for("admin.customer_messages"))
+
+        allowed_types = {
+            "pdf": ("application/pdf", lambda data: data.startswith(b"%PDF-")),
+            "jpg": ("image/jpeg", lambda data: data.startswith(b"\xff\xd8\xff")),
+            "jpeg": ("image/jpeg", lambda data: data.startswith(b"\xff\xd8\xff")),
+            "png": ("image/png", lambda data: data.startswith(b"\x89PNG\r\n\x1a\n")),
+            "gif": ("image/gif", lambda data: data.startswith((b"GIF87a", b"GIF89a"))),
+            "webp": ("image/webp", lambda data: len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP"),
+            "txt": ("text/plain", lambda data: b"\x00" not in data and _is_utf8_text(data)),
+            "csv": ("text/csv", lambda data: b"\x00" not in data and _is_utf8_text(data)),
+        }
+        def _is_utf8_text(data):
+            try:
+                data.decode("utf-8")
+                return True
+            except UnicodeDecodeError:
+                return False
+
+        from werkzeug.utils import secure_filename
+        attachments = []
+        total_size = 0
+        for upload in uploads:
+            filename = secure_filename(upload.filename or "")
+            extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+            specification = allowed_types.get(extension)
+            if not filename or not specification:
+                flash("Attachments must be PDF, JPG, PNG, GIF, WEBP, TXT, or CSV files.", "error")
+                return redirect(url_for("admin.customer_messages"))
+            mime_type, signature_check = specification
+            data = upload.read(5 * 1024 * 1024 + 1)
+            if not data or len(data) > 5 * 1024 * 1024 or not signature_check(data):
+                flash(f"The file {filename} is empty, too large, or does not match its allowed file type.", "error")
+                return redirect(url_for("admin.customer_messages"))
+            total_size += len(data)
+            if total_size > 8 * 1024 * 1024:
+                flash("The combined email attachments must be 8 MB or smaller.", "error")
+                return redirect(url_for("admin.customer_messages"))
+            attachments.append((filename, mime_type, data))
+
+        campaign_title = title or "An update from Beamers Farms"
+        campaign = CustomerMessageCampaign(
+            title=campaign_title,
+            body=body,
+            channels_json=json.dumps(channels),
+            attachment_names=", ".join(item[0] for item in attachments)[:1000],
+            created_by=(session.get("staff_display_name") or session.get("staff_username") or "Owner")[:120],
+        )
+        db.session.add(campaign)
+        db.session.flush()
+        customers = Customer.query.filter(
+            Customer.active.is_(True), Customer.deleted_at.is_(None)
+        ).order_by(Customer.id.asc()).all()
+        for index, customer in enumerate(customers, start=1):
+            try:
+                outcomes = deliver_customer_campaign(customer, channels, campaign_title, body, attachments)
+            except Exception:
+                outcomes = [
+                    {"channel": channel, "recipient": "", "status": "failed", "error": "The delivery service could not process this customer."}
+                    for channel in channels
+                ]
+            sent_for_customer = False
+            for outcome in outcomes:
+                delivery_status = outcome.get("status", "failed")
+                if delivery_status == "sent":
+                    campaign.sent_count += 1
+                    sent_for_customer = True
+                elif delivery_status == "failed":
+                    campaign.failed_count += 1
+                db.session.add(CustomerMessageDelivery(
+                    campaign_id=campaign.id,
+                    customer_id=customer.id,
+                    channel=outcome.get("channel", "unknown")[:20],
+                    recipient=outcome.get("recipient", "")[:180],
+                    status=delivery_status[:20],
+                    provider_message_id=(outcome.get("provider_message_id") or "")[:180] or None,
+                    error=(outcome.get("error") or "")[:500],
+                    sent_at=datetime.utcnow() if delivery_status == "sent" else None,
+                ))
+            if sent_for_customer:
+                campaign.recipient_count += 1
+            if index % 50 == 0:
+                db.session.commit()
+        db.session.commit()
+        flash(
+            f"Message campaign saved. Reached {campaign.recipient_count} customer account(s) across "
+            f"{campaign.sent_count} channel delivery(ies); {campaign.failed_count} delivery attempt(s) failed. "
+            "Customers without a reachable/eligible channel were skipped.",
+            "success" if campaign.sent_count else "error",
+        )
+        return redirect(url_for("admin.customer_messages"))
+
+    campaigns = CustomerMessageCampaign.query.order_by(CustomerMessageCampaign.created_at.desc()).limit(20).all()
+    campaign_summaries = []
+    for campaign in campaigns:
+        status_counts = Counter(delivery.status for delivery in campaign.deliveries)
+        try:
+            campaign_channels = json.loads(campaign.channels_json or "[]")
+            if not isinstance(campaign_channels, list):
+                campaign_channels = []
+        except (TypeError, ValueError):
+            campaign_channels = []
+        failed_details = [
+            {"channel": delivery.channel, "error": delivery.error}
+            for delivery in campaign.deliveries
+            if delivery.status == "failed" and delivery.error
+        ][:5]
+        campaign_summaries.append({"campaign": campaign, "channels": campaign_channels, "status_counts": status_counts, "failed_details": failed_details})
+    return render_template(
+        "admin/customer_messages.html",
+        readiness=readiness,
+        campaigns=campaign_summaries,
+        customer_count=Customer.query.filter(Customer.active.is_(True), Customer.deleted_at.is_(None)).count(),
+    )
+
+
 @admin_bp.route("/coupons", methods=["GET", "POST"])
 @admin_required
 def coupons():
     if request.method == "POST":
-        if request.form.get("action") == "mass_gift":
-            base_coupon = db.session.get(Coupon, int(request.form.get("coupon_id", "0") or 0))
-            if not base_coupon or not base_coupon.active or base_coupon.customer_id is not None:
+        action = request.form.get("action", "")
+        if action in {"mass_gift", "selected_gift"}:
+            try:
+                coupon_id = int(request.form.get("coupon_id", "0") or 0)
+            except (TypeError, ValueError):
+                coupon_id = 0
+            base_coupon = db.session.get(Coupon, coupon_id)
+            now = datetime.utcnow()
+            if (not base_coupon or not base_coupon.active or base_coupon.customer_id is not None
+                    or (base_coupon.starts_at and base_coupon.starts_at > now)
+                    or (base_coupon.ends_at and base_coupon.ends_at < now)):
                 flash("Choose an active, shared coupon template to gift.", "error")
                 return redirect(url_for("admin.coupons"))
-            recipients = Customer.query.filter(Customer.deleted_at.is_(None)).order_by(Customer.id.asc()).all()
+            if action == "selected_gift":
+                raw_ids = [item for item in re.split(r"[,;\s]+", request.form.get("customer_ids", "").strip()) if item]
+                try:
+                    customer_ids = list(dict.fromkeys(int(value) for value in raw_ids))
+                except (TypeError, ValueError):
+                    customer_ids = []
+                if not customer_ids or len(customer_ids) > 1000 or any(value <= 0 for value in customer_ids):
+                    flash("Enter one or more valid customer IDs (up to 1,000).", "error")
+                    return redirect(url_for("admin.coupons"))
+                recipients = Customer.query.filter(
+                    Customer.id.in_(customer_ids), Customer.active.is_(True), Customer.deleted_at.is_(None)
+                ).order_by(Customer.id.asc()).all()
+                if len(recipients) != len(customer_ids):
+                    flash("One or more customer IDs do not identify an active customer account. No gifts were sent.", "error")
+                    return redirect(url_for("admin.coupons"))
+            else:
+                recipients = Customer.query.filter(
+                    Customer.active.is_(True), Customer.deleted_at.is_(None)
+                ).order_by(Customer.id.asc()).all()
             if not recipients:
                 flash("There are no customer accounts to receive the gift.", "error")
                 return redirect(url_for("admin.coupons"))
             gift_message = request.form.get("gift_message", "").strip()[:500]
+            from utils.coupons import gift_coupon_to_customer
+            gifted_count = 0
             for recipient in recipients:
-                suffix = f"-G{recipient.id}-{secrets.token_hex(3).upper()}"
-                prefix = base_coupon.code[:max(1, 39 - len(suffix))].rstrip("-")
-                code = f"{prefix}{suffix}"[:40]
-                while Coupon.query.filter_by(code=code).first():
-                    suffix = f"-G{recipient.id}-{secrets.token_hex(4).upper()}"
-                    prefix = base_coupon.code[:max(1, 39 - len(suffix))].rstrip("-")
-                    code = f"{prefix}{suffix}"[:40]
-                db.session.add(Coupon(
-                    code=code, discount_type=base_coupon.discount_type, value=base_coupon.value,
-                    minimum_spend=base_coupon.minimum_spend, max_uses=1, uses=0,
-                    excluded_product_ids=base_coupon.excluded_product_ids, active=True,
-                    starts_at=base_coupon.starts_at, ends_at=base_coupon.ends_at,
-                    customer_id=recipient.id, gift_message=gift_message, gifted_at=datetime.utcnow(),
-                ))
-                add_customer_notice(recipient.id, "A coupon gift from Beamers Farm", gift_message or "A personal coupon has been added to your account.", kind="coupon")
+                already_gifted = Coupon.query.filter_by(gift_template_id=base_coupon.id, customer_id=recipient.id).first()
+                gift = gift_coupon_to_customer(base_coupon, recipient, gift_message)
+                if gift and not already_gifted:
+                    gifted_count += 1
             db.session.commit()
-            flash(f"Personal coupon gifts sent to {len(recipients)} customer account(s).", "success")
+            flash(f"Personal coupon gifts added to {gifted_count} customer account(s). Existing gifts were not duplicated.", "success")
             return redirect(url_for("admin.coupons"))
         code=request.form.get("code", "").strip().upper(); dtype=request.form.get("discount_type", "percent")
         try: value=Decimal(request.form.get("value", "0")); minimum=Decimal(request.form.get("minimum_spend", "0"))
         except Exception: flash("Enter valid coupon amounts.", "error"); return redirect(url_for("admin.coupons"))
-        if not code or value <= 0 or (dtype == "percent" and value > 100): flash("Enter a valid code and discount.", "error")
+        if (not re.fullmatch(r"[A-Z0-9][A-Z0-9_-]{1,39}", code) or dtype not in {"percent", "fixed"}
+                or not value.is_finite() or not minimum.is_finite() or value <= 0 or minimum < 0
+                or (dtype == "percent" and value > 100)):
+            flash("Enter a valid coupon code and discount.", "error")
         elif Coupon.query.filter_by(code=code).first(): flash("That coupon code already exists.", "error")
         else:
-            max_uses=int(request.form.get("max_uses") or 0) or None
-            db.session.add(Coupon(code=code,discount_type=dtype,value=value,minimum_spend=max(Decimal("0"),minimum),max_uses=max_uses,excluded_product_ids=request.form.get("excluded_product_ids","").strip()))
+            try:
+                max_uses=int(request.form.get("max_uses") or 0) or None
+            except ValueError:
+                flash("Maximum uses must be a positive whole number or left blank.", "error")
+                return redirect(url_for("admin.coupons"))
+            if max_uses is not None and max_uses < 1:
+                flash("Maximum uses must be a positive whole number or left blank.", "error")
+                return redirect(url_for("admin.coupons"))
+            db.session.add(Coupon(
+                code=code, discount_type=dtype, value=value, minimum_spend=minimum, max_uses=max_uses,
+                excluded_product_ids=request.form.get("excluded_product_ids", "").strip()[:500],
+                auto_gift_new_customers=request.form.get("auto_gift_new_customers") == "yes",
+            ))
             db.session.commit(); flash("Coupon created.", "success")
         return redirect(url_for("admin.coupons"))
-    return render_template("admin/coupons.html", coupons=Coupon.query.order_by(Coupon.created_at.desc()).all(), gift_templates=Coupon.query.filter_by(active=True, customer_id=None).order_by(Coupon.code.asc()).all(), customer_count=Customer.query.filter(Customer.deleted_at.is_(None)).count())
+    now = datetime.utcnow()
+    gift_templates = Coupon.query.filter(
+        Coupon.active.is_(True), Coupon.customer_id.is_(None),
+        or_(Coupon.starts_at.is_(None), Coupon.starts_at <= now),
+        or_(Coupon.ends_at.is_(None), Coupon.ends_at >= now),
+    ).order_by(Coupon.code.asc()).all()
+    return render_template(
+        "admin/coupons.html", coupons=Coupon.query.order_by(Coupon.created_at.desc()).all(),
+        gift_templates=gift_templates,
+        customer_count=Customer.query.filter(Customer.active.is_(True), Customer.deleted_at.is_(None)).count(),
+    )
 
 @admin_bp.post("/coupons/<int:coupon_id>/toggle")
 @admin_required
@@ -1765,4 +1964,4 @@ def staff_manual():
 @admin_bp.get("/staff-manual/download")
 @admin_required
 def staff_manual_download():
-    return send_file(current_app.root_path + "/static/staff-manual.md", as_attachment=True, download_name="Beamers-Farm-Staff-Digital-Wiki.md", mimetype="text/markdown")
+    return send_file(current_app.root_path + "/static/staff-manual.md", as_attachment=True, download_name="Beamers-Farms-Staff-Digital-Wiki.md", mimetype="text/markdown")

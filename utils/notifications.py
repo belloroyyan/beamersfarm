@@ -27,8 +27,8 @@ def build_order_confirmed_message(order):
         if order.has_weight_priced_items else ""
     )
     return (
-        f"Hello {order.customer_name}, payment of {amount} for your Beamers Farm order "
+        f"Hello {order.customer_name}, payment of {amount} for your Beamers Farms order "
         f"#{order.public_id} has been verified and your order is confirmed. "
         f"{balance_note}We are preparing your order for delivery within Osogbo. "
-        "For questions, contact Beamers Farm on WhatsApp: 08062074302."
+        "For questions, contact Beamers Farms on WhatsApp: 08062074302."
     )

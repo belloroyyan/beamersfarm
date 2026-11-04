@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Inventory summary · Beamers Farm{% endblock %}
+{% block title %}Inventory summary · Beamers Farms{% endblock %}
 {% block content %}
 <div class="admin-shell"><div class="container">
   <div class="admin-topbar compact-topbar inventory-topbar">
@@ -34,8 +34,8 @@
   <article class="print-receipt inventory-report">
   {% set cover_title = "Inventory Summary" %}{% set cover_lines = [(report.period_label), ("Stock position and sales movement for the selected period")] %}
   {% include "reports/_cover.html" %}
-    <div class="inventory-watermark" aria-hidden="true">BEAMERS FARM · INVENTORY REPORT</div>
-    <header class="print-receipt-header"><img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farm" loading="lazy" decoding="async"><div><p class="eyebrow">Private · {{ nav.copy_label }}</p><h1>Inventory summary</h1><p>{{ report.period_label }}{% if report.search_query %} · Product filter: {{ report.search_query }}{% endif %}</p></div><span class="status-pill status-confirmed">{{ report.rows|length }} product lines</span></header>
+    <div class="inventory-watermark" aria-hidden="true">Beamers Farms · INVENTORY REPORT</div>
+    <header class="print-receipt-header"><img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farms" loading="lazy" decoding="async"><div><p class="eyebrow">Private · {{ nav.copy_label }}</p><h1>Inventory summary</h1><p>{{ report.period_label }}{% if report.search_query %} · Product filter: {{ report.search_query }}{% endif %}</p></div><span class="status-pill status-confirmed">{{ report.rows|length }} product lines</span></header>
     <div class="inventory-report-note"><strong>How to read this report.</strong> Current stock is counted in physical sale units. “Verified units” and gross item sales are non-cancelled orders with payment verified during orders placed in the selected period; requested kg is the customer's combined size on verified lines. Gross item sales are before recorded refunds and exclude delivery fees. Unverified orders reserve stock but are not counted as sales. Cancelled orders are excluded and their stock is restored.</div>
     <section class="print-receipt-section">
       <h2>Stock and period activity</h2>
@@ -44,7 +44,7 @@
       </tbody></table></div>{% else %}<div class="empty-state compact"><h3>No product records match.</h3><p>Try a different product name or ID.</p></div>{% endif %}
     </section>
     <div class="inventory-period-footnote"><span>{{ report.metrics.pending_orders }} unverified order(s) · {{ format_quantity(report.metrics.pending_units) }} reserved unit(s)</span><span>{{ report.metrics.cancelled_orders }} cancelled order(s) · {{ format_quantity(report.metrics.cancelled_units) }} returned unit(s)</span><span>Settled cash received: {{ format_currency(report.metrics.money_received) }} · refunds: {{ format_currency(report.metrics.money_refunded) }} · net: {{ format_currency(report.metrics.net_cash_inflow) }}</span><span>Gross item sales before refunds · delivery fees excluded · {{ report.period_label }}</span></div>
-    <footer class="print-receipt-footer"><span>Beamers Farm · Internal inventory report</span><span>Item sales exclude delivery fees</span></footer>
+    <footer class="print-receipt-footer"><span>Beamers Farms · Internal inventory report</span><span>Item sales exclude delivery fees</span></footer>
   </article>
 </div></div>
 {% endblock %}

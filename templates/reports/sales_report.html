@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Sales Report · Beamers Farm{% endblock %}
+{% block title %}Sales Report · Beamers Farms{% endblock %}
 {% block content %}
 <div class="admin-shell"><div class="container">
   <div class="admin-topbar compact-topbar inventory-topbar">
@@ -17,7 +17,7 @@
   </section>
 
   <article class="print-receipt sales-report">
-    <div class="inventory-watermark" aria-hidden="true">BEAMERS FARM · SALES REPORT</div>
+    <div class="inventory-watermark" aria-hidden="true">Beamers Farms · SALES REPORT</div>
     {% set cover_title = "Sales Report" %}
     {% set cover_lines = [("Gross revenue " ~ format_currency(data.gross)), ("Net revenue " ~ format_currency(data.net)), ("Delivery fees collected " ~ format_currency(data.fees)), ("Cancelled orders " ~ format_currency(data.cancelled))] %}
     {% include "reports/_cover.html" %}
@@ -53,7 +53,7 @@
       <p><strong>Delivery fees collected</strong>: fees on non-cancelled orders whose payment has been verified.</p>
       <p><strong>Cancelled value</strong>: total value of orders marked Cancelled.</p>
     </section>
-    <footer class="print-receipt-footer"><span>Beamers Farm · Sales Report</span><span>Generated {{ generated_at|local_time("%d %b %Y · %H:%M") }} WAT</span></footer>
+    <footer class="print-receipt-footer"><span>Beamers Farms · Sales Report</span><span>Generated {{ generated_at|local_time("%d %b %Y · %H:%M") }} WAT</span></footer>
   </article>
 </div></div>
 {% endblock %}

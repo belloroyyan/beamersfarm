@@ -25,7 +25,7 @@ def upgrade():
         sa.Column("title", sa.String(140), nullable=False),
         sa.Column("message", sa.String(700), nullable=False),
         sa.Column("kind", sa.String(32), nullable=False, server_default="account"),
-        sa.Column("created_by", sa.String(120), nullable=False, server_default="Beamers Farm"),
+        sa.Column("created_by", sa.String(120), nullable=False, server_default="Beamers Farms"),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("dismissed_at", sa.DateTime(), nullable=True),
     )

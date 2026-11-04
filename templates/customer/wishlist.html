@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}My wishlist · Beamers Farms{% endblock %}
+{% block content %}
+<div class="admin-shell customer-account-shell">
+  <div class="container">
+    <div class="admin-topbar">
+      <div>
+        <p class="eyebrow">Beamers Farms</p>
+        <h1>My wishlist</h1>
+        <p class="form-note">Products you have saved to revisit.</p>
+      </div>
+      <a class="button button-outline" href="{{ url_for('shop.products') }}">Browse products <span>→</span></a>
+    </div>
+
+    {% if wishlist_items %}
+      <section class="admin-panel" aria-label="Saved products">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Saved for later</p><h2>{{ wishlist_items|length }} product{{ '' if wishlist_items|length == 1 else 's' }}</h2></div>
+        </div>
+        <div class="product-grid">
+          {% for item in wishlist_items %}
+            {% set product = item.product %}
+            {% if product %}
+            <article class="product-card">
+              <div class="product-art product-photo art-{{ product.image }}">
+                <img src="{{ product_image_url(product.image) }}" alt="{{ product.name }}" loading="lazy" decoding="async"><span class="photo-shade"></span>
+              </div>
+              <div class="product-info">
+                <div class="product-heading">
+                  <h3>{% if product.active %}<a href="{{ url_for('shop.product_detail', product_id=product.id) }}">{{ product.name }}</a>{% else %}{{ product.name }}{% endif %}</h3>
+                  {% if not product.active %}<span class="stock-badge">No longer listed</span>
+                  {% elif product.stock <= 0 %}<span class="stock-badge">Out of stock</span>
+                  {% else %}<span class="stock-badge">{{ format_quantity(product.stock) }} available</span>{% endif %}
+                </div>
+                <small class="product-minimum">{{ format_currency(product.price) }} per {{ product.unit }}</small>
+                {% if not product.active %}
+                  <p class="form-note">This product is no longer listed by Beamers Farms, so it cannot currently be ordered.</p>
+                {% elif product.stock <= 0 %}
+                  <p class="form-note">This product is currently out of stock. It remains saved here, but cannot be ordered right now.</p>
+                {% else %}
+                  <p class="form-note">Available to order while stock lasts.</p>
+                {% endif %}
+                <div class="product-buy">
+                  {% if product.active %}<a class="button button-lime" href="{{ url_for('shop.product_detail', product_id=product.id) }}">View product <span>→</span></a>{% endif %}
+                  <form method="post" action="{{ url_for('customer.remove_from_wishlist', product_id=product.id) }}">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="next" value="{{ request.full_path }}">
+                    <button class="button button-outline" type="submit">Remove</button>
+                  </form>
+                </div>
+              </div>
+            </article>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </section>
+    {% else %}
+      <div class="empty-state">
+        <h2>Your wishlist is empty.</h2>
+        <p>Save products you would like to come back to. Their current stock and availability will be shown here.</p>
+        <a class="button button-dark" href="{{ url_for('shop.products') }}">Explore products <span>→</span></a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

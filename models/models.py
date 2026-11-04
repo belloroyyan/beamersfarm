@@ -41,6 +41,7 @@ class Product(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     order_items = db.relationship("OrderItem", back_populates="product")
+    wishlist_entries = db.relationship("WishlistItem", back_populates="product", cascade="all, delete-orphan")
 
     @property
     def processing_options_list(self):
@@ -154,6 +155,8 @@ class Coupon(db.Model):
     gift_message = db.Column(db.String(500), nullable=False, default="", server_default="")
     gifted_at = db.Column(db.DateTime, nullable=True)
     gift_viewed_at = db.Column(db.DateTime, nullable=True)
+    auto_gift_new_customers = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    gift_template_id = db.Column(db.Integer, nullable=True, index=True)
 class PrivacyRule(db.Model):
     __tablename__ = "privacy_rules"
     id = db.Column(db.Integer, primary_key=True)
@@ -224,6 +227,7 @@ class Customer(db.Model):
     orders = db.relationship("Order", back_populates="customer")
     wholesale_orders = db.relationship("WholesaleOrder", back_populates="customer")
     abandoned_carts = db.relationship("AbandonedCart", back_populates="customer", cascade="all, delete-orphan")
+    wishlist_items = db.relationship("WishlistItem", back_populates="customer", cascade="all, delete-orphan")
 
 
 class CustomerEmailVerification(db.Model):
@@ -235,12 +239,39 @@ class CustomerEmailVerification(db.Model):
     expires_at = db.Column(db.DateTime, nullable=False)
     customer = db.relationship("Customer")
 
+
+class CustomerEmailCode(db.Model):
+    __tablename__ = "customer_email_codes"
+    __table_args__ = (db.UniqueConstraint("customer_id", name="uq_customer_email_codes_customer"),)
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True)
+    code_hash = db.Column(db.String(64), nullable=False)
+    attempts = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    requests_in_window = db.Column(db.Integer, nullable=False, default=1, server_default="1")
+    request_window_started_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    last_sent_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    consumed_at = db.Column(db.DateTime, nullable=True)
+    customer = db.relationship("Customer")
+
+
+class WishlistItem(db.Model):
+    __tablename__ = "wishlist_items"
+    __table_args__ = (db.UniqueConstraint("customer_id", "product_id", name="uq_wishlist_customer_product"),)
+    id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    customer = db.relationship("Customer", back_populates="wishlist_items")
+    product = db.relationship("Product", back_populates="wishlist_entries")
+
 class CustomerNote(db.Model):
     __tablename__ = "customer_notes"
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True)
     body = db.Column(db.Text, nullable=False)
-    created_by = db.Column(db.String(120), nullable=False, default="Beamers Farm Owner")
+    created_by = db.Column(db.String(120), nullable=False, default="Beamers Farms Owner")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     customer = db.relationship("Customer")
 
@@ -320,6 +351,7 @@ class Order(db.Model):
     payment_provider = db.Column(db.String(30), nullable=True)
     payment_reference = db.Column(db.String(160), nullable=True, index=True)
     payment_channel = db.Column(db.String(30), nullable=True)
+    payment_checkout_url = db.Column(db.String(1000), nullable=True)
     payment_initiated_at = db.Column(db.DateTime, nullable=True)
     payment_failure_reason = db.Column(db.String(500), nullable=True)
     payment_verified_at = db.Column(db.DateTime, nullable=True)
@@ -537,7 +569,7 @@ class GalleryImage(db.Model):
 
 
 class PartnerListing(db.Model):
-    """An independent supplier advertisement, not a Beamers Farm product."""
+    """An independent supplier advertisement, not a Beamers Farms product."""
     __tablename__ = "partner_listings"
     __table_args__ = (
         db.CheckConstraint("price IS NULL OR price >= 0", name="ck_partner_listings_price_nonnegative"),
@@ -622,6 +654,7 @@ class Review(db.Model):
     rating = db.Column(db.Integer, nullable=False)
     title = db.Column(db.String(160), nullable=False)
     body = db.Column(db.Text, nullable=False)
+    image = db.Column(db.String(255), nullable=True)
     status = db.Column(db.String(20), nullable=False, default="Pending", server_default="Pending")
     owner_response = db.Column(db.Text, nullable=False, default="")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -686,6 +719,37 @@ class CustomerPushSubscription(db.Model):
         secondary=order_customer_push_subscriptions,
         back_populates="customer_push_subscriptions",
     )
+
+
+class CustomerMessageCampaign(db.Model):
+    __tablename__ = "customer_message_campaigns"
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(160), nullable=False, default="")
+    body = db.Column(db.Text, nullable=False)
+    channels_json = db.Column(db.String(200), nullable=False, default="[]")
+    attachment_names = db.Column(db.String(1000), nullable=False, default="")
+    created_by = db.Column(db.String(120), nullable=False, default="Owner")
+    recipient_count = db.Column(db.Integer, nullable=False, default=0)
+    sent_count = db.Column(db.Integer, nullable=False, default=0)
+    failed_count = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    deliveries = db.relationship("CustomerMessageDelivery", back_populates="campaign", cascade="all, delete-orphan")
+
+
+class CustomerMessageDelivery(db.Model):
+    __tablename__ = "customer_message_deliveries"
+    __table_args__ = (db.UniqueConstraint("campaign_id", "customer_id", "channel", name="uq_customer_message_delivery_campaign_customer_channel"),)
+    id = db.Column(db.Integer, primary_key=True)
+    campaign_id = db.Column(db.Integer, db.ForeignKey("customer_message_campaigns.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
+    channel = db.Column(db.String(20), nullable=False)
+    recipient = db.Column(db.String(180), nullable=False, default="")
+    status = db.Column(db.String(20), nullable=False, default="pending")
+    provider_message_id = db.Column(db.String(180), nullable=True)
+    error = db.Column(db.String(500), nullable=False, default="")
+    sent_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    campaign = db.relationship("CustomerMessageCampaign", back_populates="deliveries")
 
 
 class CommunityPost(db.Model):
@@ -763,6 +827,6 @@ class CustomerNotice(db.Model):
     message = db.Column(db.String(700), nullable=False)
     kind = db.Column(db.String(32), nullable=False, default="account", server_default="account")
     related_url = db.Column(db.String(500), nullable=True)
-    created_by = db.Column(db.String(120), nullable=False, default="Beamers Farm", server_default="Beamers Farm")
+    created_by = db.Column(db.String(120), nullable=False, default="Beamers Farms", server_default="Beamers Farms")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
     dismissed_at = db.Column(db.DateTime, nullable=True)

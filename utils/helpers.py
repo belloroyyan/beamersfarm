@@ -55,7 +55,7 @@ def parse_quantity(value, *, allow_fractional=False, allow_zero=False):
     return normalized
 
 
-def delivery_fee_for(subtotal, fee=1500):
+def delivery_fee_for(subtotal, fee: int | Decimal = 1500):
     return Decimal(str(fee)) if as_decimal(subtotal) > 0 else Decimal("0.00")
 
 
@@ -92,7 +92,7 @@ def cart_count(cart):
     )
 
 
-def build_cart(cart, products, delivery_fee=1500):
+def build_cart(cart, products, delivery_fee: int | Decimal = 1500):
     lines = []
     subtotal = Decimal("0.00")
     for product_id, raw_value in (cart or {}).items():

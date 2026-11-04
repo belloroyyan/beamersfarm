@@ -405,4 +405,4 @@ def staff_manual(account):
 @salesperson_bp.get("/staff-manual/download")
 @salesperson_required
 def staff_manual_download(account):
-    return send_file(current_app.root_path + "/static/staff-manual.md", as_attachment=True, download_name="Beamers-Farm-Staff-Digital-Wiki.md", mimetype="text/markdown")
+    return send_file(current_app.root_path + "/static/staff-manual.md", as_attachment=True, download_name="Beamers-Farms-Staff-Digital-Wiki.md", mimetype="text/markdown")

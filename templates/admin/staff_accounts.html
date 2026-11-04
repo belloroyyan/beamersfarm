@@ -1,5 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Salesperson access · Beamers Farm{% endblock %}
+{% block title %}Salesperson access · Beamers Farms{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/staff-report.css') }}">
+{% endblock %}
 {% block content %}
 <div class="admin-shell">
   <div class="container">
@@ -8,6 +11,7 @@
         <a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a>
         <p class="eyebrow">Owner settings</p>
         <h1>Staff access.</h1>
+        <div class="owner-new-button"><button class="button button-dark" type="button" data-open-admin-dialog="staff-account-create-dialog">New Staff account</button></div>
         <p class="form-note"><a class="table-link" href="{{ url_for('admin.staff_report') }}">Generate staff report →</a><br>Create an individual account for each salesperson and control exactly what they can do. Each salesperson’s Actions menu shows only what you allow here. Deactivation blocks access on their next request; accounts are retained for accountability.</p>
       </div>
     </div>
@@ -63,18 +67,21 @@
       </section>
 
       <aside class="admin-panel staff-add-panel">
-        <p class="eyebrow">Add a hire</p><h2>New salesperson account</h2>
         <p class="form-note">Each person gets their own sign-in. Give them their credentials privately and reset or revoke them when staffing changes.</p>
+        <div class="staff-permission-note"><strong>Default operating profile</strong><p>New accounts can view the live order stream, verify payments, change order status, print receipts, view and manage complaints, and receive new-order alerts. Community moderation, in-person sales and inventory are off until you enable them above.</p><p>Payment-before-confirmation safeguards remain enforced regardless of permissions.</p></div>
+      </aside>
+      <dialog class="admin-panel staff-add-panel" data-admin-dialog="staff-account-create-dialog" aria-labelledby="staff-account-create-title">
+        <p class="eyebrow">Add a hire</p><h2 id="staff-account-create-title">New salesperson account</h2>
+        <button class="admin-dialog-x" type="button" data-admin-dialog-close aria-label="Close">×</button>
         <form method="post">
           <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="add">
           <label>Full name<input name="display_name" maxlength="120" required></label>
           <label>Username<input name="username" minlength="3" maxlength="40" pattern="[a-z0-9][a-z0-9._-]{2,39}" autocomplete="off" required><small>3–40 lowercase letters, numbers, dots, underscores, or hyphens.</small></label>
           <label>Password<input type="password" name="password" minlength="12" maxlength="256" autocomplete="new-password" required></label>
           <label>Confirm password<input type="password" name="confirm_password" minlength="12" maxlength="256" autocomplete="new-password" required></label>
-          <button class="button button-dark button-full" type="submit">Add salesperson</button>
+          <div class="form-actions"><button class="button button-outline" type="button" data-admin-dialog-close>Cancel</button><button class="button button-dark" type="submit">Add salesperson</button></div>
         </form>
-        <div class="staff-permission-note"><strong>Default operating profile</strong><p>New accounts can view the live order stream, verify payments, change order status, print receipts, view and manage complaints, and receive new-order alerts. Community moderation, in-person sales and inventory are off until you enable them above.</p><p>Payment-before-confirmation safeguards remain enforced regardless of permissions.</p></div>
-      </aside>
+      </dialog>
     </div>
   </div>
 </div>

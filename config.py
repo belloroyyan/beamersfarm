@@ -89,6 +89,7 @@ class Config:
     UPDATE_UPLOAD_FOLDER = str(BASE_DIR / "static" / "uploads" / "updates")
     MAX_CONTENT_LENGTH = 8 * 1024 * 1024
     DELIVERY_FEE = 1500
+    BUSINESS_TIME_ZONE = os.environ.get("BUSINESS_TIME_ZONE", "Africa/Lagos").strip() or "Africa/Lagos"
     # Delivery estimate shown to customers: dispatch batch close time plus this transit range.
     # Only shop opening hours (local Osogbo time, 24h clock) count towards transit time.
     DELIVERY_TRANSIT_MIN_MINUTES = int(os.environ.get("DELIVERY_TRANSIT_MIN_MINUTES", "30"))
@@ -104,9 +105,14 @@ class Config:
     PAYMENT_BANK = os.environ.get("PAYMENT_BANK", "Opay")
     PAYMENT_ACCOUNT_NUMBER = os.environ.get("PAYMENT_ACCOUNT_NUMBER", "8062074302")
     PAYMENT_ACCOUNT_NAME = os.environ.get("PAYMENT_ACCOUNT_NAME", "Dauda Akanni Bello")
-    PAYSTACK_ENABLED = os.environ.get("PAYSTACK_ENABLED", "false").lower() == "true"
-    PAYSTACK_PUBLIC_KEY = os.environ.get("PAYSTACK_PUBLIC_KEY", "").strip()
-    PAYSTACK_SECRET_KEY = os.environ.get("PAYSTACK_SECRET_KEY", "").strip()
+    OPAY_ENABLED = os.environ.get("OPAY_ENABLED", "false").lower() == "true"
+    OPAY_ENVIRONMENT = os.environ.get("OPAY_ENVIRONMENT", "test").strip().lower()
+    OPAY_MERCHANT_ID = os.environ.get("OPAY_MERCHANT_ID", "").strip()
+    OPAY_PUBLIC_KEY = os.environ.get("OPAY_PUBLIC_KEY", "").strip()
+    OPAY_PRIVATE_KEY = os.environ.get("OPAY_PRIVATE_KEY", "").strip()
+    RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+    RESEND_FROM = os.environ.get("RESEND_FROM", "").strip()
+    # Legacy SMTP keys are retained for deployment compatibility but are no longer used.
     MESSAGING_ENABLED = os.environ.get("MESSAGING_ENABLED", "false").lower() == "true"
     MESSAGING_MODE = os.environ.get("MESSAGING_MODE", "mock").lower()
     WHATSAPP_ENABLED = os.environ.get("WHATSAPP_ENABLED", "false").lower() == "true"
@@ -116,6 +122,9 @@ class Config:
     WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN", "")
     WHATSAPP_TEMPLATE_NAME = os.environ.get("WHATSAPP_TEMPLATE_NAME", "beamers_order_confirmed")
     WHATSAPP_TEMPLATE_LANGUAGE = os.environ.get("WHATSAPP_TEMPLATE_LANGUAGE", "en")
+    # Owner broadcasts use a separately approved Meta template whose body has one text placeholder.
+    WHATSAPP_CAMPAIGN_TEMPLATE_NAME = os.environ.get("WHATSAPP_CAMPAIGN_TEMPLATE_NAME", "").strip()
+    WHATSAPP_CAMPAIGN_TEMPLATE_LANGUAGE = os.environ.get("WHATSAPP_CAMPAIGN_TEMPLATE_LANGUAGE", "en").strip()
     WHATSAPP_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "")
     META_APP_SECRET = os.environ.get("META_APP_SECRET", "")
     WHATSAPP_MAX_ATTEMPTS = int(os.environ.get("WHATSAPP_MAX_ATTEMPTS", "5"))
@@ -134,8 +143,11 @@ class Config:
     ).lower() == "true"
     SESSION_COOKIE_NAME = "frost_fowl_session"
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SECURE = IS_PRODUCTION
-    SESSION_COOKIE_SAMESITE = "Lax"
+    # Public Manus Preview and production run over HTTPS in a cross-site iframe.
+    # Set LOCAL_HTTP_COOKIE_MODE=true only for direct plain-HTTP local browsing.
+    LOCAL_HTTP_COOKIE_MODE = os.environ.get("LOCAL_HTTP_COOKIE_MODE", "false").lower() == "true"
+    SESSION_COOKIE_SECURE = not LOCAL_HTTP_COOKIE_MODE
+    SESSION_COOKIE_SAMESITE = "Lax" if LOCAL_HTTP_COOKIE_MODE else "None"
     PERMANENT_SESSION_LIFETIME = 60 * 60 * 8
     # The request may include an image capped at 8 MB plus multipart headers/form fields.
     MAX_CONTENT_LENGTH = 9 * 1024 * 1024
@@ -170,12 +182,17 @@ class Config:
                 missing = [name for name, value in required.items() if not value]
                 if missing:
                     raise RuntimeError("WhatsApp is enabled but required variables are missing: " + ", ".join(missing))
-            if cls.PAYSTACK_ENABLED:
+            if not cls.RESEND_API_KEY or not cls.RESEND_FROM:
+                raise RuntimeError("Production email requires RESEND_API_KEY and RESEND_FROM.")
+            if cls.OPAY_ENVIRONMENT not in {"test", "live"}:
+                raise RuntimeError("OPAY_ENVIRONMENT must be either test or live.")
+            if cls.OPAY_ENABLED:
                 missing = [
                     name for name, value in {
-                        "PAYSTACK_PUBLIC_KEY": cls.PAYSTACK_PUBLIC_KEY,
-                        "PAYSTACK_SECRET_KEY": cls.PAYSTACK_SECRET_KEY,
+                        "OPAY_MERCHANT_ID": cls.OPAY_MERCHANT_ID,
+                        "OPAY_PUBLIC_KEY": cls.OPAY_PUBLIC_KEY,
+                        "OPAY_PRIVATE_KEY": cls.OPAY_PRIVATE_KEY,
                     }.items() if not value
                 ]
                 if missing:
-                    raise RuntimeError("Paystack is enabled but required variables are missing: " + ", ".join(missing))
+                    raise RuntimeError("OPay checkout is enabled but required variables are missing: " + ", ".join(missing))

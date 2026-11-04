@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Staff sign in · Beamers Farm{% endblock %}
+{% block title %}Staff sign in · Beamers Farms{% endblock %}
 {% block content %}
 <div class="container auth-shell"><div class="auth-card"><div class="auth-icon">BF</div><p class="eyebrow">Staff access</p><h1>Sign in to your workspace.</h1><p>Choose your role to open the right desk.</p><form method="post">
 <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><label>Sign in as<select name="role" data-staff-role required><option value="owner">Owner</option><option value="dispatch_rider">Dispatch rider</option>{% if salesperson_enabled %}<option value="salesperson">Salesperson</option>{% endif %}</select></label>

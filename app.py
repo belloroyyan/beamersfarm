@@ -17,6 +17,7 @@ from routes.complaints import complaints_bp
 from routes.dispatch import dispatch_bp
 from routes.salesperson import salesperson_bp
 from routes.payments import payments_bp
+from services.payments import opay_is_configured
 from routes.reviews import reviews_bp
 from routes.customer import current_customer, customer_bp
 from routes.community import community_bp
@@ -91,7 +92,7 @@ def ensure_delivery_zones():
             ),
             DeliveryZone(
                 name="Farm pickup (Elapop Estate)",
-                description="Collect your order from Beamers Farm; no delivery fee.",
+                description="Collect your order from Beamers Farms; no delivery fee.",
                 fee=Decimal("0.00"),
                 is_pickup=True,
                 sort_order=0,
@@ -156,6 +157,7 @@ def create_app():
             "partner_image_url": partner_image_url,
             "gallery_image_url": gallery_image_url,
             "community_url": lambda key: __import__("utils.community_media", fromlist=["community_image_url"]).community_image_url(key),
+            "review_image_url": lambda key: __import__("utils.review_media", fromlist=["review_image_url"]).review_image_url(key),
             "format_currency": format_currency,
             "format_quantity": format_quantity,
             "cart_count": cart_count(session.get("cart", {})),
@@ -163,8 +165,7 @@ def create_app():
             "payment_bank": app.config["PAYMENT_BANK"],
             "payment_account_number": app.config["PAYMENT_ACCOUNT_NUMBER"],
             "payment_account_name": app.config["PAYMENT_ACCOUNT_NAME"],
-            "paystack_enabled": app.config["PAYSTACK_ENABLED"],
-            "paystack_public_key": app.config["PAYSTACK_PUBLIC_KEY"],
+            "opay_checkout_enabled": opay_is_configured(),
             "vapid_public_key": app.config.get("VAPID_PUBLIC_KEY", ""),
             "shop_is_open": shop_settings.is_open if shop_settings else app.config["SHOP_OPEN_DEFAULT"],
             "shop_closed_message": shop_settings.closed_message if shop_settings else app.config["SHOP_CLOSED_MESSAGE"],
@@ -227,16 +228,16 @@ def create_app():
 
     @app.get("/health")
     def health():
-        return jsonify(status="ok", service="beamers-farm")
+        return jsonify(status="ok", service="beamers-farms")
 
     @app.get("/ready")
     def ready():
         try:
             db.session.execute(text("SELECT 1"))
-            return jsonify(status="ready", service="beamers-farm")
+            return jsonify(status="ready", service="beamers-farms")
         except SQLAlchemyError:
             db.session.rollback()
-            return jsonify(status="not-ready", service="beamers-farm"), 503
+            return jsonify(status="not-ready", service="beamers-farms"), 503
 
     @app.get("/manus-routes.json")
     def route_manifest():

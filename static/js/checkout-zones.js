@@ -40,7 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }).filter((item) => item.score > 0).sort((a, b) => b.score - a.score);
     locationMatch.hidden = false;
     if (!matches.length) {
-      locationMatch.innerHTML = "<strong>No configured zone matched that search.</strong><span>Choose a delivery option below or contact Beamers Farm to confirm your area.</span>";
+      locationMatch.innerHTML = "<strong>No configured zone matched that search.</strong><span>Choose a delivery option below or contact Beamers Farms to confirm your area.</span>";
       return;
     }
     const bestScore = matches[0].score;

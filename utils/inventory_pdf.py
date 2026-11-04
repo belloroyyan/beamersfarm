@@ -44,8 +44,8 @@ def build_inventory_pdf(report, brand_mark_path=None):
         rightMargin=11 * mm,
         topMargin=14 * mm,
         bottomMargin=13 * mm,
-        title="Beamers Farm Inventory Summary",
-        author="Beamers Farm",
+        title="Beamers Farms Inventory Summary",
+        author="Beamers Farms",
         subject=report["period_label"],
     )
     styles = getSampleStyleSheet()

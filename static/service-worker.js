@@ -1,4 +1,4 @@
-const CACHE_NAME = "beamers-farm-pwa-v23";
+const CACHE_NAME = "beamers-farms-pwa-v24";
 const OFFLINE_URL = "/static/offline.html";
 const PRECACHE_URLS = [
   OFFLINE_URL,
@@ -42,7 +42,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(
-        keys.filter((key) => key.startsWith("beamers-farm-pwa-") && key !== CACHE_NAME)
+        keys.filter((key) => key.startsWith("beamers-farms-pwa-") && key !== CACHE_NAME)
           .map((key) => caches.delete(key))
       ))
       .then(() => self.clients.claim())

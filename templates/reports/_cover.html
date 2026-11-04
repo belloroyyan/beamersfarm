@@ -1,8 +1,9 @@
 <section class="report-cover">
-  <img class="report-cover-logo" src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farm">
-  <p class="eyebrow">Beamers Farm · {{ nav.desk }}</p>
+  <img class="report-cover-logo" src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="Beamers Farms">
+  <p class="eyebrow">Beamers Farms · {{ nav.desk }}</p>
   <h2 class="report-cover-title">{{ cover_title }}</h2>
   <p class="report-cover-period">{{ report.period_label if report is defined and report else period_label }}{% if (report.start_date if report is defined and report else start_date) %} · {{ report.start_date if report is defined and report else start_date }} to {{ report.end_date if report is defined and report else end_date }}{% endif %}</p>
   <ul class="report-cover-points">{% for line in cover_lines %}<li>{{ line }}</li>{% endfor %}</ul>
-  <p class="report-cover-note">Prepared on {{ generated_at|local_time("%d %B %Y at %H:%M") }} WAT for internal use. Figures reflect orders placed within the selected timeline, using Osogbo local dates. Customer and payment details are confidential.</p>
+  <div class="report-cover-meta"><div><strong>REPORTING PERIOD</strong><span>{{ report.period_label if report is defined and report else period_label|default("All available records") }}</span></div><div><strong>PREPARED BY</strong><span>{{ prepared_by|default(nav.copy_label|default("Owner")) }}</span></div><div><strong>DATE</strong><span>{{ generated_at|local_time("%d %B %Y") }}</span></div></div>
+  <p class="report-cover-note">Prepared for internal use. Figures reflect orders placed within the selected timeline, using Osogbo local dates. Customer and payment details are confidential.</p>
 </section>

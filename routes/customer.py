@@ -1,13 +1,15 @@
 import hmac
+import hashlib
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import urlparse
+from sqlalchemy import or_
 
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import Coupon, Customer, CustomerEmailVerification, CustomerNotice, CustomerPushSubscription, Order, Product, ShopSettings, db
+from models import Coupon, Customer, CustomerEmailCode, CustomerNotice, CustomerPushSubscription, Order, Product, ShopSettings, WishlistItem, db
 from utils.helpers import format_quantity, parse_quantity, product_uses_requested_kg
 from utils.notifications import normalize_nigerian_phone
 from utils.push_subscriptions import valid_push_endpoint
@@ -80,9 +82,20 @@ def register():
                 email_verified=False,
             )
             db.session.add(customer)
+            db.session.flush()
+            now = datetime.utcnow()
+            gift_templates = Coupon.query.filter(
+                Coupon.active.is_(True), Coupon.customer_id.is_(None),
+                Coupon.auto_gift_new_customers.is_(True),
+                or_(Coupon.starts_at.is_(None), Coupon.starts_at <= now),
+                or_(Coupon.ends_at.is_(None), Coupon.ends_at >= now),
+            ).all()
+            from utils.coupons import gift_coupon_to_customer
+            for template in gift_templates:
+                gift_coupon_to_customer(template, customer)
             db.session.commit()
             session["customer_id"] = customer.id
-            flash("Your Beamers Farm account is ready.", "success")
+            flash("Your Beamers Farms account is ready.", "success")
             return redirect(safe_next(request.args.get("next") or request.form.get("next")))
     return render_template("customer/register.html", next_url=request.args.get("next", ""))
 
@@ -98,7 +111,7 @@ def login():
         phone = normalize_nigerian_phone(identifier)
         matching_customer = Customer.query.filter((Customer.phone == phone) | (Customer.email == identifier)).first() if phone or identifier else None
         if matching_customer and not matching_customer.active:
-            flash("This customer account has been deactivated. Please contact Beamers Farm customer care for help.", "error")
+            flash("This customer account has been deactivated. Please contact Beamers Farms customer care for help.", "error")
         elif not matching_customer or not check_password_hash(matching_customer.password_hash, password):
             flash("The phone/email or password is not correct.", "error")
         else:
@@ -129,8 +142,59 @@ def account():
     previous_recommendations = Product.query.filter(Product.id.in_(previous_product_ids), Product.active.is_(True), Product.stock > 0).all() if previous_product_ids else []
     previous_recommendations.sort(key=lambda item: previous_product_ids.index(item.id))
     personalized_recommendations = personalized_products(customer, limit=4)
-    gifted_coupons = Coupon.query.filter_by(customer_id=customer.id, active=True).order_by(Coupon.gifted_at.desc(), Coupon.created_at.desc()).all()
-    return render_template("customer/account.html", customer=customer, orders=orders, previous_recommendations=previous_recommendations[:4], personalized_recommendations=personalized_recommendations, gifted_coupons=gifted_coupons, vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""))
+    account_coupons = Coupon.query.filter_by(customer_id=customer.id).order_by(Coupon.gifted_at.desc(), Coupon.created_at.desc(), Coupon.id.desc()).all()
+    now = datetime.utcnow()
+    coupon_statuses = {}
+    for coupon in account_coupons:
+        if not coupon.active:
+            status = "Paused"
+        elif coupon.max_uses is not None and coupon.uses >= coupon.max_uses:
+            status = "Used"
+        elif coupon.starts_at and coupon.starts_at > now:
+            status = "Not active yet"
+        elif coupon.ends_at and coupon.ends_at < now:
+            status = "Expired"
+        else:
+            status = "Available"
+        coupon_statuses[coupon.id] = status
+    wishlist_count = WishlistItem.query.filter_by(customer_id=customer.id).count()
+    from services.email import smtp_is_configured
+    return render_template("customer/account.html", customer=customer, orders=orders, previous_recommendations=previous_recommendations[:4], personalized_recommendations=personalized_recommendations, account_coupons=account_coupons, coupon_statuses=coupon_statuses, wishlist_count=wishlist_count, email_verification_ready=smtp_is_configured(), vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""))
+
+
+@customer_bp.get("/wishlist")
+@account_required
+def wishlist():
+    customer = current_customer()
+    items = WishlistItem.query.filter_by(customer_id=customer.id).order_by(WishlistItem.created_at.desc()).all()
+    return render_template("customer/wishlist.html", customer=customer, wishlist_items=items)
+
+
+@customer_bp.post("/wishlist/<int:product_id>/add")
+@account_required
+def add_to_wishlist(product_id):
+    customer = current_customer()
+    product = Product.query.filter_by(id=product_id, active=True).first_or_404()
+    item = WishlistItem.query.filter_by(customer_id=customer.id, product_id=product.id).first()
+    if item is None:
+        db.session.add(WishlistItem(customer_id=customer.id, product_id=product.id))
+        db.session.commit()
+        flash(f"{product.name} was saved to your wishlist.", "success")
+    else:
+        flash(f"{product.name} is already in your wishlist.", "success")
+    return redirect(safe_next(request.form.get("next")))
+
+
+@customer_bp.post("/wishlist/<int:product_id>/remove")
+@account_required
+def remove_from_wishlist(product_id):
+    customer = current_customer()
+    item = WishlistItem.query.filter_by(customer_id=customer.id, product_id=product_id).first()
+    if item:
+        db.session.delete(item)
+        db.session.commit()
+        flash("The item was removed from your wishlist.", "success")
+    return redirect(safe_next(request.form.get("next") or url_for("customer.wishlist")))
 
 
 @customer_bp.post("/settings")
@@ -156,6 +220,7 @@ def save_settings():
     if email_changed:
         customer.email_verified = False
         customer.email_verified_at = None
+        CustomerEmailCode.query.filter_by(customer_id=customer.id).delete(synchronize_session=False)
     customer.push_notifications_enabled = request.form.get("push_notifications") == "yes"
     customer.whatsapp_notifications_enabled = request.form.get("whatsapp_notifications") == "yes"
     customer.community_profile_public = request.form.get("community_profile_public") == "yes"
@@ -309,10 +374,13 @@ def save_account_push_subscription():
     customer = current_customer()
     if not current_app.config.get("VAPID_PUBLIC_KEY"):
         return jsonify(error="Push notifications are not configured by the site owner."), 503
-    payload = request.get_json(silent=True) or {}
-    endpoint = payload.get("endpoint")
-    if not valid_push_endpoint(endpoint):
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    endpoint_value = payload.get("endpoint")
+    if not isinstance(endpoint_value, str) or not valid_push_endpoint(endpoint_value):
         return jsonify(error="The browser returned an invalid push subscription."), 400
+    endpoint = endpoint_value
     import hashlib, hmac, re
     normalized = normalize_nigerian_phone(customer.phone) or customer.phone
     customer_key = hmac.new(str(current_app.config["SECRET_KEY"]).encode(), normalized.encode(), hashlib.sha256).hexdigest()
@@ -334,26 +402,86 @@ def save_account_push_subscription():
 @account_required
 def send_verification():
     customer = current_customer()
+    if customer.email_verified:
+        flash("This email address is already verified.", "success")
+        return redirect(url_for("customer.account"))
     if not customer.email:
         flash("Add an email address first so we can verify it.", "error")
         return redirect(url_for("customer.account"))
-    token = secrets.token_urlsafe(48)
-    db.session.query(CustomerEmailVerification).filter_by(customer_id=customer.id).delete()
-    db.session.add(CustomerEmailVerification(customer_id=customer.id, token=token, expires_at=datetime.utcnow() + timedelta(hours=24)))
-    db.session.commit()
-    flash("A verification link is ready. Open it below to confirm this email address.", "success")
-    return redirect(url_for("customer.account", verification_token=token))
-
-@customer_bp.get("/verify-email/<token>")
-def verify_email(token):
-    item = CustomerEmailVerification.query.filter_by(token=token).first()
-    if not item or item.expires_at < datetime.utcnow():
-        flash("That email verification link has expired. Request a new one from your account.", "error")
+    from services.email import send_email, smtp_is_configured
+    if not smtp_is_configured():
+        flash("Email verification is not configured yet. Add the business email settings and try again.", "error")
         return redirect(url_for("customer.account"))
-    item.customer.email_verified = True
-    item.customer.email_verified_at = datetime.utcnow()
-    db.session.delete(item)
+    now = datetime.utcnow()
+    record = CustomerEmailCode.query.filter_by(customer_id=customer.id).first()
+    if record and record.last_sent_at and now - record.last_sent_at < timedelta(seconds=60):
+        flash("If your email can receive messages, a verification code has been sent. Please wait before requesting another.", "success")
+        return redirect(url_for("customer.account"))
+    if record and now - record.request_window_started_at < timedelta(hours=1) and record.requests_in_window >= 5:
+        flash("Verification requests are temporarily limited. Please try again later.", "error")
+        return redirect(url_for("customer.account"))
+    if record is None:
+        record = CustomerEmailCode(customer_id=customer.id, code_hash="", expires_at=now)
+        db.session.add(record)
+        record.requests_in_window = 1
+        record.request_window_started_at = now
+    elif now - record.request_window_started_at >= timedelta(hours=1):
+        record.requests_in_window = 1
+        record.request_window_started_at = now
+    else:
+        record.requests_in_window += 1
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    record.code_hash = _email_code_hash(customer.id, code)
+    record.attempts = 0
+    record.created_at = now
+    record.last_sent_at = now
+    record.expires_at = now + timedelta(minutes=10)
+    record.consumed_at = None
     db.session.commit()
-    session["customer_id"] = item.customer_id
+    try:
+        send_email(
+            customer.email,
+            "Verify your Beamers Farms account",
+            f"Hello {customer.name.split()[0]},\n\nYour Beamers Farms email verification code is {code}. It expires in 10 minutes.\n\nIf you did not request this code, you can ignore this email.",
+        )
+    except RuntimeError as error:
+        record.code_hash = ""
+        record.consumed_at = datetime.utcnow()
+        db.session.commit()
+        flash(str(error), "error")
+        return redirect(url_for("customer.account"))
+    flash("If your email can receive messages, a six-digit verification code has been sent. It expires in 10 minutes.", "success")
+    return redirect(url_for("customer.account"))
+
+
+def _email_code_hash(customer_id, code):
+    secret = str(current_app.config["SECRET_KEY"]).encode("utf-8")
+    message = f"customer-email-code:{customer_id}:{code}".encode("utf-8")
+    return hmac.new(secret, message, hashlib.sha256).hexdigest()
+
+
+@customer_bp.post("/verify-email")
+@account_required
+def verify_email():
+    customer = current_customer()
+    code = request.form.get("verification_code", "").strip()
+    record = CustomerEmailCode.query.filter_by(customer_id=customer.id).first()
+    now = datetime.utcnow()
+    if not code.isdigit() or len(code) != 6 or not record or record.consumed_at or record.expires_at < now or record.attempts >= 5:
+        flash("That code is invalid or expired. Request a new verification code and try again.", "error")
+        return redirect(url_for("customer.account"))
+    if not hmac.compare_digest(record.code_hash, _email_code_hash(customer.id, code)):
+        record.attempts += 1
+        if record.attempts >= 5:
+            record.consumed_at = now
+            record.code_hash = ""
+        db.session.commit()
+        flash("That code is invalid or expired. Request a new verification code and try again.", "error")
+        return redirect(url_for("customer.account"))
+    customer.email_verified = True
+    customer.email_verified_at = now
+    record.consumed_at = now
+    record.code_hash = ""
+    db.session.commit()
     flash("Email verified. Your customer account is now verified.", "success")
     return redirect(url_for("customer.account"))

@@ -125,7 +125,7 @@ def render_update_share_image(update):
         overlay = Image.new("RGBA", (panel_width, 128), (35, 56, 47, 205))
         image.paste(overlay, (panel_box[0], panel_box[3] - 128), overlay)
         draw = ImageDraw.Draw(image)
-        draw.text((panel_box[0] + 25, panel_box[3] - 91), "BEAMERS FARM", font=_font(21, True), fill=WHITE)
+        draw.text((panel_box[0] + 25, panel_box[3] - 91), "Beamers Farms", font=_font(21, True), fill=WHITE)
         draw.text((panel_box[0] + 25, panel_box[3] - 59), "FRESH FROM OSOGBO", font=_font(14, True), fill="#d9e3d7")
     else:
         x1, y1, x2, y2 = panel_box
@@ -137,7 +137,7 @@ def render_update_share_image(update):
             draw.line((x1 + 20, y1 + 90 + offset, x2 - 22, y1 + 90 + offset), fill="#334b3d", width=1)
         draw.ellipse((x1 + 68, y1 + 136, x1 + 285, y1 + 353), outline=LIME, width=3)
         draw.ellipse((x1 + 104, y1 + 172, x1 + 249, y1 + 317), outline="#70845f", width=2)
-        draw.text((x1 + 56, y2 - 92), "BEAMERS FARM", font=_font(20, True), fill=WHITE)
+        draw.text((x1 + 56, y2 - 92), "Beamers Farms", font=_font(20, True), fill=WHITE)
         draw.text((x1 + 56, y2 - 61), "FRESH FROM OSOGBO", font=_font(14, True), fill="#d9e3d7")
 
     logo_path = Path(current_app.static_folder) / "images" / "brand-mark.png"
@@ -150,12 +150,12 @@ def render_update_share_image(update):
         draw.rounded_rectangle((78, 63, 132, 117), radius=14, fill=BG)
         draw.text((87, 76), "BF", font=_font(24, True), fill=LIME)
 
-    draw.text((148, 68), "BEAMERS FARM", font=_font(20, True), fill=INK)
+    draw.text((148, 68), "Beamers Farms", font=_font(20, True), fill=INK)
     draw.text((148, 96), "FRESH, CLEAN, HYGIENICALLY PACKAGED", font=_font(12, True), fill=MUTED)
     draw.rounded_rectangle((78, 145, 222, 176), radius=15, fill="#e7e8d9")
     draw.text((94, 153), "FARM UPDATE", font=_font(13, True), fill=INK)
 
-    date_text = update.created_at.strftime("%d %b %Y") if update.created_at else "Beamers Farm"
+    date_text = update.created_at.strftime("%d %b %Y") if update.created_at else "Beamers Farms"
     draw.text((244, 151), date_text, font=_font(15), fill=MUTED)
 
     title_font = _font(45, True)
@@ -173,7 +173,7 @@ def render_update_share_image(update):
     _draw_wrapped(draw, body_lines, (80, 344), body_font, "#53665a", 34)
 
     draw.line((80, 526, 754, 526), fill="#d5d8cc", width=2)
-    draw.text((80, 545), "READ THE FULL UPDATE ON BEAMERS FARM", font=_font(14, True), fill=INK)
+    draw.text((80, 545), "READ THE FULL UPDATE ON Beamers Farms", font=_font(14, True), fill=INK)
     draw.text((80, 568), "Open the shared link for full details", font=_font(13), fill=MUTED)
 
     output = BytesIO()

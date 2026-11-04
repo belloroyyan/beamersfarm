@@ -8,13 +8,17 @@ from flask import current_app
 from markupsafe import Markup, escape
 from werkzeug.utils import secure_filename
 
+from utils.community_text import safe_internal_path
+
 ALLOWED_UPDATE_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif"}
 
 _TOKEN = re.compile(
     r"(?P<url>(?:https?://|www\.)[^\s<>\"']+[^\s<>\"'.,;:!?)\]])"
+    r"|(?P<internal>(?<![\w/:])/(?!/)[^\s<>\"']+)"
     r"|(?P<email>[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})"
     r"|(?P<phone>\+?\d[\d\s-]{8,16}\d)"
 )
+_TRAILING_INTERNAL_PUNCTUATION = ".,!?;:)]}"
 
 
 def linkify(text):
@@ -28,6 +32,18 @@ def linkify(text):
         if m.group("url"):
             href = value if value.startswith("http") else "https://" + value
             out.append(Markup('<a href="{}" target="_blank" rel="noopener nofollow">{}</a>').format(href, value))
+        elif m.group("internal"):
+            path = value
+            suffix = ""
+            while path and path[-1] in _TRAILING_INTERNAL_PUNCTUATION:
+                suffix = path[-1] + suffix
+                path = path[:-1]
+            safe_path = safe_internal_path(path)
+            if safe_path:
+                out.append(Markup('<a href="{}">{}</a>').format(escape(safe_path), escape(path)))
+                out.append(escape(suffix))
+            else:
+                out.append(escape(value))
         elif m.group("email"):
             out.append(Markup('<a href="mailto:{}">{}</a>').format(value, value))
         else:

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}{{ product.name }} · Beamers Farm{% endblock %}
-{% block structured_data %}<script type="application/ld+json">{{ {"@context":"https://schema.org", "@type":"Product", "name":product.name, "description":product.description, "image":[social_image], "sku":product.id|string, "brand":{"@type":"Brand","name":"Beamers Farm"}, "offers":{"@type":"Offer","url":canonical_url, "priceCurrency":"NGN", "price":("%.2f"|format(product.price)), "availability":"https://schema.org/InStock" if product.is_available else "https://schema.org/OutOfStock"}}|tojson }}</script>{% endblock %}
+{% block title %}{{ product.name }} · Beamers Farms{% endblock %}
+{% block structured_data %}<script type="application/ld+json">{{ {"@context":"https://schema.org", "@type":"Product", "name":product.name, "description":product.description, "image":[social_image], "sku":product.id|string, "brand":{"@type":"Brand","name":"Beamers Farms"}, "offers":{"@type":"Offer","url":canonical_url, "priceCurrency":"NGN", "price":("%.2f"|format(product.price)), "availability":"https://schema.org/InStock" if product.is_available else "https://schema.org/OutOfStock"}}|tojson }}</script>{% endblock %}
 {% block content %}
 <div class="container detail-shell">
   <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{{ url_for('shop.index') }}">Shop</a><span aria-hidden="true">/</span><span>{{ product.name }}</span></nav>
@@ -19,6 +19,15 @@
         {% if processing_options %}<fieldset class="processing-choice"><legend>Processing preferences <small>(choose any, or none)</small></legend><div class="processing-option-list">{% for option in processing_options %}<label class="processing-option"><input type="checkbox" name="processing_method" value="{{ option }}"><span>{{ option }}</span></label>{% endfor %}</div><small class="field-help">Leave everything unticked to receive the product as listed.</small></fieldset>{% endif %}<small class="field-help">Minimum order: {{ format_quantity(product.minimum_order_quantity) }} {{ product.unit }}.{% if product.allow_fractional_quantity %} Partial quantities are accepted up to three decimal places.{% endif %}</small>
       </form>
       {% else %}<div class="out-of-stock">Currently unavailable</div>{% endif %}
+      {% if current_customer %}
+        {% if wishlist_saved|default(false) %}
+        <form class="wishlist-product-action" method="post" action="{{ url_for('customer.remove_from_wishlist', product_id=product.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ request.full_path }}"><button class="button button-outline" type="submit">Remove from wishlist</button></form>
+        {% else %}
+        <form class="wishlist-product-action" method="post" action="{{ url_for('customer.add_to_wishlist', product_id=product.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ request.full_path }}"><button class="button button-outline" type="submit">Save to wishlist</button></form>
+        {% endif %}
+      {% else %}
+        <p class="wishlist-product-action"><a class="table-link" href="{{ url_for('customer.login', next=request.full_path) }}">Sign in to save this product to your wishlist</a></p>
+      {% endif %}
     </div>
   </div>
 </div>

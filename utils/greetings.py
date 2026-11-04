@@ -1,4 +1,4 @@
-"""Time-of-day greetings for Beamers Farm's Nigeria-based business context."""
+"""Time-of-day greetings for Beamers Farms' Nigeria-based business context."""
 
 from datetime import datetime
 from zoneinfo import ZoneInfo

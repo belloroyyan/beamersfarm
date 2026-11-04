@@ -3,6 +3,6 @@
 
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/service-worker.js", { scope: "/" })
-      .catch((error) => console.warn("Beamers Farm offline support could not be enabled.", error));
+      .catch((error) => console.warn("Beamers Farms offline support could not be enabled.", error));
   });
 })();

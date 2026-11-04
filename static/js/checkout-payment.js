@@ -1,1 +1,13 @@
-document.addEventListener("DOMContentLoaded",function(){document.querySelectorAll('input[name="payment_method"]').forEach(function(input){input.addEventListener('change',function(){document.querySelectorAll('.payment-choice').forEach(function(card){card.classList.toggle('selected',card.querySelector('input').checked)});var email=document.querySelector('[data-payment-email]');if(email)email.required=this.value==='paystack';});});});
+document.addEventListener("DOMContentLoaded", () => {
+  const updatePaymentChoice = () => {
+    document.querySelectorAll(".payment-choice").forEach((card) => {
+      const input = card.querySelector('input[name="payment_method"]');
+      card.classList.toggle("selected", Boolean(input && input.checked));
+    });
+  };
+
+  document.querySelectorAll('input[name="payment_method"]').forEach((input) => {
+    input.addEventListener("change", updatePaymentChoice);
+  });
+  updatePaymentChoice();
+});

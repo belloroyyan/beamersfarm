@@ -5,7 +5,7 @@
   <div class="page-heading admin-heading"><div><a class="back-link" href="{{ url_for('admin.partner_ads') }}">← Back to partner advertisements</a><p class="eyebrow">Independent supplier listing #{{ listing.id }}</p><h1>{{ listing.name }}</h1></div></div>
   <form class="form-card edit-product-card partner-edit-card" method="post" enctype="multipart/form-data">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-    <div class="third-party-notice"><strong>Independent supplier listing.</strong> This offer is not part of Beamers Farm products, stock, order totals, or checkout.</div>
+    <div class="third-party-notice"><strong>Independent supplier listing.</strong> This offer is not part of Beamers Farms products, stock, order totals, or checkout.</div>
     <div class="field-grid"><label>Offer / product name<input type="text" name="name" maxlength="120" value="{{ listing.name }}" required></label><label>Category<input type="text" name="category" maxlength="80" value="{{ listing.category }}"></label></div>
     <label>Supplier / business name<input type="text" name="supplier_name" maxlength="120" value="{{ listing.supplier_name }}" required></label>
     <label>Description<textarea name="description" rows="5" maxlength="4000" required>{{ listing.description }}</textarea></label>

@@ -1,192 +1,81 @@
-{
-  "routes": [
-    {
-      "path": "/",
-      "title": "Shop"
-    },
-    {
-      "path": "/product/:product_id",
-      "title": "Product detail"
-    },
-    {
-      "path": "/cart",
-      "title": "Shopping cart"
-    },
-    {
-      "path": "/help",
-      "title": "Help and ordering guide"
-    },
-    {
-      "path": "/track-order",
-      "title": "Track a guest order"
-    },
-    {
-      "path": "/account/login",
-      "title": "Customer sign in"
-    },
-    {
-      "path": "/account/register",
-      "title": "Create customer account"
-    },
-    {
-      "path": "/account/forgot-password",
-      "title": "Recover customer account"
-    },
-    {
-      "path": "/account",
-      "title": "Customer account"
-    },
-    {
-      "path": "/reviews",
-      "title": "Leave a customer review"
-    },
-    {
-      "path": "/testimonials",
-      "title": "Customer testimonials"
-    },
-    {
-      "path": "/checkout",
-      "title": "Delivery details"
-    },
-    {
-      "path": "/order/:order_id/:token/success",
-      "title": "Order confirmation"
-    },
-    {
-      "path": "/order/:order_id/:token/receipt",
-      "title": "Printable customer receipt"
-    },
-    {
-      "path": "/admin/login",
-      "title": "Staff login"
-    },
-    {
-      "path": "/admin/",
-      "title": "Order desk"
-    },
-    {
-      "path": "/admin/staff",
-      "title": "Salesperson account management"
-    },
-    {
-      "path": "/sales/",
-      "title": "Salesperson order desk"
-    },
-    {
-      "path": "/sales/orders/:order_id",
-      "title": "Salesperson order details"
-    },
-    {
-      "path": "/dispatch/",
-      "title": "Dispatch rider queue"
-    },
-    {
-      "path": "/dispatch/orders/:order_id",
-      "title": "Dispatch order detail"
-    },
-    {
-      "path": "/admin/orders/:order_id",
-      "title": "Order detail"
-    },
-    {
-      "path": "/admin/products",
-      "title": "Product management"
-    },
-    {
-      "path": "/admin/products/:product_id/edit",
-      "title": "Edit product"
-    },
-    {
-      "path": "/admin/delivery-zones",
-      "title": "Delivery zones and pickup fees"
-    },
-    {
-      "path": "/admin/orders/:order_id/receipt",
-      "title": "Private owner receipt"
-    },
-    {
-      "path": "/admin/complaints",
-      "title": "Complaints"
-    },
-    {
-      "path": "/admin/complaints/:complaint_id",
-      "title": "Complaint detail"
-    },
-    {
-      "path": "/admin/reviews",
-      "title": "Review moderation"
-    },
-    {
-      "path": "/complaint",
-      "title": "Customer care"
-    },
-    {
-      "path": "/webhooks/whatsapp",
-      "title": "WhatsApp webhook"
-    },
-    {
-      "path": "/products",
-      "title": "Products"
-    },
-    {
-      "path": "/secure-drop",
-      "title": "Secure drop"
-    },
-    {
-      "path": "/secure-drop/:token",
-      "title": "Secure drop receiver"
-    },
-    {
-      "path": "/admin/packages",
-      "title": "Predefined packages"
-    },
-    {
-      "path": "/admin/order-stream",
-      "title": "Live order stream"
-    },
-    {
-      "path": "/updates",
-      "title": "Shop updates"
-    },
-    {
-      "path": "/updates/:update_id",
-      "title": "Update detail"
-    },
-    {
-      "path": "/gallery",
-      "title": "Gallery"
-    },
-    {
-      "path": "/wholesale",
-      "title": "Wholesale orders"
-    },
-    {
-      "path": "/privacy",
-      "title": "Privacy and security"
-    },
-    {
-      "path": "/community/",
-      "title": "Community"
-    },
-    {
-      "path": "/community/notifications",
-      "title": "Community notifications"
-    },
-    {
-      "path": "/community/support",
-      "title": "Community support (staff)"
-    },
-    {
-      "path": "/partner-offers/:listing_id",
-      "title": "Independent supplier offer"
-    },
-    {
-      "path": "/sitemap.xml",
-      "title": "Sitemap"
-    },
-    {
-      "path": "/robots.txt",
-      "title": "Robots"
-    }
-  ]
-}
+{"routes":[
+  {"path":"/","title":"Beamers Farms shop"},
+  {"path":"/products","title":"Products"},
+  {"path":"/product/:product_id","title":"Product detail"},
+  {"path":"/cart","title":"Shopping cart"},
+  {"path":"/checkout","title":"Delivery or pickup checkout"},
+  {"path":"/help","title":"Help and ordering guide"},
+  {"path":"/track-order","title":"Track an order"},
+  {"path":"/gallery","title":"Farm gallery"},
+  {"path":"/updates","title":"Shop updates"},
+  {"path":"/updates/:update_id","title":"Update detail"},
+  {"path":"/wholesale","title":"Wholesale orders"},
+  {"path":"/privacy","title":"Privacy and security"},
+  {"path":"/community/","title":"Community"},
+  {"path":"/community/post/:post_id","title":"Community post"},
+  {"path":"/community/notifications","title":"Community notifications"},
+  {"path":"/community/support","title":"Community support"},
+  {"path":"/complaint","title":"Customer care"},
+  {"path":"/reviews","title":"Leave an order review"},
+  {"path":"/testimonials","title":"Customer testimonials"},
+  {"path":"/partner-offers/:listing_id","title":"Independent supplier offer"},
+  {"path":"/partner-advertisements/apply/:token","title":"Partner listing application"},
+  {"path":"/account","title":"Customer account"},
+  {"path":"/account/login","title":"Customer sign in"},
+  {"path":"/account/register","title":"Create customer account"},
+  {"path":"/account/forgot-password","title":"Recover customer account"},
+  {"path":"/account/reset-password","title":"Reset customer password"},
+  {"path":"/account/wishlist","title":"Customer wishlist"},
+  {"path":"/order/:order_ref/:token/success","title":"Order confirmation"},
+  {"path":"/order/:order_ref/:token/receipt","title":"Customer receipt"},
+  {"path":"/payments/opay/start/:order_ref/:token","title":"Start OPay checkout"},
+  {"path":"/payments/opay/return/:order_ref/:token","title":"Return from OPay"},
+  {"path":"/secure-drop","title":"Secure drop desk"},
+  {"path":"/secure-drop/:token","title":"Secure drop receiver"},
+  {"path":"/admin/login","title":"Staff login"},
+  {"path":"/admin/","title":"Owner order desk"},
+  {"path":"/admin/analytics","title":"Owner analytics"},
+  {"path":"/admin/complaints","title":"Owner complaints"},
+  {"path":"/admin/complaints/:complaint_id","title":"Owner complaint detail"},
+  {"path":"/admin/coupons","title":"Coupon management"},
+  {"path":"/admin/customer-messages","title":"Customer messages"},
+  {"path":"/admin/customers","title":"Customer profiles"},
+  {"path":"/admin/delivery-zones","title":"Delivery zones"},
+  {"path":"/admin/forms","title":"Customer forms"},
+  {"path":"/admin/gallery","title":"Gallery management"},
+  {"path":"/admin/gallery/:image_id/edit","title":"Edit gallery item"},
+  {"path":"/admin/in-person-orders","title":"Record in-person sale"},
+  {"path":"/admin/inventory","title":"Inventory"},
+  {"path":"/admin/orders/:order_ref","title":"Owner order detail"},
+  {"path":"/admin/orders/:order_ref/receipt","title":"Owner order receipt"},
+  {"path":"/admin/orders/summary","title":"Order summary"},
+  {"path":"/admin/packages","title":"Package management"},
+  {"path":"/admin/partner-advertisements","title":"Partner listings"},
+  {"path":"/admin/partner-advertisements/:listing_id/edit","title":"Edit partner listing"},
+  {"path":"/admin/partner-advertisements/invites","title":"Partner invitations"},
+  {"path":"/admin/privacy-rules","title":"Privacy rules"},
+  {"path":"/admin/products","title":"Product management"},
+  {"path":"/admin/products/:product_id/edit","title":"Edit product"},
+  {"path":"/admin/recommendations","title":"Order-success recommendations"},
+  {"path":"/admin/reports/sales","title":"Sales report"},
+  {"path":"/admin/reviews","title":"Review moderation"},
+  {"path":"/admin/staff","title":"Staff accounts"},
+  {"path":"/admin/staff-manual","title":"Staff manual"},
+  {"path":"/admin/staff-report","title":"Staff report"},
+  {"path":"/admin/updates","title":"Update management"},
+  {"path":"/admin/wholesale-orders","title":"Wholesale request management"},
+  {"path":"/dispatch/","title":"Dispatch rider queue"},
+  {"path":"/dispatch/orders/:order_ref","title":"Dispatch order detail"},
+  {"path":"/sales/","title":"Sales desk"},
+  {"path":"/sales/complaints","title":"Salesperson complaints"},
+  {"path":"/sales/complaints/:complaint_id","title":"Salesperson complaint detail"},
+  {"path":"/sales/in-person-orders","title":"Record salesperson sale"},
+  {"path":"/sales/inventory","title":"Salesperson inventory"},
+  {"path":"/sales/orders/:order_ref","title":"Sales order detail"},
+  {"path":"/sales/orders/:order_ref/settlement-receipt","title":"Settlement receipt"},
+  {"path":"/sales/profile","title":"Salesperson profile"},
+  {"path":"/sales/reports/inventory","title":"Inventory report"},
+  {"path":"/sales/reports/orders","title":"Order summary report"},
+  {"path":"/sales/reports/sales","title":"Sales report"},
+  {"path":"/sales/staff-manual","title":"Sales staff manual"}
+]}

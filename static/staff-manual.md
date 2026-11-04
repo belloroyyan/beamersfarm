@@ -1,4 +1,4 @@
-# Beamers Farm Staff Digital Wiki
+# Beamers Farms Staff Digital Wiki
 
 ## Purpose
 This manual covers order handling, payment verification, cancellation reasons, customer privacy, staff profiles, reports, and escalation.

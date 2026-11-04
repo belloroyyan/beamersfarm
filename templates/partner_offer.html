@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ page_title|default("Beamers Farm") }}{% endblock %}
+{% block title %}{{ page_title|default("Beamers Farms") }}{% endblock %}
 {% block content %}
 <section class="container partner-offer-shell">
   <a class="back-link" href="{{ url_for('shop.products') }}#partner-offers">← Back to products and partner offers</a>
@@ -22,7 +22,7 @@
           {% for link in listing.social_links %}<a class="button button-outline" href="{{ link.url }}" target="_blank" rel="noopener noreferrer nofollow">{{ link.label }} ↗</a>{% endfor %}
         </div>
       </section>
-      <aside class="third-party-notice"><strong>Important:</strong> This listing is provided for visibility only. {{ listing.supplier_name }} is responsible for the product, its availability, price, delivery, payment, and customer service. Beamers Farm does not stock, sell, take payment for, or fulfil this offer.</aside>
+      <aside class="third-party-notice"><strong>Important:</strong> This listing is provided for visibility only. {{ listing.supplier_name }} is responsible for the product, its availability, price, delivery, payment, and customer service. Beamers Farms does not stock, sell, take payment for, or fulfil this offer.</aside>
     </div>
   </div>
 </section>

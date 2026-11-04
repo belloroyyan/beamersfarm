@@ -1,1 +1,102 @@
-{% extends "base.html" %}{% block title %}Staff report · Beamers Farm{% endblock %}{% block content %}<div class="admin-shell"><div class="container"><div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.staff_accounts') }}">← Back to staff access</a><p class="eyebrow">Owner desk / accountability</p><h1>Staff report.</h1><p class="form-note">Summarized profile details and the latest recorded actions for each salesperson.</p></div><button class="button button-dark" type="button" data-print>Print / Save as PDF</button></div><article class="print-receipt staff-report">{% for account in accounts %}<section class="staff-report-card"><header><div><h2>{{ account.display_name }}</h2><p>@{{ account.username }} · {{ 'Active' if account.active else 'Inactive' }}</p></div><span class="status-pill {{ 'status-confirmed' if account.active else 'status-cancelled' }}">{{ 'Active' if account.active else 'Inactive' }}</span></header><div class="staff-report-grid"><div><strong>Phone</strong><span>{{ account.phone or 'Missing' }}</span></div><div><strong>Email</strong><span>{{ account.email or 'Missing' }}</span></div><div><strong>Address</strong><span>{{ account.address or 'Missing' }}</span></div><div><strong>Socials</strong><span>{{ account.socials or 'Missing' }}</span></div><div><strong>Created</strong><span>{{ account.created_at|local_time('%d %b %Y') }}</span></div><div><strong>Profile updated</strong><span>{{ account.profile_updated_at|local_time('%d %b %Y · %H:%M') if account.profile_updated_at else 'Not yet' }}</span></div></div><h3>Actions so far</h3><ul class="staff-action-list">{% for item in logs[account.id] %}<li><strong>{{ item.action }}</strong><span>{{ item.detail }}</span><small>{{ item.created_at|local_time('%d %b %Y · %H:%M') }}</small></li>{% else %}<li>No logged actions yet.</li>{% endfor %}</ul></section>{% else %}<div class="empty-state compact"><h3>No salesperson accounts.</h3></div>{% endfor %}<footer class="print-receipt-footer"><span>Beamers Farm · Staff report</span><span>Generated {{ generated_at|local_time('%d %b %Y · %H:%M') }} WAT</span></footer></article></div></div>{% endblock %}{% block scripts %}<script src="{{ url_for('static', filename='js/receipt-print.js') }}" defer></script>{% endblock %}
+{% extends "base.html" %}
+{% block title %}Staff report · Beamers Farms{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/staff-report.css') }}">
+{% endblock %}
+{% block content %}
+<div class="admin-shell staff-report-page">
+  <div class="container">
+    <div class="admin-topbar staff-report-topbar">
+      <div>
+        <a class="back-link" href="{{ url_for('admin.staff_accounts') }}">← Back to staff access</a>
+        <p class="eyebrow">Owner desk / accountability</p>
+        <h1>Staff report.</h1>
+        <p class="form-note">A clear profile summary and a record of each salesperson’s latest recorded actions.</p>
+      </div>
+      <button class="button button-dark" type="button" data-print>Print / Save as PDF</button>
+    </div>
+
+    <article class="print-receipt staff-report">
+      {% for account in accounts %}
+      <section class="staff-report-card" aria-labelledby="staff-report-name-{{ account.id }}">
+        <header class="staff-report-identity">
+          <div class="staff-report-person">
+            <p class="staff-report-kicker">Salesperson profile</p>
+            <h2 id="staff-report-name-{{ account.id }}">{{ account.display_name }}</h2>
+            <p class="staff-report-username">@{{ account.username }}</p>
+          </div>
+          <span class="status-pill {{ 'status-confirmed' if account.active else 'status-cancelled' }}">{{ 'Active' if account.active else 'Inactive' }}</span>
+        </header>
+
+        <section class="staff-report-section staff-report-contact" aria-labelledby="staff-contact-title-{{ account.id }}">
+          <div class="staff-report-section-heading">
+            <p class="staff-report-kicker">Reach this person</p>
+            <h3 id="staff-contact-title-{{ account.id }}">Contact details</h3>
+          </div>
+          <dl class="staff-report-grid">
+            <div><dt>Phone</dt><dd>{{ account.phone or 'Missing' }}</dd></div>
+            <div><dt>Email</dt><dd>{{ account.email or 'Missing' }}</dd></div>
+            <div><dt>Address</dt><dd>{{ account.address or 'Missing' }}</dd></div>
+            <div><dt>Socials</dt><dd>{{ account.socials or 'Missing' }}</dd></div>
+          </dl>
+        </section>
+
+        <section class="staff-report-section staff-report-dates" aria-labelledby="staff-dates-title-{{ account.id }}">
+          <div class="staff-report-section-heading">
+            <p class="staff-report-kicker">Account record</p>
+            <h3 id="staff-dates-title-{{ account.id }}">Dates</h3>
+          </div>
+          <dl class="staff-report-date-grid">
+            <div><dt>Account created</dt><dd>{{ account.created_at|local_time('%d %b %Y') }}</dd></div>
+            <div><dt>Profile last updated</dt><dd>{{ account.profile_updated_at|local_time('%d %b %Y · %H:%M') if account.profile_updated_at else 'Not yet' }}</dd></div>
+          </dl>
+        </section>
+
+        <section class="staff-report-section staff-report-actions" aria-labelledby="staff-actions-title-{{ account.id }}" data-staff-action-log>
+          <div class="staff-report-section-heading staff-report-actions-heading">
+            <div>
+              <p class="staff-report-kicker">Accountability</p>
+              <h3 id="staff-actions-title-{{ account.id }}">Action history</h3>
+            </div>
+            <span class="staff-report-optional-note">Optional in print</span>
+          </div>
+          <ul class="staff-action-list">
+            {% for item in logs[account.id] %}
+            <li>
+              <strong>{{ item.action }}</strong>
+              <span>{{ item.detail }}</span>
+              <small>{{ item.created_at|local_time('%d %b %Y · %H:%M') }}</small>
+            </li>
+            {% else %}
+            <li class="staff-report-no-actions">No logged actions yet.</li>
+            {% endfor %}
+          </ul>
+        </section>
+      </section>
+      {% else %}
+      <div class="empty-state compact"><h3>No salesperson accounts.</h3></div>
+      {% endfor %}
+      <footer class="print-receipt-footer staff-report-footer">
+        <span>Beamers Farms · Staff report</span>
+        <span>Generated {{ generated_at|local_time('%d %b %Y · %H:%M') }} WAT</span>
+      </footer>
+    </article>
+  </div>
+</div>
+
+<dialog class="staff-report-print-dialog" data-staff-print-dialog aria-labelledby="staff-print-title" aria-describedby="staff-print-description">
+  <form method="dialog" class="staff-report-print-card">
+    <p class="staff-report-kicker">Print options</p>
+    <h2 id="staff-print-title">Include action logs?</h2>
+    <p id="staff-print-description">Choose whether the action history sections should appear in your printout or saved PDF. They will remain visible on this page either way.</p>
+    <div class="staff-report-print-actions">
+      <button class="button button-dark" type="button" data-print-with-actions>Yes, include logs</button>
+      <button class="button button-outline" type="button" data-print-without-actions>No, omit logs</button>
+    </div>
+    <button class="staff-report-print-cancel" type="submit">Cancel</button>
+  </form>
+</dialog>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/staff-report-print.js') }}" defer></script>
+{% endblock %}

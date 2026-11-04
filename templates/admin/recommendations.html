@@ -6,7 +6,7 @@
   <form method="post" class="recommendation-manager-form">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
     <div class="recommendation-manager-grid">
-      <section class="admin-panel recommendation-select-panel"><div class="panel-heading"><div><p class="eyebrow">Beamers Farm products</p><h2>Choose products</h2><p class="form-note">Active products with available stock are eligible. Choose up to six.</p></div><span class="section-note">{{ products|length }} products</span></div>
+      <section class="admin-panel recommendation-select-panel"><div class="panel-heading"><div><p class="eyebrow">Beamers Farms products</p><h2>Choose products</h2><p class="form-note">Active products with available stock are eligible. Choose up to six.</p></div><span class="section-note">{{ products|length }} products</span></div>
         <div class="recommendation-select-list">
           {% for product in products %}<label class="recommendation-select-row{% if not product.active %} is-disabled{% endif %}"><input type="checkbox" name="products" value="{{ product.id }}" {% if product.recommended %}checked{% endif %} {% if not product.active %}disabled{% endif %}><span class="recommendation-select-copy"><strong>{{ product.name }}</strong><small>Product #{{ product.id }} · {{ format_currency(product.price) }} / {{ product.unit }} · stock {{ format_quantity(product.stock) }} · {{ 'Active' if product.active else 'Archived' }}</small></span></label>{% else %}<p class="form-note">No catalog products yet.</p>{% endfor %}
         </div>
