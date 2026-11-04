@@ -29,6 +29,11 @@
       </header>
       {% set cover_title = "Order Summary" %}{% set cover_lines = [(orders|length ~ " order(s) in this report"), (orders|selectattr("status","equalto","Cancelled")|list|length ~ " cancelled"), (orders|selectattr("order_channel","equalto","in_person")|list|length ~ " farm-counter sale(s)")] %}
       {% include "reports/_cover.html" %}
+      {% set section_number = "03" %}
+      {% set section_title = "Order Summary" %}
+      {% set section_lead = "A complete view of orders placed during the selected period, from customer and fulfilment details to payment and status." %}
+      {% set section_description = "This section lists the order records included in the report, with fulfilment method, item lines, total value, payment state and current status. Customer and payment details are shown for internal business review only." %}
+      {% include "reports/_section_intro.html" %}
       {% if orders %}
         <section class="print-receipt-section">
           <div class="order-table-wrap">
