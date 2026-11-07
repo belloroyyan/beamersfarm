@@ -2,8 +2,9 @@
 {% block title %}Products · Beamers Farms{% endblock %}
 {% block content %}
 <div class="admin-shell"><div class="container">
-  <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / catalog</p><h1>Products &amp; stock</h1></div><div class="admin-actions"><a class="button button-outline light-outline" href="{{ url_for('admin.partner_ads') }}">Manage partner ads</a><a class="button button-outline light-outline" href="{{ url_for('shop.index') }}">View shop ↗</a></div></div>
   <div class="owner-new-button"><button class="button button-lime" type="button" data-open-admin-dialog="product-create-dialog">New Product</button></div>
+
+  <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / catalog</p><h1>Products &amp; stock</h1></div><div class="admin-actions"><a class="button button-outline light-outline" href="{{ url_for('admin.partner_ads') }}">Manage partner ads</a><a class="button button-outline light-outline" href="{{ url_for('shop.index') }}">View shop ↗</a></div></div>
   <div class="product-admin-grid">
     <section class="admin-panel">
       <div class="panel-heading"><div><p class="eyebrow">Current catalog</p><h2>Prices and availability</h2><p class="form-note">These are Beamers Farms products. Stock is counted in physical sale units. Use Partner advertisements for independent suppliers and offers that are not sold or fulfilled by Beamers Farms.</p></div></div>

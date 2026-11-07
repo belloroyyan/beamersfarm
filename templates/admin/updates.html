@@ -2,8 +2,9 @@
 {% from "macros/update_sharing.html" import update_share_buttons %}
 {% block title %}Updates · Owner desk{% endblock %}
 {% block content %}<div class="admin-shell"><div class="container">
+  <div class="owner-new-button"><button class="button button-lime" type="button" data-open-admin-dialog="update-create-dialog">New Update</button></div>
+
 <div class="admin-topbar"><div><p class="eyebrow">Owner desk / updates</p><h1>Post an update</h1></div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to overview</a></div>
-<div class="owner-new-button"><button class="button button-lime" type="button" data-open-admin-dialog="update-create-dialog">New Update</button></div>
 <dialog class="admin-panel" data-admin-dialog="update-create-dialog" aria-labelledby="update-create-title" {% if request.method == 'POST' %}open{% endif %}>
   <h2 id="update-create-title">Post an update</h2>
   <button class="admin-dialog-x" type="button" data-admin-dialog-close aria-label="Close">×</button>

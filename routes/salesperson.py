@@ -1,4 +1,5 @@
 from functools import wraps
+from decimal import Decimal
 
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, send_file, session, url_for
 from sqlalchemy import or_
@@ -6,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from datetime import datetime
 
-from models import Complaint, CustomerNotice, Order, Product, SalespersonAccount, StaffActionLog, ShopSettings, db
+from models import OrderFinancialRecord, Complaint, CustomerNotice, Order, Product, SalespersonAccount, StaffActionLog, ShopSettings, db
 from utils.order_workflow import ORDER_STATUSES, update_order_status
 from utils.order_settlement import save_order_weights
 from utils.order_search import order_search_filter
@@ -15,7 +16,7 @@ from utils.salesperson_permissions import get_salesperson_permissions, salespers
 from utils.web_push import web_push_is_configured
 from utils.in_person_orders import create_in_person_order
 from utils.inventory_reports import build_inventory_report
-from utils.sales_report import build_sales_summary, filter_orders_by_text
+from utils.sales_report import build_sales_summary, build_previous_period_comparison, filter_orders_by_text
 from zoneinfo import ZoneInfo
 
 salesperson_bp = Blueprint("salesperson", __name__, url_prefix="/sales")
@@ -113,6 +114,48 @@ def order_detail(account, order_ref):
     order = find_order(order_ref)
     permissions = get_salesperson_permissions(account)
     if request.method == "POST":
+        if request.form.get("action") == "edit_order_item":
+            if not permissions.get("change_order_status"):
+                abort(403)
+            try:
+                item = next(item for item in order.items if item.id == int(request.form.get("item_id", "0")))
+                price = Decimal(request.form.get("unit_price", str(item.unit_price)))
+                if not price.is_finite() or price < 0 or price > Decimal("9999999999.99"):
+                    raise ValueError
+                if item.pricing_type == "weight_deposit":
+                    item.weight_price_per_kg = price
+                else:
+                    item.unit_price = price
+                    item.subtotal = (price * Decimal(str(item.quantity))).quantize(Decimal("0.01"))
+                item.processing_method = request.form.get("processing_method", "").strip()[:1000]
+                order.subtotal = sum((Decimal(str(line.subtotal or 0)) for line in order.items), Decimal("0.00"))
+                order.total = max(Decimal("0.00"), order.subtotal + Decimal(str(order.delivery_fee or 0)) - Decimal(str(order.discount_amount or 0)))
+                db.session.commit()
+                log_staff_action(account, "Adjusted order line", f"Order #{order.public_id}, item #{item.id}")
+                db.session.commit()
+                flash("This order line was updated. The catalogue price remains unchanged.", "success")
+            except (ValueError, StopIteration, ArithmeticError):
+                db.session.rollback()
+                flash("Enter a valid price and order line.", "error")
+            return redirect(url_for("salesperson.order_detail", order_ref=order.public_id))
+        if request.form.get("action") == "verify_customer_cancellation":
+            if not permissions.get("change_order_status"):
+                abort(403)
+            if not order.cancellation_requested_at or order.status in {"Delivered", "Picked up", "Cancelled"}:
+                flash("There is no eligible customer cancellation request to verify.", "error")
+            else:
+                ok, message = update_order_status(order, "Cancelled", actor="salesperson", actor_name=account.display_name, cancel_reason="Customer requested cancellation")
+                if not ok:
+                    flash(message, "error")
+                    return redirect(url_for("salesperson.order_detail", order_ref=order.public_id))
+                if order.payment_status == "Verified" and Decimal(str(order.total or 0)) > 0:
+                    exists = OrderFinancialRecord.query.filter_by(order_id=order.id, event_type="refund", notes="Verified customer cancellation refund").first()
+                    if not exists:
+                        db.session.add(OrderFinancialRecord(order_id=order.id, event_type="refund", amount=Decimal(str(order.total)), status="pending", payment_method="bank transfer", notes="Verified customer cancellation refund", recorded_by=account.display_name))
+                db.session.commit()
+                log_staff_action(account, "Verified customer cancellation", f"Order #{order.public_id}")
+                flash("Cancellation verified; refund recorded for processing where payment was verified.", "success")
+            return redirect(url_for("salesperson.order_detail", order_ref=order.public_id))
         if request.form.get("save_weights") == "yes":
             if not permissions["record_weigh_ins"]:
                 abort(403)
@@ -120,7 +163,7 @@ def order_detail(account, order_ref):
                 order,
                 request.form,
                 recorded_by=account.display_name,
-                allowed_statuses={"Confirmed", "Preparing"},
+                allowed_statuses={"Confirmed", "Prepared"},
             )
             flash(message, "success" if ok else "error")
             return redirect(url_for("salesperson.order_detail", order_ref=order.public_id))
@@ -360,7 +403,7 @@ def _now_local():
 def sales_report(account):
     report = _period_report()
     return render_template("reports/sales_report.html", report=report, data=build_sales_summary(report["orders"]),
-                           nav=_sales_nav(account), show_customer=salesperson_has_permission(account, "view_customer_details"),
+                           comparison=build_previous_period_comparison(report), nav=_sales_nav(account), show_customer=salesperson_has_permission(account, "view_customer_details"),
                            generated_at=_now_local())
 
 
@@ -405,4 +448,4 @@ def staff_manual(account):
 @salesperson_bp.get("/staff-manual/download")
 @salesperson_required
 def staff_manual_download(account):
-    return send_file(current_app.root_path + "/static/staff-manual.md", as_attachment=True, download_name="Beamers-Farms-Staff-Digital-Wiki.md", mimetype="text/markdown")
+    return send_file(current_app.root_path + "/static/staff-manual-salesperson.md", as_attachment=True, download_name="Beamers-Farms-Staff-Digital-Wiki.md", mimetype="text/markdown")

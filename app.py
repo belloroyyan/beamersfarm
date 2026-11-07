@@ -10,6 +10,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config, INSTANCE_DIR
 from models import AnalyticsEvent, Coupon, Customer, CustomerNotice, DeliveryZone, Product, ShopSettings, db
+from utils.delivery_operations import sync_delivery_schedule
 from routes.admin import admin_bp
 from routes.shop import shop_bp
 from routes.whatsapp import whatsapp_bp
@@ -177,6 +178,12 @@ def create_app():
         }
 
     @app.before_request
+    def apply_delivery_schedule():
+        try:
+            sync_delivery_schedule()
+        except Exception:
+            db.session.rollback()
+    @app.before_request
     def record_site_analytics():
         ignored_paths = {
             "/service-worker.js",
@@ -224,6 +231,9 @@ def create_app():
         )
         if response.content_type and response.content_type.startswith("text/html"):
             response.headers.setdefault("Cache-Control", "no-store")
+        elif request.endpoint == "static" and response.status_code == 200:
+            # Static filenames are not content-hashed, so use a short, safe cache lifetime.
+            response.headers.setdefault("Cache-Control", "public, max-age=3600, stale-while-revalidate=86400")
         return response
 
     @app.get("/health")

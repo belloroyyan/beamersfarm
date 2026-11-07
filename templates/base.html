@@ -47,7 +47,7 @@
     <div class="container header-inner">
       <a class="brand" href="{{ url_for('shop.index') }}">
         <img src="{{ url_for('static', filename='images/brand-mark.png') }}" alt="" class="brand-mark" loading="lazy" decoding="async">
-        <span><strong>Beamers Farms</strong><small>Fresh, clean, hygienically packaged.</small></span>
+        <span><strong>BEAMERS Farms</strong><small>Fresh, clean, hygienically packaged.</small></span>
       </a>
       <a class="header-cart" href="{{ url_for('shop.cart') }}" aria-label="Open your cart">Cart <span class="cart-count">{{ format_quantity(cart_count) }}</span></a>
       <button class="tour-toggle" type="button" data-tour-open aria-label="Show the how-to-order guide" title="How to order"><svg aria-hidden="true" focusable="false" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2 1-1.2 1.8"/><circle cx="12" cy="16.9" r=".6" fill="currentColor"/></svg></button>
@@ -66,6 +66,7 @@
             <a href="{{ url_for('shop.gallery') }}">Gallery</a>
             <a href="{{ url_for('community.feed') }}">Community</a>
             <a href="{{ url_for('shop.track_order') }}">Track order</a>
+            <a href="{{ url_for('shop.redelivery_lookup') }}">Request redelivery</a>
             <a href="{{ url_for('shop.wholesale') }}">Wholesale orders</a>
             <a href="{{ url_for('shop.help_page') }}">Help</a>
             <a href="{{ url_for('shop.privacy') }}">Privacy & security</a>
@@ -147,7 +148,9 @@
   <footer class="site-footer">
     <div class="container footer-columns">
       <div><strong class="footer-brand">Beamers Farms</strong><p>Fresh, clean, hygienically packaged chicken for Osogbo kitchens.</p><small>Elapop Estate, Oke Baale, Osogbo, Nigeria</small><small>Open daily · 7:00 AM–7:00 PM</small><small class="company-registration">CAC registration no. 9967398</small><small class="footer-copy">© {{ now_year|default(2026) }} Beamers Farms</small></div>
-      <div><h3>Shop</h3><a href="{{ url_for('shop.products') }}">Products</a><a href="{{ url_for('shop.wholesale') }}">Wholesale orders</a><a href="{{ url_for('shop.updates') }}">Updates</a><a href="{{ url_for('shop.gallery') }}">Gallery</a><a href="{{ url_for('shop.track_order') }}">Track order</a></div>
+      <div><h3>Shop</h3><a href="{{ url_for('shop.products') }}">Products</a><a href="{{ url_for('shop.wholesale') }}">Wholesale orders</a><a href="{{ url_for('shop.updates') }}">Updates</a><a href="{{ url_for('shop.gallery') }}">Gallery</a><a href="{{ url_for('shop.track_order') }}">Track order</a>
+            <a href="{{ url_for('shop.redelivery_lookup') }}">Request redelivery</a>
+            </div>
       <div><h3>Community</h3><a href="{{ url_for('community.feed') }}">Community</a><a href="{{ url_for('reviews.testimonials') }}">Testimonials</a><a href="{{ url_for('reviews.submit_review') }}">Leave a review</a><a href="{{ url_for('customer.account') if current_customer else url_for('customer.login') }}">{{ 'My account' if current_customer else 'Customer account' }}</a></div>
       <div><h3>Help & contact</h3><a href="https://wa.me/2348062074302" target="_blank" rel="noopener">WhatsApp 0806 207 4302</a><a href="{{ url_for('shop.help_page') }}">Help centre</a><a href="{{ url_for('shop.privacy') }}">Privacy & security</a><a href="{{ url_for('complaints.create_complaint') }}">Customer care</a></div>
     </div>
@@ -159,6 +162,7 @@
   <script src="{{ url_for('static', filename='js/share.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/cancel-reason.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/pwa-register.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/live-sections.js') }}" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

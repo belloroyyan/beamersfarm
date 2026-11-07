@@ -9,7 +9,7 @@
     <div class="detail-copy">
       <p class="eyebrow">Frozen cut · listed price per {{ product.unit }}</p>
       <h1>{{ product.name }}</h1>
-      <p class="detail-description">{{ product.description }}</p>
+      {% if product.promotional_tag %}<span class="product-promo-tag product-detail-tag">{{ product.promotional_tag }}</span>{% endif %}<p class="detail-description">{{ product.description }}</p>
       <div class="detail-price"><strong>{{ format_currency(product.price) }} <small>per {{ product.unit }}</small></strong><span>{{ format_quantity(product.stock) }} {{ product.unit }} available</span></div>
       {% if product.is_available %}
       <form class="quantity-form" action="{{ url_for('shop.add_to_cart', product_id=product.id) }}" method="post">
@@ -32,5 +32,6 @@
   </div>
 </div>
 {% if reorder_order %}<aside class="reorder-popover" data-reorder-popover role="dialog" aria-label="Reorder suggestion"><button type="button" class="reorder-close" data-reorder-close aria-label="Close suggestion">×</button><p class="eyebrow">Welcome back</p><h2>Reorder {{ product.name }}?</h2><p>You bought this in your last matching order on {{ reorder_order.created_at|local_time("%d %b %Y") }}.</p><form method="post" action="{{ url_for('customer.reorder', order_id=reorder_order.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="button button-lime" type="submit">Reorder last order <span>→</span></button></form></aside>{% endif %}
+{% if product_reviews %}<section class="container section product-reviews"><div class="section-heading"><div><p class="eyebrow">Verified customer experiences</p><h2>Reviews for {{ product.name }}</h2></div></div><div class="testimonial-grid">{% for review in product_reviews %}<article class="testimonial-card"><div class="review-stars">{% for _ in range(review.rating) %}★{% endfor %}</div><h3>{{ review.title }}</h3><p>{{ review.body }}</p><strong class="testimonial-name">{{ review.customer_name }}</strong></article>{% endfor %}</div></section>{% endif %}
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='js/reorder-popover.js') }}" defer></script>{% endblock %}

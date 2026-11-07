@@ -1,112 +1,58 @@
-/* Expected attributes: dialog[data-admin-dialog="id"], [data-open-admin-dialog="id"], and [data-admin-dialog-close]. */
+/* Shared, delegated dialog controller for all admin create/edit dialogs. */
 (() => {
-  "use strict";
+  const findDialog = (id) => {
+    if (!id) return null;
+    return document.querySelector(`[data-admin-dialog="${CSS.escape(id)}"]`) || document.getElementById(id);
+  };
 
-  const STORAGE_KEY = "active-admin-dialog";
-  const dialogSelector = 'dialog[data-admin-dialog]';
-
-  function getDialog(key) {
-    if (!key) return null;
-
-    return Array.from(document.querySelectorAll(dialogSelector)).find(
-      (dialog) => dialog.getAttribute("data-admin-dialog") === key,
-    ) || null;
-  }
-
-  function saveDialogKey(key) {
-    try {
-      window.sessionStorage.setItem(STORAGE_KEY, key);
-    } catch (_error) {
-      // Storage may be unavailable; dialog behavior should still work.
-    }
-  }
-
-  function readDialogKey() {
-    try {
-      return window.sessionStorage.getItem(STORAGE_KEY);
-    } catch (_error) {
-      return null;
-    }
-  }
-
-  function clearDialogKey() {
-    try {
-      window.sessionStorage.removeItem(STORAGE_KEY);
-    } catch (_error) {
-      // Storage may be unavailable; dialog behavior should still work.
-    }
-  }
-
-  function openDialog(dialog) {
-    const key = dialog.getAttribute("data-admin-dialog");
-    if (!key) return;
-
-    saveDialogKey(key);
-    if (dialog.open) return;
-
-    try {
-      dialog.showModal();
-    } catch (_error) {
-      // Ignore invalid/unavailable dialog state rather than breaking the page.
-    }
-  }
-
-  function closeDialog(dialog) {
-    if (dialog && dialog.open) dialog.close();
-    clearDialogKey();
-  }
-
-  function initialize() {
-    const dialogs = Array.from(document.querySelectorAll(dialogSelector));
-
-    dialogs.forEach((dialog) => {
-      dialog.addEventListener("close", clearDialogKey);
-      dialog.addEventListener("click", (event) => {
-        if (event.target === dialog) closeDialog(dialog);
-      });
+  function placeCreateActions() {
+    document.querySelectorAll('.admin-shell > .container, .admin-shell .container').forEach((container) => {
+      const action = container.querySelector(':scope > .owner-new-button');
+      const heading = container.querySelector(':scope > .admin-topbar');
+      if (action && heading && heading.nextElementSibling !== action) {
+        heading.insertAdjacentElement('afterend', action);
+      }
     });
+  }
 
-    document.addEventListener("click", (event) => {
-      const target = event.target;
-      if (!target || typeof target.closest !== "function") return;
+  document.addEventListener('DOMContentLoaded', placeCreateActions);
 
-      const openButton = target.closest("[data-open-admin-dialog]");
-      if (openButton) {
-        event.preventDefault();
-        const dialog = getDialog(openButton.getAttribute("data-open-admin-dialog"));
-        if (dialog) openDialog(dialog);
+  document.addEventListener('click', (event) => {
+    const opener = event.target.closest('[data-open-admin-dialog]');
+    if (opener) {
+      event.preventDefault();
+      const dialog = findDialog(opener.dataset.openAdminDialog);
+      if (!dialog) {
+        console.error('Admin dialog not found:', opener.dataset.openAdminDialog);
+        opener.setAttribute('aria-invalid', 'true');
         return;
       }
-
-      const closeButton = target.closest("[data-admin-dialog-close]");
-      if (closeButton) {
-        const dialog = closeButton.closest(dialogSelector);
-        if (dialog) closeDialog(dialog);
-      }
-    });
-
-    const hadValidationError = document.querySelector(
-      ".flash.error, [data-flash-category=\"error\"]",
-    );
-    if (!hadValidationError) {
-      clearDialogKey();
+      if (typeof dialog.showModal === 'function') dialog.showModal();
+      else dialog.setAttribute('open', '');
       return;
     }
 
-    const savedKey = readDialogKey();
-    if (!savedKey) return;
-
-    const dialog = getDialog(savedKey);
-    if (dialog) {
-      openDialog(dialog);
-    } else {
-      clearDialogKey();
+    const closer = event.target.closest('[data-admin-dialog-close]');
+    if (closer) {
+      const dialog = closer.closest('dialog');
+      if (dialog?.open) dialog.close();
+      else dialog?.removeAttribute('open');
+      return;
     }
-  }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initialize, { once: true });
-  } else {
-    initialize();
-  }
+    const editOpener = event.target.closest('[data-open-order-edit]');
+    if (editOpener) {
+      const dialog = document.getElementById(editOpener.dataset.openOrderEdit);
+      if (dialog?.showModal) dialog.showModal();
+    }
+    const genericCloser = event.target.closest('[data-close-dialog]');
+    if (genericCloser) genericCloser.closest('dialog')?.close();
+  });
+
+  document.addEventListener('click', (event) => {
+    const dialog = event.target;
+    if (dialog instanceof HTMLDialogElement && dialog.matches('dialog.admin-panel') && event.target === dialog) {
+      dialog.close();
+    }
+  });
 })();

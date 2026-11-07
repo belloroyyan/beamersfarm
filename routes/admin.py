@@ -14,7 +14,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import AbandonedCart, AnalyticsEvent, Coupon, Complaint, PrivacyRule, Customer, CustomerNotice, CustomerNote, CustomerPushSubscription, CustomerMessageCampaign, CustomerMessageDelivery, DeliveryZone, DropShare, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, DispatchBatch, PartnerListing, Product, ProductPackage, ProductPackageItem, Review, SalespersonAccount, StaffActionLog, ShopSettings, ShopUpdate, StaffPushSubscription, WholesaleOrder, WholesaleOrderItem, PartnerAdInvite, SiteOverlaySeen, CommunityPost, CommunityComment, CommunityReaction, CommunityReport, CommunityBlock, CommunityNotification, db, order_customer_push_subscriptions
+from models import AbandonedCart, AnalyticsEvent, Coupon, Complaint, PrivacyRule, CommunityConductRule, Customer, CustomerNotice, CustomerNote, CustomerPushSubscription, CustomerMessageCampaign, CustomerMessageDelivery, DeliveryZone, DeliveryRedeliveryRequest, DispatchBatch, DropShare, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, PartnerListing, Product, ProductPackage, ProductPackageItem, Review, SalespersonAccount, StaffActionLog, ShopSettings, ShopUpdate, StaffPushSubscription, WholesaleOrder, WholesaleOrderItem, PartnerAdInvite, SiteOverlaySeen, CommunityPost, CommunityComment, CommunityReaction, CommunityReport, CommunityBlock, CommunityNotification, db, order_customer_push_subscriptions
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.product_images import save_product_image
 from utils.gallery import delete_gallery_image, save_gallery_image, save_gallery_media, gallery_media_type
@@ -28,7 +28,7 @@ from utils.order_workflow import ORDER_STATUSES, update_order_status
 from utils.order_settlement import save_order_weights
 from utils.inventory_pdf import build_inventory_pdf
 from utils.inventory_reports import build_inventory_report
-from utils.sales_report import build_sales_summary, filter_orders_by_text
+from utils.sales_report import build_sales_summary, build_previous_period_comparison, filter_orders_by_text
 from utils.order_search import order_search_filter
 from utils.dispatch_batches import assign_dispatch_batch
 from utils.salesperson_permissions import PERMISSION_DEFINITIONS, PERMISSION_GROUPS, get_salesperson_permissions, serialize_salesperson_permissions
@@ -383,7 +383,7 @@ def order_stream():
     order_filter = order_search_filter(search_query)
     if order_filter is not None:
         query = query.filter(order_filter)
-    return render_template("admin/order_stream.html", orders=query.limit(150).all(), search_query=search_query, sort=sort, dispatch_settings=ShopSettings.query.get(1), stream_refresh_seconds=20)
+    return render_template("admin/order_stream.html", orders=query.limit(150).all(), search_query=search_query, sort=sort, stream_refresh_seconds=20)
 
 @admin_bp.get("/orders/summary")
 @admin_required
@@ -421,9 +421,35 @@ def sales_report():
     report = _inventory_report_from_request()
     return render_template(
         "reports/sales_report.html", report=report, data=build_sales_summary(report["orders"]),
+        comparison=build_previous_period_comparison(report),
         nav=_owner_nav(), show_customer=True, generated_at=datetime.now(ZoneInfo("Africa/Lagos")),
     )
 
+
+@admin_bp.route("/delivery-settings", methods=["GET", "POST"])
+@admin_required
+def delivery_settings():
+    import json
+    settings = ShopSettings.query.get(1)
+    if not settings:
+        settings = ShopSettings(id=1)
+        db.session.add(settings)
+    if request.method == "POST":
+        settings.delivery_open_time = request.form.get("delivery_open_time", "07:00")[:5]
+        settings.delivery_close_time = request.form.get("delivery_close_time", "19:00")[:5]
+        settings.auto_shop_hours = request.form.get("auto_shop_hours") == "yes"
+        settings.dispatch_batch_hours = max(Decimal("0.25"), min(Decimal("24"), Decimal(request.form.get("dispatch_batch_hours", "2"))))
+        settings.dispatch_batch_weight_limit = max(Decimal("0.001"), Decimal(request.form.get("dispatch_batch_weight_limit", "50")))
+        windows = [line.strip() for line in request.form.get("delivery_windows", "").splitlines() if line.strip()]
+        settings.delivery_windows_json = json.dumps(windows[:12])
+        channels = [channel for channel in request.form.getlist("closure_channels") if channel in {"push", "whatsapp", "email"}]
+        settings.closure_channels_json = json.dumps(channels)
+        settings.closed_message = request.form.get("closed_message", settings.closed_message).strip()[:500] or settings.closed_message
+        db.session.commit()
+        flash("Delivery settings saved.", "success")
+        return redirect(url_for("admin.delivery_settings"))
+    from utils.delivery_operations import delivery_windows
+    return render_template("admin/delivery_settings.html", settings=settings, delivery_windows=delivery_windows(settings), closure_channels=json.loads(settings.closure_channels_json or "[]"))
 
 @admin_bp.post("/shop/toggle")
 @admin_required
@@ -434,6 +460,9 @@ def toggle_shop():
         db.session.add(settings)
     settings.is_open = not settings.is_open
     db.session.commit()
+    if not settings.is_open:
+        from utils.delivery_operations import close_expired_batches
+        close_expired_batches(close_today=True)
     flash(f"Shop is now {'open for orders' if settings.is_open else 'closed for new orders'}.", "success")
     return redirect(url_for("admin.dashboard"))
 
@@ -448,6 +477,41 @@ def order_detail(order_ref):
         from flask import abort
         abort(404)
     if request.method == "POST":
+        if request.form.get("action") == "edit_order_item":
+            try:
+                item = next(item for item in order.items if item.id == int(request.form.get("item_id", "0")))
+                price = Decimal(request.form.get("unit_price", str(item.unit_price)))
+                if not price.is_finite() or price < 0 or price > MAX_PRODUCT_PRICE:
+                    raise ValueError
+                if item.pricing_type == "weight_deposit":
+                    item.weight_price_per_kg = price
+                else:
+                    item.unit_price = price
+                    item.subtotal = (price * Decimal(str(item.quantity))).quantize(Decimal("0.01"))
+                item.processing_method = request.form.get("processing_method", "").strip()[:1000]
+                order.subtotal = sum((Decimal(str(line.subtotal or 0)) for line in order.items), Decimal("0.00"))
+                order.total = max(Decimal("0.00"), order.subtotal + Decimal(str(order.delivery_fee or 0)) - Decimal(str(order.discount_amount or 0)))
+                db.session.commit()
+                flash("This order line was updated. The catalog product price remains unchanged.", "success")
+            except (ValueError, StopIteration, ArithmeticError):
+                db.session.rollback()
+                flash("Enter a valid price and order line.", "error")
+            return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+        if request.form.get("action") == "verify_customer_cancellation":
+            if not order.cancellation_requested_at or order.status in {"Delivered", "Picked up", "Cancelled"}:
+                flash("There is no eligible customer cancellation request to verify.", "error")
+            else:
+                ok, message = update_order_status(order, "Cancelled", actor="owner", actor_name="Owner", cancel_reason="Customer requested cancellation")
+                if not ok:
+                    flash(message, "error")
+                    return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+                if order.payment_status == "Verified" and Decimal(str(order.total or 0)) > 0:
+                    already_recorded = OrderFinancialRecord.query.filter_by(order_id=order.id, event_type="refund", notes="Verified customer cancellation refund").first()
+                    if not already_recorded:
+                        db.session.add(OrderFinancialRecord(order_id=order.id, event_type="refund", amount=Decimal(str(order.total)), status="pending", payment_method="bank transfer", notes="Verified customer cancellation refund", recorded_by="Owner"))
+                db.session.commit()
+                flash("Customer cancellation verified. The order is cancelled and any verified payment has been recorded as a pending refund.", "success")
+            return redirect(url_for("admin.order_detail", order_ref=order.public_id))
         old_status = order.status
         verify_and_confirm = request.form.get("verify_and_confirm") == "yes" or request.form.get("verify_payment_only") == "yes"
         verify_payment = verify_and_confirm or request.form.get("verify_payment") == "yes"
@@ -496,6 +560,28 @@ def record_order_weights(order_ref):
         abort(404)
     ok, message = save_order_weights(order, request.form, recorded_by="Owner")
     flash(message, "success" if ok else "error")
+    return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+
+
+@admin_bp.post("/orders/<string:order_ref>/cancellation-refund")
+@admin_required
+def settle_cancellation_refund(order_ref):
+    order = Order.query.filter_by(public_id=order_ref).first_or_404()
+    record = OrderFinancialRecord.query.filter_by(order_id=order.id, event_type="refund", notes="Verified customer cancellation refund", status="pending").first()
+    if not record:
+        flash("There is no pending customer-cancellation refund to settle.", "error")
+        return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+    method = request.form.get("payment_method", "bank transfer")
+    if method not in {"cash", "bank transfer"}:
+        flash("Choose a valid refund method.", "error")
+        return redirect(url_for("admin.order_detail", order_ref=order.public_id))
+    record.status = "settled"
+    record.payment_method = method
+    record.reference = request.form.get("reference", "").strip()[:160]
+    record.settled_at = datetime.utcnow()
+    record.recorded_by = "Owner"
+    db.session.commit()
+    flash("Cancellation refund marked as paid and settled.", "success")
     return redirect(url_for("admin.order_detail", order_ref=order.public_id))
 
 
@@ -686,7 +772,7 @@ def _customer_profile(customer):
     if not completed_orders:
         attention.append("First-purchase opportunity")
     return {
-        "ref": f"BF-{customer.id:06d}", "status": "Active" if customer.active else ("Deactivated" if customer.deleted_at else "Suspended"),
+        "ref": str(customer.id), "status": "Active" if customer.active else ("Deactivated" if customer.deleted_at else "Suspended"),
         "verification": verification, "location": state_location, "completeness": completeness, "customer_type": customer_type,
         "last_active": last_event, "last_login": last_event, "last_purchase": last_purchase,
         "orders": orders, "valid_orders": valid_orders, "successful_orders": len(completed_orders), "total": total,
@@ -696,6 +782,7 @@ def _customer_profile(customer):
         "coupon_count": Coupon.query.filter_by(customer_id=customer.id).count(),
         "attached_coupons": Coupon.query.filter_by(customer_id=customer.id).order_by(Coupon.created_at.desc()).all(),
         "abandoned_carts": len(customer.abandoned_carts or []), "cart_items": cart_items,
+        "wishlist_items": sorted(customer.wishlist_items or [], key=lambda item: item.created_at or datetime.min, reverse=True),
         "visits": len(events), "login_frequency": len(events), "viewed_products": viewed_products,
         "recent_viewed": viewed_products[:5], "purchased_products": purchased_products, "notifications": notifications,
         "complaints": complaints, "reviews": reviews, "posts": posts, "comments": comments, "reactions": reactions,
@@ -754,15 +841,31 @@ def customers():
     search = request.args.get("q", "").strip()[:120]
     query = Customer.query.order_by(Customer.active.desc(), Customer.created_at.desc())
     if search:
-        query = query.filter(or_(Customer.name.ilike(f"%{search}%"), Customer.phone.ilike(f"%{search}%"), Customer.email.ilike(f"%{search}%")))
+        identity_filter = [Customer.name.ilike(f"%{search}%"), Customer.phone.ilike(f"%{search}%"), Customer.email.ilike(f"%{search}%")]
+        if search.isdigit():
+            identity_filter.append(Customer.id == int(search))
+        query = query.filter(or_(*identity_filter))
     customers = query.all()
     segment_filter = request.args.get("segment", "").strip()
     segments = {customer.id: customer_segment(customer) for customer in customers}
     customer_coupons = {customer.id: Coupon.query.filter_by(customer_id=customer.id).order_by(Coupon.created_at.desc()).all() for customer in customers}
     profiles = {customer.id: _customer_profile(customer) for customer in customers}
+    sort_key = request.args.get("sort", "newest")
+    if sort_key == "email_verified":
+        customers.sort(key=lambda c: (not bool(c.email_verified), c.name.casefold()))
+    elif sort_key == "email_unverified":
+        customers.sort(key=lambda c: (bool(c.email_verified), c.name.casefold()))
+    elif sort_key == "profile_complete":
+        customers.sort(key=lambda c: (-profiles[c.id]["completeness"], c.name.casefold()))
+    elif sort_key == "profile_incomplete":
+        customers.sort(key=lambda c: (profiles[c.id]["completeness"], c.name.casefold()))
+    elif sort_key == "highest_value":
+        customers.sort(key=lambda c: (-profiles[c.id]["total"], c.name.casefold()))
+    elif sort_key == "most_orders":
+        customers.sort(key=lambda c: (-profiles[c.id]["successful_orders"], c.name.casefold()))
     if segment_filter:
         customers = [customer for customer in customers if segments[customer.id]["name"] == segment_filter]
-    return render_template("admin/customers.html", customers=customers, customer_coupons=customer_coupons, profiles=profiles, search_query=search, segments=segments, segment_filter=segment_filter, segment_options=["New", "Repeat", "High value", "At risk"], gift_coupons=Coupon.query.filter_by(active=True, customer_id=None).order_by(Coupon.code.asc()).all())
+    return render_template("admin/customers.html", customers=customers, customer_coupons=customer_coupons, profiles=profiles, search_query=search, segments=segments, segment_filter=segment_filter, segment_options=["New", "Repeat", "High value", "At risk"], sort_key=sort_key, gift_coupons=Coupon.query.filter_by(active=True, customer_id=None).order_by(Coupon.code.asc()).all())
 
 
 @admin_bp.route("/forms", methods=["GET", "POST"])
@@ -910,6 +1013,7 @@ def edit_product(product_id):
         product.featured = show_on_homepage
         product.name = request.form.get("name", "").strip()[:120] or product.name
         product.description = request.form.get("description", "").strip()[:2000]
+        product.promotional_tag = request.form.get("promotional_tag", "").strip()[:40]
         product.unit = request.form.get("unit", "per pack").strip()[:80] or "per pack"
         product.processing_options = __import__("json").dumps([x.strip()[:120] for x in request.form.get("processing_options", "").replace(",", "\n").splitlines() if x.strip()][:8])
         image_path, image_error = save_product_image(request.files.get("image"))
@@ -1330,12 +1434,22 @@ def review_settings():
 @admin_required
 def reviews():
     status = request.args.get("status", "").strip()
+    rating_value = request.args.get("rating", "").strip()
     query = Review.query.order_by(Review.created_at.desc())
     if status in REVIEW_STATUSES:
         query = query.filter(Review.status == status)
+    try:
+        rating = int(rating_value) if rating_value else None
+    except (TypeError, ValueError):
+        rating = None
+    if rating not in range(1, 6):
+        rating = None
+    if rating is not None:
+        query = query.filter(Review.rating == rating)
     return render_template(
         "admin/reviews.html", reviews=query.all(), statuses=REVIEW_STATUSES,
-        selected_status=status, review_settings=ShopSettings.query.get(1),
+        selected_status=status, selected_rating=str(rating) if rating else "",
+        review_settings=ShopSettings.query.get(1),
     )
 
 
@@ -1443,7 +1557,7 @@ def customer_messages():
     if request.method == "POST":
         channels = list(dict.fromkeys(
             channel for channel in request.form.getlist("channels")
-            if channel in {"push", "whatsapp", "email"}
+            if channel in {"push", "email"}
         ))
         title = request.form.get("title", "").strip()
         body = request.form.get("body", "").strip()
@@ -1562,6 +1676,10 @@ def customer_messages():
         )
         return redirect(url_for("admin.customer_messages"))
 
+    from sqlalchemy import func
+    whatsapp_stats = {row[0]: row[1] for row in db.session.query(OrderNotification.status, func.count(OrderNotification.id)).filter(OrderNotification.channel == "whatsapp").group_by(OrderNotification.status).all()}
+    whatsapp_totals = {"queued": whatsapp_stats.get("pending", 0) + whatsapp_stats.get("processing", 0), "sent": whatsapp_stats.get("sent", 0), "delivered": whatsapp_stats.get("delivered", 0), "read": whatsapp_stats.get("read", 0), "failed": whatsapp_stats.get("failed", 0)}
+    failed_whatsapp = OrderNotification.query.filter_by(channel="whatsapp", status="failed").order_by(OrderNotification.created_at.desc()).limit(30).all()
     campaigns = CustomerMessageCampaign.query.order_by(CustomerMessageCampaign.created_at.desc()).limit(20).all()
     campaign_summaries = []
     for campaign in campaigns:
@@ -1582,8 +1700,88 @@ def customer_messages():
         "admin/customer_messages.html",
         readiness=readiness,
         campaigns=campaign_summaries,
+        whatsapp_totals=whatsapp_totals,
+        failed_whatsapp=failed_whatsapp,
         customer_count=Customer.query.filter(Customer.active.is_(True), Customer.deleted_at.is_(None)).count(),
     )
+
+
+@admin_bp.post("/whatsapp-queue/<int:notification_id>/retry")
+@admin_required
+def retry_whatsapp_notification(notification_id):
+    notification = db.session.get(OrderNotification, notification_id)
+    if not notification or notification.channel != "whatsapp" or notification.status != "failed":
+        flash("Only failed transactional WhatsApp messages can be retried.", "error")
+        return redirect(url_for("admin.customer_messages"))
+    notification.status = "pending"
+    notification.attempts = 0
+    notification.next_attempt_at = datetime.utcnow()
+    notification.processing_started_at = None
+    notification.last_error = None
+    db.session.commit()
+    flash("WhatsApp message returned to the utility queue.", "success")
+    return redirect(url_for("admin.customer_messages"))
+
+
+@admin_bp.get("/dispatch-batches")
+@admin_required
+def dispatch_batches():
+    batches = DispatchBatch.query.order_by(DispatchBatch.window_start.desc(), DispatchBatch.id.desc()).limit(100).all()
+    requests_queue = DeliveryRedeliveryRequest.query.filter_by(status="pending").order_by(DeliveryRedeliveryRequest.created_at.asc()).all()
+    return render_template("admin/dispatch_batches.html", batches=batches, redelivery_requests=requests_queue)
+
+
+@admin_bp.post("/dispatch-batches/<int:batch_id>/dispatch")
+@admin_required
+def dispatch_batch_orders(batch_id):
+    batch = DispatchBatch.query.get_or_404(batch_id)
+    if batch.status != "open":
+        flash("Only open dispatch batches can be sent out.", "error")
+        return redirect(url_for("admin.dispatch_batches"))
+    candidates = [o for o in batch.orders if o.fulfillment_type == "delivery" and o.payment_status == "Verified" and o.status in {"Confirmed", "Prepared"}]
+    if not candidates:
+        flash("This batch has no confirmed or prepared delivery orders ready for dispatch.", "error")
+    else:
+        for order in candidates:
+            ok, _ = update_order_status(order, "Out for delivery", actor="owner", actor_name="Owner")
+            if not ok:
+                db.session.rollback()
+                flash(f"Could not dispatch order #{order.id}; no batch orders were changed.", "error")
+                return redirect(url_for("admin.dispatch_batches"))
+        flash(f"{len(candidates)} order(s) in batch #{batch.id} marked Out for delivery.", "success")
+    return redirect(url_for("admin.dispatch_batches"))
+
+
+@admin_bp.post("/redelivery-requests/<int:request_id>/<action>")
+@admin_required
+def review_redelivery_request(request_id, action):
+    redelivery = DeliveryRedeliveryRequest.query.get_or_404(request_id)
+    if action not in {"accept", "decline"} or redelivery.status != "pending":
+        flash("This redelivery request has already been reviewed or the action is invalid.", "error")
+        return redirect(url_for("admin.dispatch_batches"))
+    order = redelivery.order
+    if action == "decline":
+        redelivery.status = "declined"
+        db.session.commit()
+        flash(f"Redelivery request for order #{order.id} declined.", "success")
+        return redirect(url_for("admin.dispatch_batches"))
+    if order.status in {"Delivered", "Picked up", "Cancelled"} or order.payment_status != "Verified":
+        flash("Only an unfinished, payment-verified order can be reopened through redelivery.", "error")
+        return redirect(url_for("admin.dispatch_batches"))
+    old_batch = order.dispatch_batch
+    if old_batch and old_batch.status == "open":
+        old_batch.assigned_weight = max(Decimal("0.000"), Decimal(str(old_batch.assigned_weight or 0)) - sum((Decimal(str(i.requested_weight_kg or i.quantity or 0)) for i in order.items), Decimal("0.000")))
+    order.dispatch_batch_id = None
+    order.preferred_delivery_window = redelivery.preferred_window
+    order.fulfillment_type = "pickup" if redelivery.request_type == "pickup" else "delivery"
+    order.status = "Confirmed"
+    if order.fulfillment_type == "delivery":
+        from utils.dispatch_batches import assign_dispatch_batch
+        assign_dispatch_batch(order, next_window=True)
+    redelivery.status = "accepted"
+    db.session.commit()
+    flash(f"Redelivery accepted. Order #{order.id} reopened and assigned to a new delivery batch.", "success")
+    return redirect(url_for("admin.dispatch_batches"))
 
 
 @admin_bp.route("/coupons", methods=["GET", "POST"])
@@ -1591,6 +1789,11 @@ def customer_messages():
 def coupons():
     if request.method == "POST":
         action = request.form.get("action", "")
+        if action == "disable_all":
+            changed = Coupon.query.filter_by(active=True).update({Coupon.active: False}, synchronize_session=False)
+            db.session.commit()
+            flash(f"All coupons have been disabled ({changed} coupon(s)).", "success")
+            return redirect(url_for("admin.coupons"))
         if action in {"mass_gift", "selected_gift"}:
             try:
                 coupon_id = int(request.form.get("coupon_id", "0") or 0)
@@ -1937,18 +2140,6 @@ def clear_database():
     )
     return redirect(url_for("admin.dashboard"))
 
-@admin_bp.post("/dispatch/settings")
-@admin_required
-def save_dispatch_settings():
-    settings=ShopSettings.query.get(1)
-    if not settings: settings=ShopSettings(id=1); db.session.add(settings)
-    try:
-        settings.dispatch_batch_hours=max(Decimal("0.25"), min(Decimal("24"), Decimal(request.form.get("dispatch_batch_hours","2"))))
-        settings.dispatch_batch_weight_limit=max(Decimal("0.001"), Decimal(request.form.get("dispatch_batch_weight_limit","50")))
-    except (ArithmeticError, ValueError):
-        flash("Enter a valid dispatch interval and weight limit.","error"); return redirect(url_for("admin.order_stream"))
-    db.session.commit(); flash("Dispatch batching settings saved.","success"); return redirect(url_for("admin.order_stream"))
-
 @admin_bp.get("/staff-report")
 @admin_required
 def staff_report():
@@ -1965,3 +2156,29 @@ def staff_manual():
 @admin_required
 def staff_manual_download():
     return send_file(current_app.root_path + "/static/staff-manual.md", as_attachment=True, download_name="Beamers-Farms-Staff-Digital-Wiki.md", mimetype="text/markdown")
+
+
+@admin_bp.route("/community-code-of-conduct", methods=["GET", "POST"])
+@admin_required
+def community_code_of_conduct():
+    if request.method == "POST":
+        title = request.form.get("title", "").strip()
+        body = request.form.get("body", "").strip()
+        if title and body:
+            db.session.add(CommunityConductRule(title=title[:160], body=body[:5000], sort_order=int(request.form.get("sort_order") or 0)))
+            db.session.commit()
+            flash("Community rule added.", "success")
+        else:
+            flash("Add a title and rule text.", "error")
+        return redirect(url_for("admin.community_code_of_conduct"))
+    rules = CommunityConductRule.query.order_by(CommunityConductRule.sort_order.asc(), CommunityConductRule.id.asc()).all()
+    return render_template("admin/community_code_of_conduct.html", rules=rules)
+
+@admin_bp.post("/community-code-of-conduct/<int:rule_id>/toggle")
+@admin_required
+def toggle_community_conduct_rule(rule_id):
+    rule = CommunityConductRule.query.get_or_404(rule_id)
+    rule.active = not rule.active
+    db.session.commit()
+    flash("Community rule visibility updated.", "success")
+    return redirect(url_for("admin.community_code_of_conduct"))

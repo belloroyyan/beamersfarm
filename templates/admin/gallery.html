@@ -2,6 +2,8 @@
 {% block title %}Manage gallery · Owner desk{% endblock %}
 {% block content %}
 <div class="admin-shell"><div class="container">
+  <div class="owner-new-button"><button class="button button-lime" type="button" data-open-admin-dialog="gallery-create-dialog">New Gallery item</button></div>
+
   <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / farm gallery</p><h1>Manage gallery.</h1><p class="form-note">Add farm photos or browser-playable videos for the public gallery. You control captions, display order, pinning, and visibility.</p></div><a class="button button-outline light-outline" href="{{ url_for('shop.gallery') }}">View public gallery ↗</a></div>
   <div class="gallery-admin-grid">
     <section class="admin-panel gallery-list-panel">
@@ -15,7 +17,6 @@
         </article>{% endfor %}
       </div>{% else %}<div class="empty-state compact"><h3>{{ 'No matching gallery images.' if search_query else 'Your gallery is empty.' }}</h3><p>{{ 'Try a different title or ID.' if search_query else 'Add a photo with the form to begin.' }}</p></div>{% endif %}
     </section>
-    <div class="owner-new-button"><button class="button button-lime" type="button" data-open-admin-dialog="gallery-create-dialog">New Gallery item</button></div>
     <dialog class="admin-panel add-product-panel gallery-add-panel" data-admin-dialog="gallery-create-dialog" aria-labelledby="gallery-create-title"><p class="eyebrow">New gallery photo</p><h2 id="gallery-create-title">Add media</h2><p class="form-note">Use a photo you have permission to publish. Accepted: JPG, PNG, WEBP (8 MB) or MP4, WEBM, MOV (80 MB).</p>
       <button class="admin-dialog-x" type="button" data-admin-dialog-close aria-label="Close">×</button>
       <form method="post" enctype="multipart/form-data">

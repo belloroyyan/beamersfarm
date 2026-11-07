@@ -38,6 +38,7 @@ class Product(db.Model):
     low_stock_threshold = db.Column(db.Numeric(12, 3), nullable=False, default=Decimal("5.000"), server_default="5.000")
     minimum_order_quantity = db.Column(db.Numeric(12, 3), nullable=False, default=Decimal("1.000"), server_default="1.000")
     processing_options = db.Column(db.Text, nullable=False, default="")
+    promotional_tag = db.Column(db.String(40), nullable=False, default="", server_default="")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     order_items = db.relationship("OrderItem", back_populates="product")
@@ -95,6 +96,7 @@ class DispatchBatch(db.Model):
     weight_limit = db.Column(db.Numeric(12, 3), nullable=False, default=Decimal("50.000"))
     assigned_weight = db.Column(db.Numeric(12, 3), nullable=False, default=Decimal("0.000"))
     status = db.Column(db.String(24), nullable=False, default="open", server_default="open")
+    closed_at = db.Column(db.DateTime, nullable=True)
     orders = db.relationship("Order", backref="dispatch_batch", foreign_keys="Order.dispatch_batch_id")
 
 class DeliveryZone(db.Model):
@@ -135,6 +137,25 @@ class ShopSettings(db.Model):
     reviews_open = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
     registration_open = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
     partner_forms_open = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    delivery_open_time = db.Column(db.String(5), nullable=False, default="07:00", server_default="07:00")
+    delivery_close_time = db.Column(db.String(5), nullable=False, default="19:00", server_default="19:00")
+    auto_shop_hours = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    delivery_windows_json = db.Column(db.Text, nullable=False, default='["9:00 AM – 11:00 AM", "3:00 PM – 5:00 PM"]', server_default='["9:00 AM – 11:00 AM", "3:00 PM – 5:00 PM"]')
+    closure_channels_json = db.Column(db.String(120), nullable=False, default='["push", "whatsapp", "email"]', server_default='["push", "whatsapp", "email"]')
+
+
+class DeliveryRedeliveryRequest(db.Model):
+    __tablename__ = "delivery_redelivery_requests"
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
+    request_type = db.Column(db.String(20), nullable=False, default="redelivery")
+    preferred_window = db.Column(db.String(120), nullable=True)
+    note = db.Column(db.Text, nullable=False, default="")
+    status = db.Column(db.String(24), nullable=False, default="pending", index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    order = db.relationship("Order", backref=db.backref("redelivery_requests", cascade="all, delete-orphan"))
 
 
 class Coupon(db.Model):
@@ -159,6 +180,16 @@ class Coupon(db.Model):
     gift_template_id = db.Column(db.Integer, nullable=True, index=True)
 class PrivacyRule(db.Model):
     __tablename__ = "privacy_rules"
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(160), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+    active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    sort_order = db.Column(db.Integer, nullable=False, default=0)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CommunityConductRule(db.Model):
+    __tablename__ = "community_conduct_rules"
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(160), nullable=False)
     body = db.Column(db.Text, nullable=False)
@@ -342,6 +373,7 @@ class Order(db.Model):
     phone = db.Column(db.String(40), nullable=False)
     address = db.Column(db.Text, nullable=False)
     email = db.Column(db.String(160), nullable=True)
+    preferred_delivery_window = db.Column(db.String(120), nullable=True)
     customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
     whatsapp_opt_in = db.Column(db.Boolean, nullable=False, default=False)
     whatsapp_opt_in_at = db.Column(db.DateTime, nullable=True)
@@ -361,6 +393,8 @@ class Order(db.Model):
     delivery_zone_name = db.Column(db.String(100), nullable=False, default="Pre-zone delivery", server_default="Pre-zone delivery")
     dispatch_batch_id = db.Column(db.Integer, db.ForeignKey("dispatch_batches.id", ondelete="SET NULL"), nullable=True, index=True)
     cancellation_reason = db.Column(db.String(160), nullable=True)
+    cancellation_requested_at = db.Column(db.DateTime, nullable=True)
+    cancellation_request_reason = db.Column(db.String(500), nullable=False, default="", server_default="")
     weighing_completed_at = db.Column(db.DateTime, nullable=True)
     weighing_recorded_by = db.Column(db.String(120), nullable=True)
     subtotal = db.Column(db.Numeric(12, 2), nullable=False, default=Decimal("0.00"))

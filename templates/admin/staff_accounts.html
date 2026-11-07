@@ -6,12 +6,13 @@
 {% block content %}
 <div class="admin-shell">
   <div class="container">
+  <div class="owner-new-button"><button class="button button-dark" type="button" data-open-admin-dialog="staff-account-create-dialog">New Staff account</button></div>
+
     <div class="admin-topbar compact-topbar">
       <div>
         <a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a>
         <p class="eyebrow">Owner settings</p>
         <h1>Staff access.</h1>
-        <div class="owner-new-button"><button class="button button-dark" type="button" data-open-admin-dialog="staff-account-create-dialog">New Staff account</button></div>
         <p class="form-note"><a class="table-link" href="{{ url_for('admin.staff_report') }}">Generate staff report →</a><br>Create an individual account for each salesperson and control exactly what they can do. Each salesperson’s Actions menu shows only what you allow here. Deactivation blocks access on their next request; accounts are retained for accountability.</p>
       </div>
     </div>

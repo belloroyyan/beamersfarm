@@ -440,3 +440,5 @@ h1,h2,h3,strong,.button,.brand strong { font-family:Fraunces,Georgia,serif; }
 /* --- Staff access: grouped permission checkboxes --------------------------- */
 .permission-group { min-width: 0; margin: 0 0 14px; padding: 0; border: 0; }
 .permission-group legend { margin-bottom: 6px; padding: 0; color: #52625b; font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+
+.product-photo{position:relative}.product-promo-tag{display:inline-flex;position:absolute;z-index:3;top:12px;right:12px;padding:6px 10px;border-radius:999px;background:#d94b35;color:#fff;font-size:.72rem;font-weight:800;letter-spacing:.02em;box-shadow:0 4px 14px #0002}.product-detail-tag{position:static;margin:.25rem 0 .75rem}.review-purchase-note{font-size:.82rem;color:var(--muted,#667085);margin:.35rem 0}

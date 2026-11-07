@@ -13,14 +13,16 @@ from flask import Blueprint, abort, current_app, flash, jsonify, make_response, 
 from sqlalchemy import or_
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import AbandonedCart, Coupon, Customer, CustomerPushSubscription, DeliveryZone, DropShare, GalleryImage, Order, OrderFinancialRecord, OrderItem, PartnerAdInvite, PartnerListing, Product, ProductPackage, ProductPackageItem, SalespersonAccount, ShopSettings, ShopUpdate, SiteOverlaySeen, WishlistItem, WholesaleOrder, WholesaleOrderItem, db
+from models import Review, AbandonedCart, Coupon, Customer, CustomerPushSubscription, DeliveryZone, DeliveryRedeliveryRequest, DropShare, GalleryImage, Order, OrderFinancialRecord, OrderItem, PartnerAdInvite, PartnerListing, Product, ProductPackage, ProductPackageItem, SalespersonAccount, ShopSettings, ShopUpdate, SiteOverlaySeen, WishlistItem, WholesaleOrder, WholesaleOrderItem, db
 from utils.helpers import build_cart, cart_processing_methods, format_quantity, parse_processing_selection, parse_quantity, product_uses_requested_kg, processing_options
 from utils.notifications import normalize_nigerian_phone
 from utils.product_images import product_image_url
 from utils.push_subscriptions import valid_push_endpoint
 from utils.update_share import render_update_share_image
 from utils.web_push import send_customer_order_confirmed_push, send_customer_order_out_for_delivery_push, send_owner_low_stock_push, send_owner_new_order_push, send_owner_wholesale_request_push, send_salesperson_new_order_push, web_push_is_configured
-from utils.dispatch_batches import assign_dispatch_batch, delivery_estimate
+from utils.dispatch_batches import assign_dispatch_batch, delivery_estimate, preview_delivery_window
+from utils.delivery_operations import delivery_windows
+from utils.delivery_operations import delivery_windows
 from utils.recommendations import personalized_products
 from services.payments import opay_is_configured
 
@@ -49,7 +51,7 @@ def customer_notification_key(phone):
 def notify_customer_of_current_order_status(order, subscription_id):
     if order.status == "Out for delivery" and order.fulfillment_type == "delivery":
         return send_customer_order_out_for_delivery_push(order, subscription_ids=[subscription_id])
-    if order.status in {"Confirmed", "Preparing", "Out for delivery", "Delivered", "Ready for pickup", "Picked up"}:
+    if order.status in {"Confirmed", "Prepared", "Out for delivery", "Delivered", "Ready for pickup", "Picked up"}:
         return send_customer_order_confirmed_push(order, subscription_ids=[subscription_id])
     return None
 
@@ -392,7 +394,8 @@ def product_detail(product_id):
         reorder_order = Order.query.filter_by(customer_id=customer.id).join(OrderItem).filter(OrderItem.product_id == product.id).order_by(Order.created_at.desc()).first()
         wishlist_saved = WishlistItem.query.filter_by(customer_id=customer.id, product_id=product.id).first() is not None
     description = " ".join((product.description or "").split())[:155]
-    return render_template("product.html", product=product, processing_options=processing_options(product), reorder_order=reorder_order, wishlist_saved=wishlist_saved, **seo_meta(f"{product.name} | Fresh Frozen Chicken in Osogbo", description or f"Buy {product.name} from Beamers Farms with Osogbo delivery or farm pickup.", "shop.product_detail", {"product_id": product.id}, public_asset_url(url_for("static", filename="images/brand-mark.png")), "product", keywords=f"{product.name}, frozen chicken Osogbo, buy chicken Nigeria"))
+    product_reviews = Review.query.join(Order, Review.order_id == Order.id).join(OrderItem, OrderItem.order_id == Order.id).filter(Review.status == "Approved", OrderItem.product_id == product.id).distinct().order_by(Review.published_at.desc(), Review.created_at.desc()).limit(30).all()
+    return render_template("product.html", product=product, product_reviews=product_reviews, processing_options=processing_options(product), reorder_order=reorder_order, wishlist_saved=wishlist_saved, **seo_meta(f"{product.name} | Fresh Frozen Chicken in Osogbo", description or f"Buy {product.name} from Beamers Farms with Osogbo delivery or farm pickup.", "shop.product_detail", {"product_id": product.id}, public_asset_url(url_for("static", filename="images/brand-mark.png")), "product", keywords=f"{product.name}, frozen chicken Osogbo, buy chicken Nigeria"))
 
 
 @shop_bp.get("/gallery")
@@ -501,8 +504,7 @@ def robots():
         "Disallow: /payments",
         "Disallow: /webhooks",
         "Disallow: /partner-advertisements/",
-        "Disallow: /community/notifications",
-        "Disallow: /community/support",
+        "Disallow: /community",
         "Disallow: /coupon/",
         f"Sitemap: {public_url('shop.sitemap')}",
         "",
@@ -617,7 +619,6 @@ def sitemap():
         ("shop.index", {}, None), ("shop.products", {}, None), ("shop.gallery", {}, None),
         ("shop.updates", {}, None), ("shop.wholesale", {}, None), ("shop.help_page", {}, None),
         ("shop.privacy", {}, None), ("reviews.testimonials", {}, None),
-        ("community.feed", {}, None), ("complaints.create_complaint", {}, None),
     ]
     products = Product.query.filter_by(active=True).all()
     entries += [("shop.product_detail", {"product_id": item.id}, getattr(item, "updated_at", None) or item.created_at) for item in products]
@@ -815,6 +816,9 @@ def checkout():
     ).all()
     selected_zone_id = request.values.get("delivery_zone_id", "")
     selected_zone = next((zone for zone in zones if str(zone.id) == selected_zone_id), None)
+    delivery_window_options = delivery_windows(ShopSettings.query.get(1))
+    selected_preferred_window = request.values.get("preferred_delivery_window", "").strip()
+    selected_window_estimate = preview_delivery_window(selected_preferred_window) if selected_preferred_window else ""
     summary = cart_summary(delivery_fee=selected_zone.fee if selected_zone else None)
     signed_in_customer = db.session.get(Customer, session.get("customer_id")) if session.get("customer_id") else None
     signed_in_customer = signed_in_customer if signed_in_customer and signed_in_customer.active else None
@@ -855,6 +859,7 @@ def checkout():
             "checkout.html", summary=summary, delivery_zones=zones,
             selected_zone_id=selected_zone_id, selected_zone=selected_zone,
             customer=signed_in_customer if signed_in_customer and signed_in_customer.active else None,
+            delivery_window_options=delivery_window_options, selected_preferred_window=selected_preferred_window, selected_window_estimate=selected_window_estimate,
             available_account_coupons=available_account_coupons,
             opay_checkout_enabled=opay_is_configured(), coupon_code=coupon_code, coupon_error=coupon_error, coupon_autofilled=coupon_autofilled, **seo_meta("Choose Delivery or Pickup | Beamers Farms", "Choose delivery or free farm pickup for your Beamers Farms order.", "shop.checkout", robots="noindex,follow"),
         )
@@ -873,6 +878,10 @@ def checkout():
         payment_method = request.form.get("payment_method", "bank_transfer")
         address = request.form.get("address", "").strip()
         whatsapp_opt_in = request.form.get("whatsapp_opt_in") == "yes"
+        preferred_delivery_window = selected_preferred_window
+        if preferred_delivery_window and preferred_delivery_window not in delivery_window_options:
+            flash("Choose one of the available delivery time windows.", "error")
+            return render_checkout()
         if not selected_zone:
             flash("Choose a delivery zone or free farm pickup to see the amount due.", "error")
             return render_checkout()
@@ -926,6 +935,7 @@ def checkout():
                 customer_name=customer_name,
                 phone=phone,
                 email=email or None,
+                preferred_delivery_window=preferred_delivery_window or None,
                 address=PICKUP_ADDRESS if selected_zone.is_pickup else address,
                 whatsapp_opt_in=whatsapp_opt_in,
                 whatsapp_opt_in_at=datetime.utcnow() if whatsapp_opt_in else None,
@@ -1012,6 +1022,23 @@ def checkout():
         return redirect(url_for("shop.order_success", order_ref=order.public_id, token=order.public_token))
 
     return render_checkout()
+
+
+@shop_bp.post("/order/<string:order_ref>/<string:token>/cancel-request")
+def request_order_cancellation(order_ref, token):
+    order = Order.query.filter_by(public_id=order_ref, public_token=token).first()
+    if not order:
+        abort(404)
+    if order.status in {"Delivered", "Picked up", "Cancelled"}:
+        flash("This order can no longer be cancelled online because it has been completed or cancelled.", "error")
+    elif order.cancellation_requested_at:
+        flash("A cancellation request is already awaiting staff review.", "success")
+    else:
+        order.cancellation_requested_at = datetime.utcnow()
+        order.cancellation_request_reason = request.form.get("reason", "").strip()[:500]
+        db.session.commit()
+        flash("Your cancellation request has been sent to Beamers Farms for verification.", "success")
+    return redirect(url_for("shop.order_success", order_ref=order.public_id, token=order.public_token))
 
 
 @shop_bp.get("/order/<string:order_ref>/<string:token>/success")
@@ -1140,3 +1167,40 @@ def customer_push_subscription(order_ref, token):
         enabled=True,
         message="Order notifications are enabled for this customer on this device. Future orders for this customer will not need another prompt.",
     ), 201
+
+@shop_bp.route("/request-redelivery", methods=["GET", "POST"])
+def redelivery_lookup():
+    if request.method == "POST":
+        order_ref = request.form.get("order_ref", "").strip()
+        phone = request.form.get("phone", "").strip()
+        order = Order.query.filter_by(public_id=order_ref).first() or (db.session.get(Order, int(order_ref)) if order_ref.isdigit() else None)
+        if not order or normalize_nigerian_phone(order.phone) != normalize_nigerian_phone(phone):
+            flash("We could not match that order reference and phone number.", "error")
+            return render_template("redelivery_lookup.html")
+        return redirect(url_for("shop.redelivery_request", order_ref=order.public_id, token=order.public_token))
+    return render_template("redelivery_lookup.html")
+
+@shop_bp.route("/request-redelivery/<string:order_ref>/<string:token>", methods=["GET", "POST"])
+def redelivery_request(order_ref, token):
+    order = Order.query.filter_by(public_id=order_ref, public_token=token).first()
+    if not order:
+        abort(404)
+    settings = ShopSettings.query.get(1)
+    windows = delivery_windows(settings)
+    if request.method == "POST":
+        request_type = request.form.get("request_type", "redelivery")
+        if request_type not in {"redelivery", "pickup"}: request_type = "redelivery"
+        preferred = request.form.get("preferred_window", "").strip() or None
+        if preferred and preferred not in windows: preferred = None
+        pending = DeliveryRedeliveryRequest.query.filter_by(order_id=order.id, status="pending").first()
+        if order.status in {"Delivered", "Picked up", "Cancelled"} or not order.dispatch_batch or order.dispatch_batch.status != "closed":
+            flash("Redelivery can be requested only for an unfinished order whose delivery batch has closed.", "error")
+        elif pending:
+            flash("A redelivery request for this order is already awaiting staff review.", "success")
+        else:
+            customer_id = order.customer_id
+            db.session.add(DeliveryRedeliveryRequest(order_id=order.id, customer_id=customer_id, request_type=request_type, preferred_window=preferred, note=request.form.get("note", "").strip()[:1000]))
+            db.session.commit()
+            flash("Your request has been received. It will remain pending until the farm team accepts it.", "success")
+        return redirect(url_for("shop.order_success", order_ref=order.public_id, token=order.public_token))
+    return render_template("redelivery_request.html", order=order, delivery_window_options=windows)

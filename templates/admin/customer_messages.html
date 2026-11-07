@@ -2,10 +2,13 @@
 {% block title %}Message customers · Owner desk{% endblock %}
 {% block content %}
 <div class="admin-shell"><div class="container">
-  <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / customer care</p><h1>Message customers.</h1><p class="form-note">{{ customer_count }} active customer account(s). Choose one or more channels; only customers eligible and reachable on each channel are contacted.</p></div><button class="button button-lime" type="button" data-open-admin-dialog="customer-message-create-dialog">New Customer message</button></div>
+  <div class="owner-new-button"><button class="button button-lime" type="button" data-open-admin-dialog="customer-message-create-dialog">New Customer message</button></div>
+  <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a><p class="eyebrow">Owner desk / customer care</p><h1>Message customers.</h1><p class="form-note">{{ customer_count }} active customer account(s). Choose one or more channels; only customers eligible and reachable on each channel are contacted.</p></div></div>
+  <section class="admin-panel"><h2>Transactional WhatsApp queue</h2><p class="form-note">WhatsApp is reserved for utility messages tied to an existing order or customer transaction. Promotions must use push notifications.</p><div class="customer-profile-metrics"><div><strong>{{ whatsapp_totals.queued }}</strong><span>Queued</span></div><div><strong>{{ whatsapp_totals.sent }}</strong><span>Sent</span></div><div><strong>{{ whatsapp_totals.delivered }}</strong><span>Delivered</span></div><div><strong>{{ whatsapp_totals.read }}</strong><span>Read</span></div><div><strong>{{ whatsapp_totals.failed }}</strong><span>Failed</span></div></div>{% if failed_whatsapp %}<div class="profile-section"><h3>Failed transactional messages</h3>{% for item in failed_whatsapp %}<article class="profile-feed-item"><strong>Order #{{ item.order_id }} · {{ item.event|replace('_', ' ')|title }}</strong><small>{{ item.created_at|local_time("%d %b %Y · %H:%M") }} · {{ item.attempts }} attempt(s)</small><p>{{ item.last_error or "Delivery failed without a provider error description." }}</p><form method="post" action="{{ url_for('admin.retry_whatsapp_notification', notification_id=item.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="button button-outline" type="submit">Retry message</button></form></article>{% endfor %}</div>{% endif %}</section>
+
 
   <section class="admin-panel campaign-channel-guide"><p class="eyebrow">Delivery readiness</p><div class="campaign-readiness-list">
-    {% for channel, label, detail in [('push', 'Push notifications', 'Customer enabled push and has an active browser subscription.'), ('whatsapp', 'WhatsApp', 'Customer enabled WhatsApp updates and has a valid phone number. Only an approved campaign template is used.'), ('email', 'Email', 'Customer has a verified email address. Optional attachments go by email only.')] %}
+    {% for channel, label, detail in [('push', 'Push notifications', 'Customer enabled push and has an active browser subscription.'), ('email', 'Email', 'Customer has a verified email address. Optional attachments go by email only.')] %}
     <article><div class="admin-record-head"><strong>{{ label }}</strong><span class="status-pill {{ 'status-confirmed' if readiness[channel].ready else 'status-cancelled' }}">{{ 'Ready' if readiness[channel].ready else 'Not configured' }}</span></div><p>{{ detail }}</p>{% if readiness[channel].reason %}<small>{{ readiness[channel].reason }}</small>{% endif %}</article>
     {% endfor %}
   </div></section>
@@ -16,11 +19,11 @@
     <form method="post" enctype="multipart/form-data" class="customer-message-form">
       <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
       <fieldset class="campaign-channel-select"><legend>Delivery channels</legend>
-        {% for channel, label in [('push', 'Push notification'), ('whatsapp', 'WhatsApp'), ('email', 'Email')] %}
+        {% for channel, label in [('push', 'Push notification'), ('email', 'Email')] %}
         <label class="permission-option"><input type="checkbox" name="channels" value="{{ channel }}" {% if not readiness[channel].ready %}disabled{% endif %}><span><strong>{{ label }}</strong><small>{% if readiness[channel].ready %}Configured and available for opted-in/reachable customers.{% else %}Unavailable until the Owner completes provider configuration.{% endif %}</small></span></label>
         {% endfor %}
       </fieldset>
-      <label>Title <span class="optional-label">optional</span><input name="title" maxlength="160" placeholder="An update from Beamers Farms"><small class="field-help">Used as a push/email title and prefixed to the WhatsApp message when provided.</small></label>
+      <label>Title <span class="optional-label">optional</span><input name="title" maxlength="160" placeholder="An update from Beamers Farms"><small class="field-help">Used as the push or email title.</small></label>
       <label>Message body<textarea name="body" rows="6" maxlength="3000" required placeholder="Write the message your customers should receive."></textarea><small class="field-help">Required · up to 3,000 characters.</small></label>
       <label>Email attachments <span class="optional-label">optional</span><input type="file" name="attachments" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.txt,.csv"><small class="field-help">Email only. PDF, JPG, PNG, GIF, WEBP, TXT or CSV; up to 10 files, 5 MB each, 8 MB total.</small></label>
       <label class="permission-option campaign-send-consent"><input type="checkbox" name="confirm_send" value="yes" required><span><strong>Send this message now</strong><small>I understand that messages may be sent immediately to eligible customers via the selected channel(s).</small></span></label>
@@ -31,11 +34,19 @@
   <section class="admin-panel"><div class="panel-heading"><div><p class="eyebrow">Campaign history</p><h2>Recent messages</h2><p class="form-note">Delivery totals are recorded per customer and channel; skips and provider failures are not reported as sent.</p></div></div>
     {% if campaigns %}<div class="admin-record-list">{% for summary in campaigns %}{% set campaign = summary.campaign %}
       <article class="admin-record customer-campaign-record">
-        <div class="admin-record-head"><div><h3>{{ campaign.title or 'Customer update' }}</h3><small>{{ campaign.created_at|local_time("%d %b %Y · %H:%M") }} · by {{ campaign.created_by }}</small></div><span class="status-pill">{{ campaign.recipient_count }} customer(s) reached</span></div>
+        <div class="admin-record-head"><div><h3>{{ campaign.title or 'Customer update' }}</h3><small>{{ campaign.created_at|local_time("%d %b %Y · %H:%M") }} · by {{ campaign.created_by }}</small></div><span class="status-pill status-confirmed campaign-reached">{{ campaign.recipient_count }} customer{{ "" if campaign.recipient_count == 1 else "s" }} reached</span></div>
         <p class="campaign-history-body">{{ campaign.body|truncate(260, True, '…') }}</p>
-        <div class="campaign-history-meta"><span>Channels: {{ summary.channels|join(', ') or 'None' }}</span><span>{{ campaign.sent_count }} successful delivery(ies)</span><span>{{ summary.status_counts.get('skipped', 0) }} skipped</span><span>{{ campaign.failed_count }} failed</span></div>
+        <div class="campaign-history-meta">
+          <div class="campaign-channels"><span class="campaign-meta-label">Channels</span>{% for channel in summary.channels %}<span class="campaign-channel-chip">{{ {'push': 'Push', 'whatsapp': 'WhatsApp', 'email': 'Email'}.get(channel, channel|title) }}</span>{% else %}<span class="campaign-channel-chip is-empty">None</span>{% endfor %}</div>
+          {% set skipped = summary.status_counts.get('skipped', 0) %}
+          <dl class="campaign-stats" aria-label="Delivery results">
+            <div class="campaign-stat campaign-stat-sent{% if not campaign.sent_count %} is-zero{% endif %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg><dt>Sent</dt><dd>{{ campaign.sent_count }}</dd></div>
+            <div class="campaign-stat campaign-stat-skipped{% if not skipped %} is-zero{% endif %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg><dt>Skipped</dt><dd>{{ skipped }}</dd></div>
+            <div class="campaign-stat campaign-stat-failed{% if not campaign.failed_count %} is-zero{% endif %}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg><dt>Failed</dt><dd>{{ campaign.failed_count }}</dd></div>
+          </dl>
+        </div>
         {% if campaign.attachment_names %}<small>Attachments: {{ campaign.attachment_names }}</small>{% endif %}
-        {% if summary.failed_details %}<details class="campaign-failure-details"><summary>Recent delivery issues</summary><ul>{% for failure in summary.failed_details %}<li><strong>{{ failure.channel|title }}:</strong> {{ failure.error }}</li>{% endfor %}</ul></details>{% endif %}
+        {% if summary.failed_details %}<details class="ui-dropdown campaign-failure-details"><summary><span>Recent delivery issues</span></summary><ul class="ui-dropdown-body">{% for failure in summary.failed_details %}<li><strong>{{ failure.channel|title }}:</strong> {{ failure.error }}</li>{% endfor %}</ul></details>{% endif %}
       </article>
     {% endfor %}</div>{% else %}<div class="empty-state compact"><h3>No campaigns yet.</h3><p>Customer messages you send will appear here with channel delivery totals.</p></div>{% endif %}
   </section>

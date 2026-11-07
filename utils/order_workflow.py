@@ -10,7 +10,7 @@ from utils.web_push import (
 )
 
 ORDER_STATUSES = [
-    "Received", "Confirmed", "Preparing", "Out for delivery", "Ready for pickup",
+    "Received", "Confirmed", "Prepared", "Out for delivery", "Ready for pickup",
     "Delivered", "Picked up", "Cancelled",
 ]
 CANCEL_REASONS = [
@@ -24,7 +24,7 @@ CANCEL_REASONS = [
     "Other",
 ]
 PAYMENT_REQUIRED_STATUSES = {
-    "Confirmed", "Preparing", "Out for delivery", "Ready for pickup", "Delivered", "Picked up",
+    "Confirmed", "Prepared", "Out for delivery", "Ready for pickup", "Delivered", "Picked up",
 }
 DELIVERY_ONLY_STATUSES = {"Out for delivery", "Delivered"}
 PICKUP_ONLY_STATUSES = {"Ready for pickup", "Picked up"}
@@ -35,6 +35,8 @@ def update_order_status(
     verification_reference="", cancel_reason="",
 ):
     """Return (ok, message); commit a valid status/payment transition and send alerts."""
+    if new_status == "Preparing":
+        new_status = "Prepared"
     if new_status not in ORDER_STATUSES:
         return False, "Choose a valid order status."
     if verify_payment and actor not in {"owner", "salesperson"}:
@@ -43,6 +45,10 @@ def update_order_status(
         return False, "Farm-pickup orders cannot be assigned to delivery."
     if actor != "salesperson" and order.fulfillment_type != "pickup" and new_status in PICKUP_ONLY_STATUSES:
         return False, "Delivery orders cannot use pickup-only statuses."
+    if new_status == "Out for delivery" and order.fulfillment_type == "delivery":
+        batch = getattr(order, "dispatch_batch", None)
+        if batch is None or batch.status != "open":
+            return False, "This order is not assigned to an open dispatch batch. Accept a redelivery request to create a new batch first."
 
     previous_status = order.status
     status_changed = new_status != previous_status
@@ -107,6 +113,13 @@ def update_order_status(
             order.cancellation_reason = cancel_reason if cancel_reason in CANCEL_REASONS else None
         elif previous_status == "Cancelled":
             order.cancellation_reason = None
+        batch = getattr(order, "dispatch_batch", None)
+        if batch and batch.status == "open" and all(
+            linked.status in {"Delivered", "Picked up", "Cancelled"}
+            for linked in batch.orders
+        ):
+            batch.status = "closed"
+            batch.closed_at = datetime.utcnow()
     if status_changed and previous_status != "Confirmed" and new_status == "Confirmed" and order.whatsapp_opt_in:
         existing = OrderNotification.query.filter_by(
             order_id=order.id,

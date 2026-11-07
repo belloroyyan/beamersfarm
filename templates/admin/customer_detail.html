@@ -7,7 +7,7 @@
       <a class="back-link" href="{{ url_for('admin.customers') }}">← Back to customer accounts</a>
       <p class="eyebrow">Owner desk / customer intelligence</p>
       <h1>{{ customer.name }}.</h1>
-      <p class="form-note">Customer #BF-{{ "%05d"|format(customer.id) }} · {{ customer.address.split(',')[-1].strip() if customer.address and ',' in customer.address else "Location not specified" }}</p>
+      <p class="form-note">Customer ID #{{ customer.id }} · {{ customer.address.split(',')[-1].strip() if customer.address and ',' in customer.address else "Location not specified" }}</p>
     </div>
   </div>
 
@@ -94,7 +94,9 @@
     {% set purchased = [] %}
     {% for order in orders %}{% for item in order.items %}{% if item.product_name not in purchased %}{% set _ = purchased.append(item.product_name) %}{% endif %}{% endfor %}{% endfor %}
     <p>{{ purchased|join(", ") if purchased else "No purchase history to infer preferences from." }}</p>
-    <p class="form-note">Wishlist, cart-removal events, and category preferences are not currently captured by the application.</p>
+    <h3>Wishlist activity</h3>
+    {% if customer.wishlist_items %}{% for saved in customer.wishlist_items|sort(attribute="created_at", reverse=true) %}<p><strong>{{ saved.product.name if saved.product else 'Unavailable product' }}</strong> · Saved {{ saved.created_at|local_time("%d %b %Y, %I:%M %p") }}</p>{% endfor %}{% else %}<p class="form-note">No wishlist items currently saved by this customer.</p>{% endif %}
+    <p class="form-note">Wishlist additions and current saved items are tracked. Historical removals are not recorded.</p>
   </section>
 
   <section id="activity" class="admin-panel">
@@ -143,8 +145,12 @@
     <p><strong>Highest completed order:</strong> {{ format_currency(highest_order) }}</p>
     <p><strong>Promotion savings recorded:</strong> {{ format_currency(promotion_savings) }}</p>
     <p><strong>Refunds issued:</strong> {{ format_currency(refunds_issued) }}</p>
-    <p><strong>Coupons attached:</strong> {{ coupons|length }}</p>
-    {% for coupon in coupons %}<p>{{ coupon.code }} · {{ coupon.value }}{% if coupon.discount_type == "percent" %}%{% endif %} · {{ "Active" if coupon.active else "Paused" }}</p>{% else %}<p class="form-note">No coupons attached.</p>{% endfor %}
+    <details class="ui-dropdown coupon-dropdown">
+      <summary><span>Coupons attached</span><span class="ui-dropdown-count">{{ coupons|length }}</span></summary>
+      <div class="ui-dropdown-body">
+        {% for coupon in coupons %}<div class="coupon-row"><strong class="coupon-code">{{ coupon.code }}</strong><span class="coupon-value">{{ coupon.value }}{% if coupon.discount_type == "percent" %}% off{% endif %}</span><span class="status-pill {{ 'status-confirmed' if coupon.active else 'status-cancelled' }}">{{ "Active" if coupon.active else "Paused" }}</span></div>{% else %}<p class="form-note">No coupons attached.</p>{% endfor %}
+      </div>
+    </details>
   </section>
 
   <section class="admin-panel">
@@ -157,8 +163,8 @@
       <form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="{{ 'deactivate' if customer.active else 'activate' }}"><button class="button button-outline">{{ "Deactivate account" if customer.active else "Reactivate account" }}</button></form>
       <form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="{{ 'block_community' if not customer.community_posting_blocked else 'unblock_community' }}"><button class="button button-outline">{{ "Restrict community posting" if not customer.community_posting_blocked else "Restore community posting" }}</button></form>
     </div>
-    <details style="margin-top:16px"><summary>Reset customer password</summary>
-      <form method="post" class="stacked-form"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="reset_password">
+    <details class="ui-dropdown" style="margin-top:16px"><summary><span>Reset customer password</span></summary>
+      <form method="post" class="stacked-form ui-dropdown-body"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="reset_password">
       <label>Temporary password<input type="password" name="password" minlength="8" autocomplete="new-password" required></label><button class="button button-dark">Reset password</button></form>
     </details>
   </section>

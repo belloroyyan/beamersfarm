@@ -19,6 +19,12 @@
     <small>An estimate, not a guarantee. We deliver {{ estimate.shop_hours }} daily and update you here and by notification if anything changes.</small>
   </section>
   {% endif %}
+  {% if order.status not in ['Delivered', 'Picked up', 'Cancelled'] %}
+    <section class="admin-panel customer-cancel-request">
+      {% if order.cancellation_requested_at %}<p><strong>Cancellation request submitted.</strong> The farm team is reviewing it. This order has not yet been cancelled.</p>
+      {% else %}<p class="eyebrow">Need to cancel?</p><h2>Change your order?</h2><p>You can request cancellation while the order is still open. Staff will verify it before cancellation and any applicable refund is recorded.</p><button class="button button-outline" type="button" data-open-order-edit="customer-cancel-dialog">Request cancellation</button><dialog class="bf-modal" id="customer-cancel-dialog"><div class="bf-modal-head"><div><p class="eyebrow">Cancellation request</p><h2>Tell us why</h2></div><button type="button" class="bf-modal-close" aria-label="Close" data-close-dialog>×</button></div><form method="post" action="{{ url_for('shop.request_order_cancellation', order_ref=order.public_id, token=order.public_token) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><label>Reason (optional)<textarea name="reason" rows="3" maxlength="500" placeholder="Tell us why you need to cancel"></textarea></label><button class="button button-dark" type="submit">Submit cancellation request</button></form></dialog>{% endif %}
+    </section>
+  {% endif %}
   <a class="button button-lime receipt-action-top" href="{{ url_for('shop.customer_receipt', order_ref=order.public_id, token=order.public_token) }}">View / print customer receipt</a>
   {% if push_configured %}
   <section class="order-notification-card" data-customer-push data-subscription-url="{{ url_for('shop.customer_push_subscription', order_ref=order.public_id, token=order.public_token) }}" data-vapid-public-key="{{ vapid_public_key }}" data-csrf-token="{{ csrf_token() }}">

@@ -5,7 +5,7 @@ from sqlalchemy import or_
 
 from models import (
     CommunityBlock, CommunityComment, CommunityNotification, CommunityPost,
-    CommunityReaction, CommunityReport, Customer, CustomerNotice, Product,
+    CommunityReaction, CommunityReport, CommunityConductRule, Customer, CustomerNotice, Product,
     SalespersonAccount, ShopSettings, db,
 )
 from routes.customer import current_customer
@@ -84,6 +84,9 @@ def _community_author_names(posts, comments):
 @community_bp.get("/")
 def feed():
     customer = signed_customer()
+    if not customer:
+        flash("Create or sign in to a customer account to view community posts.", "info")
+        return redirect(url_for("customer.login", next=url_for("community.feed")))
     category = request.args.get("category", "Everything")
     search_query = request.args.get("q", "").strip()[:120]
     is_profile_search = search_query.startswith("@")
@@ -118,11 +121,19 @@ def feed():
         posts = query.order_by(CommunityPost.created_at.desc()).limit(100).all()
         posts = [post for post in posts if post.customer_id not in blocked]
 
-    comments = {}
-    reactions = {}
-    for post in posts:
-        comments[post.id] = CommunityComment.query.filter_by(post_id=post.id, status="published").order_by(CommunityComment.created_at.asc()).all()
-        reactions[post.id] = CommunityReaction.query.filter_by(post_id=post.id).count()
+    post_ids = [post.id for post in posts]
+    comments = {post_id: [] for post_id in post_ids}
+    reactions = {post_id: 0 for post_id in post_ids}
+    if post_ids:
+        for comment in CommunityComment.query.filter(
+            CommunityComment.post_id.in_(post_ids), CommunityComment.status == "published"
+        ).order_by(CommunityComment.post_id.asc(), CommunityComment.created_at.asc()).all():
+            comments[comment.post_id].append(comment)
+        from sqlalchemy import func
+        reaction_counts = db.session.query(CommunityReaction.post_id, func.count(CommunityReaction.id)).filter(
+            CommunityReaction.post_id.in_(post_ids)
+        ).group_by(CommunityReaction.post_id).all()
+        reactions.update({post_id: count for post_id, count in reaction_counts})
     post_authors, comment_authors = _community_author_names(posts, comments)
     for post in posts:
         if post.category in SPECIAL_CATEGORIES:
@@ -139,7 +150,7 @@ def feed():
     recently_answered.sort(key=lambda row: row[1].created_at, reverse=True)
 
     product_mentions = []
-    searchable_text = "\n".join(post.body.casefold() for post in CommunityPost.query.filter_by(status="published").all())
+    searchable_text = "\n".join(post.body.casefold() for post in posts)
     for product in Product.query.filter_by(active=True).order_by(Product.name.asc()).all():
         count = searchable_text.count(product.name.casefold()) if product.name else 0
         if count:
@@ -460,3 +471,9 @@ def moderate_report(report_id):
 def post_redirect(post_id):
     CommunityPost.query.get_or_404(post_id)
     return redirect(url_for("community.feed", post_id=post_id) + f"#post-{post_id}")
+
+
+@community_bp.get("/code-of-conduct")
+def code_of_conduct():
+    rules = CommunityConductRule.query.filter_by(active=True).order_by(CommunityConductRule.sort_order.asc(), CommunityConductRule.id.asc()).all()
+    return render_template("community/code_of_conduct.html", rules=rules)

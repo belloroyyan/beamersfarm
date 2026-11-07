@@ -58,7 +58,7 @@ def create_in_person_order(form, actor):
         customer_name=name,
         phone=phone,
         address="In-person sale at farm counter",
-        status="Confirmed",
+        status="Picked up",
         payment_status="Verified",
         payment_method="cash",
         payment_provider="in_person",

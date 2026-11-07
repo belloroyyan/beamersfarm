@@ -108,3 +108,5 @@ table { width: 100%; }
 .site-footer a:hover { text-decoration: underline; text-underline-offset: 3px; }
 /* Floating helpers must not hide page actions on small screens */
 @media (max-width: 560px) { .community-fab { bottom: 76px; } }
+
+.product-photo{position:relative}.product-promo-tag{display:inline-flex;position:absolute;z-index:3;top:12px;right:12px;padding:6px 10px;border-radius:999px;background:#d94b35;color:#fff;font-size:.72rem;font-weight:800;letter-spacing:.02em;box-shadow:0 4px 14px #0002}.product-detail-tag{position:static;margin:.25rem 0 .75rem}.review-purchase-note{font-size:.82rem;color:var(--muted,#667085);margin:.35rem 0}

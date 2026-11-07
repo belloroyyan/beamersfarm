@@ -2,8 +2,9 @@
 {% block title %}Coupons · Owner desk{% endblock %}
 {% block content %}
 <div class="admin-shell"><div class="container">
-  <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">Back to order desk</a><p class="eyebrow">Owner desk / promotions</p><h1>Coupons.</h1><p class="form-note">Coupons are checked at checkout against customer, spend, product exclusions, validity dates and usage limits.</p></div></div>
   <div class="owner-new-button"><button class="button button-lime" type="button" data-open-admin-dialog="coupon-create-dialog">New Coupon</button></div>
+
+  <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">Back to order desk</a><p class="eyebrow">Owner desk / promotions</p><h1>Coupons.</h1><p class="form-note">Coupons are checked at checkout against customer, spend, product exclusions, validity dates and usage limits.</p></div></div>
   <dialog class="admin-panel" data-admin-dialog="coupon-create-dialog" aria-labelledby="coupon-create-title">
     <p class="eyebrow">Create a shared coupon</p><h2 id="coupon-create-title">New coupon</h2><button class="admin-dialog-x" type="button" data-admin-dialog-close aria-label="Close">×</button>
     <form method="post" class="coupon-create-form">
@@ -31,6 +32,7 @@
     </form>
   </section>
 
+  <section class="admin-panel coupon-global-controls"><p class="eyebrow">Global coupon control</p><h2>Disable every coupon</h2><p>Immediately pauses all active shared and customer-specific coupons. Existing orders and previously applied discounts are not changed.</p><form method="post" onsubmit="return confirm('Disable all active coupons?')"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="disable_all"><button class="button button-outline" type="submit">Disable all coupons</button></form></section>
   <section class="admin-panel"><p class="eyebrow">Coupon register</p><div class="admin-record-list">{% for coupon in coupons %}
     <article class="admin-record"><div class="admin-record-head"><div><h2>{{ coupon.code }}</h2><small>{{ coupon.discount_type }} · {{ coupon.value }} · minimum {{ format_currency(coupon.minimum_spend) }} · {{ coupon.uses }} used{% if coupon.max_uses is not none %} / {{ coupon.max_uses }}{% endif %}{% if coupon.customer_id %} · Gifted to customer #{{ coupon.customer_id }}{% endif %}{% if coupon.auto_gift_new_customers %} · Auto-gift enabled{% endif %}</small></div><span class="status-pill">{{ 'Active' if coupon.active else 'Paused' }}</span></div>
       {% if coupon.gift_message %}<p class="form-note">{{ coupon.gift_message }}</p>{% endif %}

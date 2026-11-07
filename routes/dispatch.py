@@ -2,7 +2,7 @@ from functools import wraps
 
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, session, url_for
 
-from models import Order, db
+from models import DispatchBatch, Order, db
 from utils.push_subscriptions import delete_staff_push_subscription, save_staff_push_subscription
 from utils.web_push import web_push_is_configured
 from utils.order_search import order_search_filter
@@ -43,7 +43,10 @@ def delete_push_subscription():
 @dispatch_bp.get("/")
 @rider_required
 def dashboard():
-    queue = Order.query.filter_by(status="Out for delivery")
+    queue = Order.query.join(DispatchBatch, Order.dispatch_batch_id == DispatchBatch.id).filter(
+        Order.status.in_(["Confirmed", "Prepared", "Out for delivery"]),
+        Order.payment_status == "Verified", DispatchBatch.status == "open"
+    )
     search_query = request.args.get("q", "").strip()[:120]
     filtered_queue = queue
     order_filter = order_search_filter(search_query)

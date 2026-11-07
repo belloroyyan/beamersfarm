@@ -31,13 +31,13 @@
       {% endif %}
     </section>
     <div class="metric-grid dispatch-metrics">
-      <div class="metric-card"><span>Ready for delivery</span><strong>{{ queue_count }}</strong><small>Orders currently on the road</small></div>
+      <div class="metric-card"><span>Orders in open batches</span><strong>{{ queue_count }}</strong><small>Payment-verified orders in active delivery windows</small></div>
       <div class="metric-card"><span>Completed deliveries</span><strong>{{ completed_count }}</strong><small>All completed orders</small></div>
     </div>
     <section class="admin-panel">
       <div class="panel-heading">
-        <div><p class="eyebrow">Delivery queue</p><h2>Orders out for delivery</h2></div>
-        <span class="section-note">Oldest orders first · {{ orders|length }} shown</span>
+        <div><p class="eyebrow">Delivery queue</p><h2>Open dispatch batches</h2></div>
+        <span class="section-note">Confirmed, prepared and dispatched orders · {{ orders|length }} shown</span>
       </div>
       <form method="get" class="record-search" role="search"><label>Search delivery orders<input type="search" name="q" maxlength="120" value="{{ search_query }}" placeholder="Public or numeric ID, customer, phone"></label><button class="button button-dark" type="submit">Search</button>{% if search_query %}<a class="table-link" href="{{ url_for('dispatch.dashboard') }}">Clear</a>{% endif %}</form>
       {% if orders %}
@@ -52,15 +52,15 @@
                   <td><strong>{{ order.customer_name }}</strong><small>{{ order.phone }}</small></td>
                   <td>{{ order.created_at|local_time("%d %b %Y · %H:%M") }}</td>
                   <td>{{ order.items|length }} item{{ '' if order.items|length == 1 else 's' }}</td>
-                  <td><span class="status-pill status-out-for-delivery">{{ order.status }}</span></td>
-                  <td><a class="table-link" href="{{ url_for('dispatch.order_detail', order_ref=order.public_id) }}">Open delivery →</a></td>
+                  <td><span class="status-pill status-{{ order.status|lower|replace(' ', '-') }}">{{ order.status }}</span></td>
+                  <td>{% if order.status == 'Out for delivery' %}<a class="table-link" href="{{ url_for('dispatch.order_detail', order_ref=order.public_id) }}">Open delivery →</a>{% else %}<small>Awaiting batch dispatch</small>{% endif %}</td>
                 </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
       {% else %}
-        <div class="empty-state compact"><h3>No deliveries waiting.</h3><p>Orders will appear here after the Owner or Salesperson marks them “Out for delivery”.</p></div>
+        <div class="empty-state compact"><h3>No open dispatch batches.</h3><p>Payment-verified orders assigned to open delivery windows will appear here. Orders become actionable for the rider when marked Out for delivery.</p></div>
       {% endif %}
     </section>
   </div>
