@@ -1,4 +1,4 @@
-const CACHE_NAME = "beamers-farms-pwa-v25";
+const CACHE_NAME = "beamers-farms-pwa-v26";
 const OFFLINE_URL = "/static/offline.html";
 const PRECACHE_URLS = [
   OFFLINE_URL,
@@ -26,7 +26,10 @@ const PRECACHE_URLS = [
   "/static/images/receipt-watermark.svg",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
-  "/static/icons/apple-touch-icon.png"
+  "/static/icons/apple-touch-icon.png",
+  "/static/icons/beamers-farm-ivory.svg",
+  "/static/icons/notification-icon-192.png",
+  "/static/icons/notification-badge-96.png"
 ];
 const PRECACHE_PATHS = new Set(PRECACHE_URLS.map((path) => new URL(path, self.location.origin).pathname));
 
@@ -104,8 +107,8 @@ self.addEventListener("push", (event) => {
 
   event.waitUntil(self.registration.showNotification(title, {
     body,
-    icon: "/static/icons/icon-192.png",
-    badge: "/static/icons/icon-192.png",
+    icon: "/static/icons/notification-icon-192.png",
+    badge: "/static/icons/notification-badge-96.png",
     data: { url: targetUrl },
   }));
 });
