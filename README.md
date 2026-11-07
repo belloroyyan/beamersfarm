@@ -21,7 +21,9 @@ The supplied migration history contains MySQL-specific `ALTER COLUMN` operations
 
 For a full migration rehearsal, use an isolated disposable MySQL-compatible database. Set `CHICKEN_DATABASE_URL` to that private test DSN, keep `AUTO_CREATE_SCHEMA=false`, then run `.venv/bin/flask --app app db upgrade`. Do not point the rehearsal at the Webdev managed database.
 
-The project includes the existing migration history and a merge revision for one Alembic head. Apply production migrations only after the Owner reviews the migration and deliberately runs it against the managed database; development, testing and publication share that database if its `DATABASE_URL` is used.
+The project includes the existing migration history and a merge-only revision joining the logistics workflow and operational-index branches. The merge revision does not alter application tables; it records that both parent migrations belong to one Alembic history. Before applying it to a production database, take the normal managed-database backup and verify that the database is at a compatible revision. Do not use `flask db stamp` to bypass pending schema changes.
+
+For Railway, configure the service's **Pre-deploy Command** as `python -m scripts.railway_migrate`. This helper checks that the configured database accepts a connection (up to 45 attempts, two seconds apart) and then runs `flask --app app db upgrade`. It does not create, drop, stamp, or reset tables. The normal Gunicorn start command remains unchanged. Ensure production uses the intended `DATABASE_URL`; because `CHICKEN_DATABASE_URL` takes precedence in this project, remove that override from Railway unless it is deliberately intended to point at the production database.
 
 ## Production runtime
 
