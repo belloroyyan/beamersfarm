@@ -94,7 +94,7 @@ def _ensure_redelivery_table():
                 server_default="redelivery",
             ),
             sa.Column("preferred_window", sa.String(120), nullable=True),
-            sa.Column("note", sa.Text(), nullable=False, server_default=""),
+            sa.Column("note", sa.Text(), nullable=False),
             sa.Column("status", sa.String(24), nullable=False, server_default="pending"),
             sa.Column("created_at", sa.DateTime(), nullable=False),
             sa.Column("updated_at", sa.DateTime(), nullable=False),
