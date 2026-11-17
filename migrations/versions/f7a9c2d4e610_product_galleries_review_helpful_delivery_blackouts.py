@@ -14,10 +14,23 @@ def upgrade():
     inspector = inspect(bind)
     settings_columns = {c["name"] for c in inspector.get_columns("shop_settings")}
     if "delivery_blackouts_json" not in settings_columns:
+        # MySQL rejects DEFAULT on TEXT/BLOB/JSON columns.
         op.add_column("shop_settings", sa.Column(
-            "delivery_blackouts_json", sa.Text(), nullable=False,
-            server_default='{"dates":[],"weekdays":[]}'
+            "delivery_blackouts_json", sa.Text(), nullable=True,
         ))
+        op.execute(
+            sa.text(
+                "UPDATE shop_settings SET delivery_blackouts_json = :v "
+                "WHERE delivery_blackouts_json IS NULL"
+            ).bindparams(v='{"dates":[],"weekdays":[]}')
+        )
+        op.alter_column(
+            "shop_settings",
+            "delivery_blackouts_json",
+            existing_type=sa.Text(),
+            existing_nullable=True,
+            nullable=False,
+        )
     tables = set(inspector.get_table_names())
     if "product_images" not in tables:
         op.create_table(
