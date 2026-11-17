@@ -26,6 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
       else item.removeAttribute("aria-current");
     });
     const focusable = panels.find((panel) => Number(panel.dataset.checkoutStepPanel) === current)?.querySelector("input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),button");
+    window.scrollTo({ top: 0, behavior: "smooth" });
     if (current > 1) focusable?.focus({ preventScroll: true });
   };
 

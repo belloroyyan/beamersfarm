@@ -3,11 +3,12 @@ import hmac
 import json
 import re
 import secrets
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from io import BytesIO
 import base64
 import logging
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, abort, current_app, flash, jsonify, make_response, redirect, render_template, request, session, url_for
 from sqlalchemy import or_
@@ -19,8 +20,8 @@ from utils.notifications import normalize_nigerian_phone
 from utils.product_images import product_image_url
 from utils.push_subscriptions import valid_push_endpoint
 from utils.update_share import render_update_share_image
-from utils.web_push import send_customer_order_confirmed_push, send_customer_order_out_for_delivery_push, send_owner_low_stock_push, send_owner_new_order_push, send_owner_wholesale_request_push, send_salesperson_new_order_push, web_push_is_configured
-from utils.dispatch_batches import assign_dispatch_batch, delivery_estimate, preview_delivery_window
+from utils.web_push import send_customer_event_push, send_customer_order_confirmed_push, send_customer_order_out_for_delivery_push, send_owner_low_stock_push, send_owner_new_order_push, send_owner_wholesale_request_push, send_salesperson_new_order_push, web_push_is_configured
+from utils.dispatch_batches import assign_dispatch_batch, delivery_estimate, parse_delivery_window, preview_delivery_window
 from utils.delivery_operations import delivery_windows
 from utils.delivery_operations import delivery_windows
 from utils.recommendations import personalized_products
@@ -207,10 +208,20 @@ def index():
             .all()
         )
     total_products = available_products_query().count()
+    order_total = Order.query.count()
+    customer_total = Customer.query.filter_by(active=True).count()
+    review_total = Review.query.filter_by(status="Approved").count()
+    def metric_floor(value):
+        return f"{(value // 10) * 10}+" if value >= 10 else f"{value}+"
+    homepage_metrics = {
+        "orders": metric_floor(order_total),
+        "customers": metric_floor(customer_total),
+        "reviews": metric_floor(review_total),
+    }
     latest_update = ShopUpdate.query.order_by(ShopUpdate.id.desc()).first()
     show_update = bool(latest_update and _unseen_overlay("update", latest_update.id))
     return render_template(
-        "index.html", products=featured, total_products=total_products,
+        "index.html", products=featured, total_products=total_products, homepage_metrics=homepage_metrics,
         **seo_meta("Fresh Frozen Chicken Delivery in Osogbo | Beamers Farms", "Buy fresh, hygienically packaged frozen chicken, whole birds and chicken parts with delivery across Osogbo or farm pickup.", "shop.index", keywords="frozen chicken Osogbo, chicken delivery Osogbo, fresh chicken Nigeria, Beamers Farms"),
         latest_update=latest_update if show_update else None,
         latest_gallery=(lambda g: g if g and _unseen_overlay("gallery", g.id) else None)(GalleryImage.query.filter_by(active=True).order_by(GalleryImage.created_at.desc(), GalleryImage.id.desc()).first()),
@@ -280,6 +291,18 @@ def update_share_image(update_id):
     response.headers["Cache-Control"] = "public, max-age=3600, s-maxage=86400"
     return response
 
+
+@shop_bp.get("/about")
+def about():
+    import json
+    settings = ShopSettings.query.get(1)
+    team = []
+    if settings and getattr(settings, "team_members_json", None):
+        try:
+            team = json.loads(settings.team_members_json or "[]")
+        except Exception:
+            team = []
+    return render_template("about.html", team_members=team)
 
 @shop_bp.get("/help")
 def help_page():
@@ -395,7 +418,20 @@ def product_detail(product_id):
         wishlist_saved = WishlistItem.query.filter_by(customer_id=customer.id, product_id=product.id).first() is not None
     description = " ".join((product.description or "").split())[:155]
     product_reviews = Review.query.join(Order, Review.order_id == Order.id).join(OrderItem, OrderItem.order_id == Order.id).filter(Review.status == "Approved", OrderItem.product_id == product.id).distinct().order_by(Review.published_at.desc(), Review.created_at.desc()).limit(30).all()
-    return render_template("product.html", product=product, product_reviews=product_reviews, processing_options=processing_options(product), reorder_order=reorder_order, wishlist_saved=wishlist_saved, **seo_meta(f"{product.name} | Fresh Frozen Chicken in Osogbo", description or f"Buy {product.name} from Beamers Farms with Osogbo delivery or farm pickup.", "shop.product_detail", {"product_id": product.id}, public_asset_url(url_for("static", filename="images/brand-mark.png")), "product", keywords=f"{product.name}, frozen chicken Osogbo, buy chicken Nigeria"))
+    from sqlalchemy import func
+    rating_query = db.session.query(func.avg(Review.rating), func.count(Review.id)).filter(
+        Review.status == "Approved",
+        Review.id.in_(
+            db.session.query(Review.id)
+            .join(Order, Review.order_id == Order.id)
+            .join(OrderItem, OrderItem.order_id == Order.id)
+            .filter(OrderItem.product_id == product.id)
+            .distinct()
+        ),
+    ).first()
+    product_average_rating = float(rating_query[0]) if rating_query and rating_query[0] is not None else None
+    product_rating_count = int(rating_query[1] or 0) if rating_query else 0
+    return render_template("product.html", product=product, product_reviews=product_reviews, product_average_rating=product_average_rating, product_rating_count=product_rating_count, processing_options=processing_options(product), reorder_order=reorder_order, wishlist_saved=wishlist_saved, **seo_meta(f"{product.name} | Fresh Frozen Chicken in Osogbo", description or f"Buy {product.name} from Beamers Farms with Osogbo delivery or farm pickup.", "shop.product_detail", {"product_id": product.id}, public_asset_url(url_for("static", filename="images/brand-mark.png")), "product", keywords=f"{product.name}, frozen chicken Osogbo, buy chicken Nigeria"))
 
 
 @shop_bp.get("/gallery")
@@ -817,8 +853,18 @@ def checkout():
     selected_zone_id = request.values.get("delivery_zone_id", "")
     selected_zone = next((zone for zone in zones if str(zone.id) == selected_zone_id), None)
     delivery_window_options = delivery_windows(ShopSettings.query.get(1))
+    delivery_settings = ShopSettings.query.get(1)
+    delivery_booking_days = max(1, min(90, int(getattr(delivery_settings, "delivery_booking_days", 7) or 7)))
+    try:
+        delivery_blackouts = json.loads(delivery_settings.delivery_blackouts_json or "{}") if delivery_settings else {}
+    except (TypeError, ValueError):
+        delivery_blackouts = {}
+    today_lagos = datetime.now(ZoneInfo("Africa/Lagos")).date()
+    min_delivery_date = today_lagos.isoformat()
+    max_delivery_date = (today_lagos + timedelta(days=delivery_booking_days)).isoformat()
+    selected_requested_delivery_date = request.values.get("requested_delivery_date", "").strip()
     selected_preferred_window = request.values.get("preferred_delivery_window", "").strip()
-    selected_window_estimate = preview_delivery_window(selected_preferred_window) if selected_preferred_window else ""
+    selected_window_estimate = preview_delivery_window(selected_preferred_window, delivery_date=selected_requested_delivery_date or None) if selected_preferred_window else ""
     summary = cart_summary(delivery_fee=selected_zone.fee if selected_zone else None)
     signed_in_customer = db.session.get(Customer, session.get("customer_id")) if session.get("customer_id") else None
     signed_in_customer = signed_in_customer if signed_in_customer and signed_in_customer.active else None
@@ -860,6 +906,8 @@ def checkout():
             selected_zone_id=selected_zone_id, selected_zone=selected_zone,
             customer=signed_in_customer if signed_in_customer and signed_in_customer.active else None,
             delivery_window_options=delivery_window_options, selected_preferred_window=selected_preferred_window, selected_window_estimate=selected_window_estimate,
+            delivery_booking_days=delivery_booking_days, min_delivery_date=min_delivery_date, max_delivery_date=max_delivery_date, selected_requested_delivery_date=selected_requested_delivery_date,
+            delivery_blackouts=delivery_blackouts,
             available_account_coupons=available_account_coupons,
             opay_checkout_enabled=opay_is_configured(), coupon_code=coupon_code, coupon_error=coupon_error, coupon_autofilled=coupon_autofilled, **seo_meta("Choose Delivery or Pickup | Beamers Farms", "Choose delivery or free farm pickup for your Beamers Farms order.", "shop.checkout", robots="noindex,follow"),
         )
@@ -885,6 +933,34 @@ def checkout():
         if not selected_zone:
             flash("Choose a delivery zone or free farm pickup to see the amount due.", "error")
             return render_checkout()
+        requested_delivery_date = None
+        if not selected_zone.is_pickup and request.form.get("requested_delivery_date", "").strip():
+            try:
+                requested_delivery_date = date.fromisoformat(request.form.get("requested_delivery_date", "").strip())
+            except (TypeError, ValueError):
+                flash("Choose a valid requested delivery date, or leave it blank for the nearest available batch.", "error")
+                return render_checkout()
+            if requested_delivery_date < today_lagos or requested_delivery_date > (today_lagos + timedelta(days=delivery_booking_days)):
+                flash(f"Choose a delivery date within the next {delivery_booking_days} days.", "error")
+                return render_checkout()
+            from utils.delivery_operations import delivery_date_blocked
+            if delivery_date_blocked(requested_delivery_date, delivery_settings):
+                flash("Deliveries are unavailable on that date. Please choose another delivery day.", "error")
+                return render_checkout()
+            if preferred_delivery_window:
+                parsed_window = parse_delivery_window(preferred_delivery_window)
+                if parsed_window and requested_delivery_date == today_lagos:
+                    now_local = datetime.now(ZoneInfo("Africa/Lagos"))
+                    start_minute = parsed_window[0]
+                    requested_start = now_local.replace(
+                        hour=(start_minute // 60) % 24,
+                        minute=start_minute % 60,
+                        second=0,
+                        microsecond=0,
+                    )
+                    if requested_start <= now_local:
+                        flash("That delivery window has already started or passed today. Choose a later window or another date.", "error")
+                        return render_checkout()
         if payment_method not in {"bank_transfer", "opay_checkout"}:
             flash("Choose a valid payment method.", "error")
             return render_checkout()
@@ -936,6 +1012,7 @@ def checkout():
                 phone=phone,
                 email=email or None,
                 preferred_delivery_window=preferred_delivery_window or None,
+                requested_delivery_date=requested_delivery_date,
                 address=PICKUP_ADDRESS if selected_zone.is_pickup else address,
                 whatsapp_opt_in=whatsapp_opt_in,
                 whatsapp_opt_in_at=datetime.utcnow() if whatsapp_opt_in else None,
@@ -1008,6 +1085,12 @@ def checkout():
             raise
         if email_changed_on_order:
             flash("Your account email changed. Verify it from My account before email-only account messages can be sent.", "success")
+        send_customer_event_push(
+            "Order received",
+            f"Beamers Farms has received order #{order.public_id}. We will update you as it progresses.",
+            f"/order/{order.public_id}/{order.public_token}/success",
+            order=order,
+        )
         send_owner_new_order_push()
         for low_stock_product in low_stock_products:
             send_owner_low_stock_push(low_stock_product)

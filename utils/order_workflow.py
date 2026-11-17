@@ -4,8 +4,7 @@ from decimal import Decimal
 from models import OrderFinancialRecord, OrderNotification, db
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.web_push import (
-    send_customer_order_confirmed_push,
-    send_customer_order_out_for_delivery_push,
+    send_customer_event_push,
     send_dispatch_assignment_push,
 )
 
@@ -142,11 +141,30 @@ def update_order_status(
         return True, "No order or payment changes were made."
 
     db.session.commit()
-    if status_changed and new_status == "Confirmed" and previous_status != "Confirmed":
-        send_customer_order_confirmed_push(order)
+    if status_changed and new_status == "Cancelled" and previous_status != "Cancelled":
+        for item in order.items:
+            if item.product and item.product.active:
+                send_customer_event_push(
+                    "Product stock increased",
+                    f"{item.product.name} has more stock available at Beamers Farms.",
+                    f"/product/{item.product.id}",
+                    broadcast=True,
+                )
+    if status_changed:
+        send_customer_event_push(
+            "Order status updated",
+            f"Order #{order.public_id} is now {new_status}.",
+            f"/order/{order.public_id}/{order.public_token}/success",
+            order=order,
+        )
+    elif payment_verified_now:
+        send_customer_event_push(
+            "Payment verified",
+            f"Payment for order #{order.public_id} has been verified.",
+            f"/order/{order.public_id}/{order.public_token}/success",
+            order=order,
+        )
     if status_changed and new_status == "Out for delivery" and previous_status != "Out for delivery":
-        if order.fulfillment_type == "delivery":
-            send_customer_order_out_for_delivery_push(order)
         push_result = send_dispatch_assignment_push()
         if not push_result["configured"]:
             return True, "Order assigned to dispatch. Push alerts are not configured yet; the rider can refresh the queue."

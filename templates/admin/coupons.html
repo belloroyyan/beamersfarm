@@ -5,6 +5,7 @@
   <div class="owner-new-button"><button class="button button-lime" type="button" data-open-admin-dialog="coupon-create-dialog">New Coupon</button></div>
 
   <div class="admin-topbar"><div><a class="back-link" href="{{ url_for('admin.dashboard') }}">Back to order desk</a><p class="eyebrow">Owner desk / promotions</p><h1>Coupons.</h1><p class="form-note">Coupons are checked at checkout against customer, spend, product exclusions, validity dates and usage limits.</p></div></div>
+  <details class="coupon-actions-menu"><summary>Actions <span aria-hidden="true">⋮</span></summary><div class="coupon-actions-popover"><button type="button" data-open-admin-dialog="coupon-selected-gift-dialog">Gift to selected customers</button><button type="button" data-open-admin-dialog="coupon-all-gift-dialog">Gift to all active customers</button><button type="button" data-open-admin-dialog="coupon-disable-all-dialog">Disable all coupons</button></div></details>
   <dialog class="admin-panel" data-admin-dialog="coupon-create-dialog" aria-labelledby="coupon-create-title">
     <p class="eyebrow">Create a shared coupon</p><h2 id="coupon-create-title">New coupon</h2><button class="admin-dialog-x" type="button" data-admin-dialog-close aria-label="Close">×</button>
     <form method="post" class="coupon-create-form">
@@ -16,24 +17,24 @@
     </form>
   </dialog>
 
-  <section class="admin-panel mass-coupon-panel"><p class="eyebrow">Personal coupon gifts</p><h2>Gift to selected customers</h2><p>Enter one or more active customer IDs, separated by commas or spaces. Each customer receives a unique one-use code. Up to 1,000 customer IDs can be entered at once.</p>
+  <dialog class="admin-panel mass-coupon-panel" data-admin-dialog="coupon-selected-gift-dialog"><button class="admin-dialog-x" type="button" data-admin-dialog-close aria-label="Close">×</button><p class="eyebrow">Personal coupon gifts</p><h2>Gift to selected customers</h2><p>Enter one or more active customer IDs, separated by commas or spaces. Each customer receives a unique one-use code. Up to 1,000 customer IDs can be entered at once.</p>
     <form method="post" class="mass-coupon-form"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="selected_gift">
       <label>Coupon template<select name="coupon_id" required><option value="">Choose an active shared coupon</option>{% for coupon in gift_templates %}<option value="{{ coupon.id }}">{{ coupon.code }} · {{ coupon.value }}{% if coupon.discount_type == 'percent' %}% off{% else %} off{% endif %}</option>{% endfor %}</select></label>
       <label>Customer ID(s)<input name="customer_ids" required placeholder="e.g. 12, 18, 24"><small class="field-help">Find IDs in Manage customer accounts. All IDs must belong to active accounts or the gift will be rejected.</small></label>
       <label>Gift message <span class="field-help">Optional · up to 500 characters</span><input name="gift_message" maxlength="500" placeholder="Thank you for being part of Beamers Farms"></label>
       <button class="button button-dark" type="submit">Gift selected customers</button>
     </form>
-  </section>
-  <section class="admin-panel mass-coupon-panel"><p class="eyebrow">Customer appreciation</p><h2>Gift to all active customers</h2><p>Creates a unique, one-use personal code for each of {{ customer_count }} active customer account(s). Existing gifts from the same coupon template are not duplicated.</p>
+  </dialog>
+  <dialog class="admin-panel mass-coupon-panel" data-admin-dialog="coupon-all-gift-dialog"><button class="admin-dialog-x" type="button" data-admin-dialog-close aria-label="Close">×</button><p class="eyebrow">Customer appreciation</p><h2>Gift to all active customers</h2><p>Creates a unique, one-use personal code for each of {{ customer_count }} active customer account(s). Existing gifts from the same coupon template are not duplicated.</p>
     <form method="post" class="mass-coupon-form"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="mass_gift">
       <label>Coupon template<select name="coupon_id" required><option value="">Choose an active shared coupon</option>{% for coupon in gift_templates %}<option value="{{ coupon.id }}">{{ coupon.code }} · {{ coupon.value }}{% if coupon.discount_type == 'percent' %}% off{% else %} off{% endif %}</option>{% endfor %}</select></label>
       <label>Gift message <span class="field-help">Optional · up to 500 characters</span><input name="gift_message" maxlength="500" placeholder="Thank you for being part of Beamers Farms"></label>
       <button class="button button-outline" type="submit">Gift all customers</button>
     </form>
-  </section>
+  </dialog>
 
-  <section class="admin-panel coupon-global-controls"><p class="eyebrow">Global coupon control</p><h2>Disable every coupon</h2><p>Immediately pauses all active shared and customer-specific coupons. Existing orders and previously applied discounts are not changed.</p><form method="post" onsubmit="return confirm('Disable all active coupons?')"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="disable_all"><button class="button button-outline" type="submit">Disable all coupons</button></form></section>
-  <section class="admin-panel"><p class="eyebrow">Coupon register</p><div class="admin-record-list">{% for coupon in coupons %}
+  <dialog class="admin-panel coupon-global-controls" data-admin-dialog="coupon-disable-all-dialog"><button class="admin-dialog-x" type="button" data-admin-dialog-close aria-label="Close">×</button><p class="eyebrow">Global coupon control</p><h2>Disable every coupon</h2><p>Immediately pauses all active shared and customer-specific coupons. Existing orders and previously applied discounts are not changed.</p><form method="post" onsubmit="return confirm('Disable all active coupons?')"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="disable_all"><button class="button button-outline" type="submit">Disable all coupons</button></form></dialog>
+  <section class="admin-panel coupon-register"><p class="eyebrow">Coupon register</p><form method="get" class="record-search coupon-search" role="search"><label>Search coupons<input type="search" name="q" value="{{ search_query or '' }}" placeholder="Code or discount type"></label><button class="button button-dark" type="submit">Search</button>{% if search_query %}<a class="table-link" href="{{ url_for('admin.coupons') }}">Clear</a>{% endif %}</form><div class="admin-table-heading coupon-table-heading"><span>Coupon & terms</span><span>Status</span><span>Actions</span></div><div class="admin-record-list">{% for coupon in coupons %}
     <article class="admin-record"><div class="admin-record-head"><div><h2>{{ coupon.code }}</h2><small>{{ coupon.discount_type }} · {{ coupon.value }} · minimum {{ format_currency(coupon.minimum_spend) }} · {{ coupon.uses }} used{% if coupon.max_uses is not none %} / {{ coupon.max_uses }}{% endif %}{% if coupon.customer_id %} · Gifted to customer #{{ coupon.customer_id }}{% endif %}{% if coupon.auto_gift_new_customers %} · Auto-gift enabled{% endif %}</small></div><span class="status-pill">{{ 'Active' if coupon.active else 'Paused' }}</span></div>
       {% if coupon.gift_message %}<p class="form-note">{{ coupon.gift_message }}</p>{% endif %}
       <form method="post" action="{{ url_for('admin.toggle_coupon', coupon_id=coupon.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="button button-outline" type="submit">{{ 'Pause' if coupon.active else 'Activate' }}</button></form>

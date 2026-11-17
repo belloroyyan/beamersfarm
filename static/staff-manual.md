@@ -763,3 +763,8 @@ The Owner manages customer reviews from **Owner desk → Reviews**. The review q
 - Dialogs can be closed with their **×** or **Cancel** control. Check the dialog title before saving.
 - On narrow screens, forms may stack fields vertically. Scroll through the complete form rather than expecting related fields to remain side by side.
 - Labels sit above their fields; use the label text to confirm what a field expects. Do not enter sensitive customer details into a public note or response.
+
+
+## Delivery blackout dates and dispatch filters
+
+Owners can block one-off dates or recurring weekdays in Delivery Settings. Customers cannot request delivery on blocked dates. The dispatch register supports combined date-range, batch-number and delivery-window filters, plus sorting by date, batch number or delivery window.

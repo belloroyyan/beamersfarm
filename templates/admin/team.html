@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Team · Owner desk{% endblock %}
+{% block content %}
+<div class="admin-shell"><div class="container">
+  <div class="admin-topbar">
+    <div>
+      <a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a>
+      <p class="eyebrow">Owner settings</p>
+      <h1>Team on the About page.</h1>
+      <p class="form-note">Add names, roles, short bios, and photo URLs. Leave name blank to skip a row. Changes appear on the public About page.</p>
+    </div>
+  </div>
+  <form method="post" class="admin-panel account-form">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <div id="team-rows">
+      {% for m in team_members %}
+      <div class="team-row field-grid" style="margin-bottom:1rem;padding:1rem;background:#f8f4ea;border-radius:12px;">
+        <label>Name<input name="name" value="{{ m.name }}" maxlength="120"></label>
+        <label>Role<input name="role" value="{{ m.role }}" maxlength="80"></label>
+        <label>Photo URL<input name="photo" value="{{ m.photo }}" maxlength="500" placeholder="https://… or /static/…"></label>
+        <label>Short bio<textarea name="bio" rows="2" maxlength="400">{{ m.bio }}</textarea></label>
+      </div>
+      {% endfor %}
+      {% for _ in range(3) %}
+      <div class="team-row field-grid" style="margin-bottom:1rem;padding:1rem;background:#f8f4ea;border-radius:12px;">
+        <label>Name<input name="name" maxlength="120" placeholder="Full name"></label>
+        <label>Role<input name="role" maxlength="80" placeholder="e.g. Founder, Operations"></label>
+        <label>Photo URL<input name="photo" maxlength="500" placeholder="Optional image URL"></label>
+        <label>Short bio<textarea name="bio" rows="2" maxlength="400" placeholder="Optional"></textarea></label>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="form-actions">
+      <a class="button button-outline" href="{{ url_for('admin.dashboard') }}">Cancel</a>
+      <button class="button button-lime" type="submit">Save team</button>
+    </div>
+  </form>
+</div></div>
+{% endblock %}

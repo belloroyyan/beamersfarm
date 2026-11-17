@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import hashlib
 import secrets
 import re
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, send_file, session, url_for
@@ -14,7 +15,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import AbandonedCart, AnalyticsEvent, Coupon, Complaint, PrivacyRule, CommunityConductRule, Customer, CustomerNotice, CustomerNote, CustomerPushSubscription, CustomerMessageCampaign, CustomerMessageDelivery, DeliveryZone, DeliveryRedeliveryRequest, DispatchBatch, DropShare, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, PartnerListing, Product, ProductPackage, ProductPackageItem, Review, SalespersonAccount, StaffActionLog, ShopSettings, ShopUpdate, StaffPushSubscription, WholesaleOrder, WholesaleOrderItem, PartnerAdInvite, SiteOverlaySeen, CommunityPost, CommunityComment, CommunityReaction, CommunityReport, CommunityBlock, CommunityNotification, db, order_customer_push_subscriptions
+from models import AbandonedCart, AnalyticsEvent, Coupon, Complaint, PrivacyRule, CommunityConductRule, Customer, CustomerNotice, CustomerNote, CustomerPushSubscription, CustomerMessageCampaign, CustomerMessageDelivery, DeliveryZone, DeliveryRedeliveryRequest, DispatchBatch, DropShare, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, PartnerListing, Product, ProductImage, ProductPackage, ProductPackageItem, Review, ReviewHelpful, SalespersonAccount, StaffActionLog, ShopSettings, ShopUpdate, StaffPushSubscription, WholesaleOrder, WholesaleOrderItem, PartnerAdInvite, SiteOverlaySeen, CommunityPost, CommunityComment, CommunityReaction, CommunityReport, CommunityBlock, CommunityNotification, db, order_customer_push_subscriptions
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.product_images import save_product_image
 from utils.gallery import delete_gallery_image, save_gallery_image, save_gallery_media, gallery_media_type
@@ -23,7 +24,7 @@ from utils.partner_ads import delete_partner_image, normalize_http_url, parse_so
 from utils.updates import delete_update_image, save_update_image
 from utils.security import is_safe_redirect_url
 from utils.push_subscriptions import delete_staff_push_subscription, save_staff_push_subscription
-from utils.web_push import send_customer_order_confirmed_push, send_dispatch_assignment_push, send_owner_low_stock_push, web_push_is_configured
+from utils.web_push import send_customer_event_push, send_customer_order_confirmed_push, send_dispatch_assignment_push, send_owner_low_stock_push, web_push_is_configured
 from utils.order_workflow import ORDER_STATUSES, update_order_status
 from utils.order_settlement import save_order_weights
 from utils.inventory_pdf import build_inventory_pdf
@@ -329,9 +330,19 @@ def dashboard():
     abandoned_report = abandoned_cart_report()
     return render_template(
         "admin/dashboard.html", orders=orders, stats=stats, statuses=ORDER_STATUSES,
-        search_query=search_query, clear_groups=CLEAR_CATEGORY_GROUPS, clear_counts=_clear_category_counts(),
+        search_query=search_query,
         shop_settings=shop_settings, push_configured=web_push_is_configured(),
         vapid_public_key=current_app.config.get("VAPID_PUBLIC_KEY", ""), abandoned_report=abandoned_report,
+    )
+
+
+@admin_bp.get("/owner")
+@admin_required
+def owner_page():
+    return render_template(
+        "admin/owner.html",
+        clear_groups=CLEAR_CATEGORY_GROUPS,
+        clear_counts=_clear_category_counts(),
     )
 
 
@@ -438,6 +449,11 @@ def delivery_settings():
         settings.delivery_open_time = request.form.get("delivery_open_time", "07:00")[:5]
         settings.delivery_close_time = request.form.get("delivery_close_time", "19:00")[:5]
         settings.auto_shop_hours = request.form.get("auto_shop_hours") == "yes"
+        try:
+            settings.delivery_booking_days = max(1, min(90, int(request.form.get("delivery_booking_days", "7"))))
+        except (TypeError, ValueError):
+            flash("Delivery booking window must be a whole number from 1 to 90 days.", "error")
+            return redirect(url_for("admin.delivery_settings"))
         settings.dispatch_batch_hours = max(Decimal("0.25"), min(Decimal("24"), Decimal(request.form.get("dispatch_batch_hours", "2"))))
         settings.dispatch_batch_weight_limit = max(Decimal("0.001"), Decimal(request.form.get("dispatch_batch_weight_limit", "50")))
         windows = [line.strip() for line in request.form.get("delivery_windows", "").splitlines() if line.strip()]
@@ -445,11 +461,28 @@ def delivery_settings():
         channels = [channel for channel in request.form.getlist("closure_channels") if channel in {"push", "whatsapp", "email"}]
         settings.closure_channels_json = json.dumps(channels)
         settings.closed_message = request.form.get("closed_message", settings.closed_message).strip()[:500] or settings.closed_message
+        blackout_dates = []
+        for value in request.form.get("blocked_dates", "").splitlines():
+            value = value.strip()
+            if not value:
+                continue
+            try:
+                parsed_date = datetime.strptime(value, "%Y-%m-%d") if "-" in value else datetime.strptime(value, "%d/%m/%Y")
+                blackout_dates.append(parsed_date.strftime("%Y-%m-%d"))
+            except ValueError:
+                flash(f"Invalid blocked date: {value}. Use DD/MM/YYYY or YYYY-MM-DD.", "error")
+                return redirect(url_for("admin.delivery_settings"))
+        weekdays = sorted({int(value) for value in request.form.getlist("blocked_weekdays") if value in {"0","1","2","3","4","5","6"}})
+        settings.delivery_blackouts_json = json.dumps({"dates": sorted(set(blackout_dates))[:180], "weekdays": weekdays})
         db.session.commit()
         flash("Delivery settings saved.", "success")
         return redirect(url_for("admin.delivery_settings"))
     from utils.delivery_operations import delivery_windows
-    return render_template("admin/delivery_settings.html", settings=settings, delivery_windows=delivery_windows(settings), closure_channels=json.loads(settings.closure_channels_json or "[]"))
+    try:
+        blackout_rules = json.loads(settings.delivery_blackouts_json or "{}")
+    except (TypeError, ValueError):
+        blackout_rules = {}
+    return render_template("admin/delivery_settings.html", settings=settings, delivery_windows=delivery_windows(settings), closure_channels=json.loads(settings.closure_channels_json or "[]"), blackout_rules=blackout_rules)
 
 @admin_bp.post("/shop/toggle")
 @admin_required
@@ -460,6 +493,11 @@ def toggle_shop():
         db.session.add(settings)
     settings.is_open = not settings.is_open
     db.session.commit()
+    send_customer_event_push(
+        "Beamers Farms is now open" if settings.is_open else "Beamers Farms is now closed",
+        "The shop is open and accepting orders." if settings.is_open else "The shop is closed for new orders. You can still browse the catalog.",
+        "/", broadcast=True,
+    )
     if not settings.is_open:
         from utils.delivery_operations import close_expired_batches
         close_expired_batches(close_today=True)
@@ -477,6 +515,40 @@ def order_detail(order_ref):
         from flask import abort
         abort(404)
     if request.method == "POST":
+        if request.form.get("action") == "assign_dispatch_batch":
+            try:
+                old_batch = order.dispatch_batch
+                batch_id = int(request.form.get("batch_id", "0") or 0)
+                if batch_id:
+                    batch = db.session.get(DispatchBatch, batch_id)
+                    if not batch or batch.status != "open":
+                        raise ValueError("Choose an open batch.")
+                else:
+                    start_raw = request.form.get("batch_window_start", "").strip()
+                    end_raw = request.form.get("batch_window_end", "").strip()
+                    start_local = datetime.fromisoformat(start_raw)
+                    end_local = datetime.fromisoformat(end_raw)
+                    if end_local <= start_local:
+                        raise ValueError("The batch end must be after its start.")
+                    settings = ShopSettings.query.get(1)
+                    limit = Decimal(request.form.get("batch_weight_limit", str(settings.dispatch_batch_weight_limit if settings else 50)) or "50")
+                    if limit <= 0:
+                        raise ValueError("Enter a positive batch weight limit.")
+                    batch = DispatchBatch(window_start=start_local.replace(tzinfo=ZoneInfo("Africa/Lagos")).astimezone(ZoneInfo("UTC")).replace(tzinfo=None), window_end=end_local.replace(tzinfo=ZoneInfo("Africa/Lagos")).astimezone(ZoneInfo("UTC")).replace(tzinfo=None), weight_limit=limit, assigned_weight=Decimal("0.000"), status="open")
+                    db.session.add(batch); db.session.flush()
+                from utils.dispatch_batches import order_weight
+                weight = order_weight(order)
+                if old_batch and old_batch.id != batch.id:
+                    old_batch.assigned_weight = max(Decimal("0"), Decimal(str(old_batch.assigned_weight or 0)) - weight)
+                if old_batch is None or old_batch.id != batch.id:
+                    batch.assigned_weight = Decimal(str(batch.assigned_weight or 0)) + weight
+                order.dispatch_batch = batch
+                order.preferred_delivery_window = request.form.get("batch_label", "").strip()[:120] or order.preferred_delivery_window
+                db.session.commit()
+                flash(f"Order assigned to batch #{batch.id}.", "success")
+            except (TypeError, ValueError, ArithmeticError) as error:
+                db.session.rollback(); flash(str(error) or "Enter valid batch details.", "error")
+            return redirect(url_for("admin.order_detail", order_ref=order.public_id))
         if request.form.get("action") == "edit_order_item":
             try:
                 item = next(item for item in order.items if item.id == int(request.form.get("item_id", "0")))
@@ -534,7 +606,7 @@ def order_detail(order_ref):
             db.session.commit()
         flash(message, "success" if ok else "error")
         return redirect(url_for("admin.order_detail", order_ref=order.public_id))
-    return render_template("admin/order_detail.html", order=order, statuses=ORDER_STATUSES)
+    return render_template("admin/order_detail.html", order=order, statuses=ORDER_STATUSES, open_batches=DispatchBatch.query.filter_by(status="open").order_by(DispatchBatch.window_start.asc()).limit(100).all())
 
 
 @admin_bp.get("/orders/<string:order_ref>/receipt")
@@ -932,14 +1004,22 @@ def products():
         except ValueError as error:
             flash(str(error), "error")
             return redirect(url_for("admin.products"))
+        raw_tag_color = request.form.get("promotional_tag_color", "217,75,53").strip()
+        try:
+            rgb = [int(part.strip()) for part in raw_tag_color.split(",")]
+            valid_tag_color = len(rgb) == 3 and all(0 <= value <= 255 for value in rgb)
+        except (TypeError, ValueError):
+            valid_tag_color = False
         if not name or len(name) > 120:
             flash("Enter a valid product name.", "error")
+        elif not valid_tag_color:
+            flash("Tag colour must be three RGB numbers between 0 and 255.", "error")
         else:
             image_path, image_error = save_product_image(request.files.get("image"))
             if image_error:
                 flash(image_error, "error")
                 return redirect(url_for("admin.products"))
-            db.session.add(Product(
+            product = Product(
                 name=name,
                 description=description[:2000],
                 price=price,
@@ -950,7 +1030,24 @@ def products():
                 low_stock_threshold=Decimal(request.form.get("low_stock_threshold", "5") or "5"),
                 minimum_order_quantity=max(Decimal("0.001"), Decimal(request.form.get("minimum_order_quantity", "1") or "1")),
                 processing_options=__import__("json").dumps([x.strip()[:120] for x in request.form.get("processing_options", "").replace(",", "\n").splitlines() if x.strip()][:8]),
-            ))
+                promotional_tag=request.form.get("promotional_tag", "").strip()[:40],
+                promotional_tag_color=",".join(str(value) for value in rgb),
+            )
+            db.session.add(product)
+            db.session.flush()
+            image_order = 0
+            if image_path:
+                db.session.add(ProductImage(product_id=product.id, image_path=image_path, sort_order=image_order))
+                image_order += 1
+            for upload in request.files.getlist("images"):
+                gallery_path, gallery_error = save_product_image(upload)
+                if gallery_error:
+                    db.session.rollback()
+                    flash(gallery_error, "error")
+                    return redirect(url_for("admin.products"))
+                if gallery_path:
+                    db.session.add(ProductImage(product_id=product.id, image_path=gallery_path, sort_order=image_order))
+                    image_order += 1
             db.session.commit()
             flash("Product added to the catalog.", "success")
         return redirect(url_for("admin.products"))
@@ -1000,6 +1097,7 @@ def edit_product(product_id):
         ).count() >= FEATURED_LIMIT:
             flash(f"You can only pin {FEATURED_LIMIT} products to the homepage. Remove one first.", "error")
             return render_edit()
+        previous_stock = Decimal(str(product.stock or 0))
         product.price = price
         product.stock = stock
         try:
@@ -1014,20 +1112,67 @@ def edit_product(product_id):
         product.name = request.form.get("name", "").strip()[:120] or product.name
         product.description = request.form.get("description", "").strip()[:2000]
         product.promotional_tag = request.form.get("promotional_tag", "").strip()[:40]
+        raw_tag_color = request.form.get("promotional_tag_color", "217,75,53").strip()
+        try:
+            rgb = [int(part.strip()) for part in raw_tag_color.split(",")]
+            if len(rgb) != 3 or any(value < 0 or value > 255 for value in rgb):
+                raise ValueError
+            product.promotional_tag_color = ",".join(str(value) for value in rgb)
+        except (TypeError, ValueError):
+            flash("Tag colour must be three RGB numbers between 0 and 255.", "error")
+            return render_edit()
         product.unit = request.form.get("unit", "per pack").strip()[:80] or "per pack"
         product.processing_options = __import__("json").dumps([x.strip()[:120] for x in request.form.get("processing_options", "").replace(",", "\n").splitlines() if x.strip()][:8])
         image_path, image_error = save_product_image(request.files.get("image"))
         if image_error:
             flash(image_error, "error")
             return render_edit()
+        image_order = len(product.gallery_images)
         if image_path:
             product.image = image_path
+            db.session.add(ProductImage(product_id=product.id, image_path=image_path, sort_order=image_order))
+            image_order += 1
+        for upload in request.files.getlist("images"):
+            gallery_path, gallery_error = save_product_image(upload)
+            if gallery_error:
+                db.session.rollback()
+                flash(gallery_error, "error")
+                return render_edit()
+            if gallery_path:
+                db.session.add(ProductImage(product_id=product.id, image_path=gallery_path, sort_order=image_order))
+                image_order += 1
         db.session.commit()
+        if product.active and Decimal(str(product.stock or 0)) > previous_stock:
+            send_customer_event_push("Product back in stock", f"{product.name} has more stock available at Beamers Farms.", f"/product/{product.id}", broadcast=True)
         if product.active and product.stock <= product.low_stock_threshold:
             send_owner_low_stock_push(product)
         flash("Product details saved.", "success")
         return redirect(url_for("admin.products"))
     return render_edit()
+
+
+@admin_bp.post("/products/<int:product_id>/images/<int:image_id>/delete")
+@admin_required
+def delete_product_image(product_id, image_id):
+    product = Product.query.get_or_404(product_id)
+    image = ProductImage.query.filter_by(id=image_id, product_id=product_id).first_or_404()
+    stored_path = image.image_path
+    db.session.delete(image)
+    db.session.flush()
+    remaining = ProductImage.query.filter_by(product_id=product_id).order_by(ProductImage.sort_order.asc(), ProductImage.id.asc()).all()
+    if product.image == stored_path:
+        product.image = remaining[0].image_path if remaining else "chicken"
+    db.session.commit()
+    if stored_path.startswith("uploads/products/") and not any(row.image_path == stored_path for row in remaining):
+        upload_root = Path(current_app.config["PRODUCT_UPLOAD_FOLDER"])
+        candidate = upload_root / Path(stored_path).name
+        try:
+            candidate.resolve().relative_to(upload_root.resolve())
+            candidate.unlink(missing_ok=True)
+        except (OSError, ValueError):
+            current_app.logger.warning("Could not remove product image file %s", stored_path)
+    flash("Product image removed.", "success")
+    return redirect(url_for("admin.edit_product", product_id=product_id))
 
 
 @admin_bp.post("/products/<int:product_id>/toggle")
@@ -1199,6 +1344,8 @@ def gallery_manager():
             active=request.form.get("active") == "yes", pinned=request.form.get("pinned") == "yes", sort_order=sort_order,
         ))
         db.session.commit()
+        if request.form.get("active") == "yes":
+            send_customer_event_push("New gallery post", title[:120], "/gallery", broadcast=True)
         flash("Gallery image added.", "success")
         return redirect(url_for("admin.gallery_manager"))
 
@@ -1523,6 +1670,7 @@ def updates():
             return render_template("admin/updates.html", updates=ShopUpdate.query.order_by(ShopUpdate.created_at.desc()).all(), search_query=search_query)
         db.session.add(ShopUpdate(topic=topic[:160], body=body, image=image, posted_by=posted_by[:80]))
         db.session.commit()
+        send_customer_event_push("New Beamers Farms update", topic[:120], "/updates", broadcast=True)
         flash("Update posted. Visitors will see it on the homepage.", "success")
         return redirect(url_for("admin.updates"))
     updates_query = ShopUpdate.query.order_by(ShopUpdate.created_at.desc())
@@ -1763,6 +1911,7 @@ def review_redelivery_request(request_id, action):
     if action == "decline":
         redelivery.status = "declined"
         db.session.commit()
+        send_customer_event_push("Redelivery request update", f"Your redelivery request for order #{order.public_id} was declined. Please contact Beamers Farms if you need help.", f"/order/{order.public_id}/{order.public_token}/success", order=order)
         flash(f"Redelivery request for order #{order.id} declined.", "success")
         return redirect(url_for("admin.dispatch_batches"))
     if order.status in {"Delivered", "Picked up", "Cancelled"} or order.payment_status != "Verified":
@@ -1780,6 +1929,7 @@ def review_redelivery_request(request_id, action):
         assign_dispatch_batch(order, next_window=True)
     redelivery.status = "accepted"
     db.session.commit()
+    send_customer_event_push("Redelivery request accepted", f"Your redelivery request for order #{order.public_id} was accepted.", f"/order/{order.public_id}/{order.public_token}/success", order=order)
     flash(f"Redelivery accepted. Order #{order.id} reopened and assigned to a new delivery batch.", "success")
     return redirect(url_for("admin.dispatch_batches"))
 
@@ -1831,12 +1981,16 @@ def coupons():
             gift_message = request.form.get("gift_message", "").strip()[:500]
             from utils.coupons import gift_coupon_to_customer
             gifted_count = 0
+            gifted_recipients = []
             for recipient in recipients:
                 already_gifted = Coupon.query.filter_by(gift_template_id=base_coupon.id, customer_id=recipient.id).first()
                 gift = gift_coupon_to_customer(base_coupon, recipient, gift_message)
                 if gift and not already_gifted:
                     gifted_count += 1
+                    gifted_recipients.append(recipient)
             db.session.commit()
+            for recipient in gifted_recipients:
+                send_customer_event_push("A coupon was added to your account", f"Coupon {base_coupon.code} is ready in your Beamers Farms account.", "/account#gifted-coupons", customer=recipient)
             flash(f"Personal coupon gifts added to {gifted_count} customer account(s). Existing gifts were not duplicated.", "success")
             return redirect(url_for("admin.coupons"))
         code=request.form.get("code", "").strip().upper(); dtype=request.form.get("discount_type", "percent")
@@ -1861,16 +2015,20 @@ def coupons():
                 excluded_product_ids=request.form.get("excluded_product_ids", "").strip()[:500],
                 auto_gift_new_customers=request.form.get("auto_gift_new_customers") == "yes",
             ))
-            db.session.commit(); flash("Coupon created.", "success")
+            db.session.commit(); send_customer_event_push("A new coupon is available", f"Use coupon {code} on an eligible Beamers Farms order.", "/account#gifted-coupons", broadcast=True); flash("Coupon created.", "success")
         return redirect(url_for("admin.coupons"))
     now = datetime.utcnow()
+    search_query = request.args.get("q", "").strip()[:120]
+    coupons_query = Coupon.query.order_by(Coupon.created_at.desc())
+    if search_query:
+        coupons_query = coupons_query.filter(or_(Coupon.code.ilike(f"%{search_query}%"), Coupon.discount_type.ilike(f"%{search_query}%")))
     gift_templates = Coupon.query.filter(
         Coupon.active.is_(True), Coupon.customer_id.is_(None),
         or_(Coupon.starts_at.is_(None), Coupon.starts_at <= now),
         or_(Coupon.ends_at.is_(None), Coupon.ends_at >= now),
     ).order_by(Coupon.code.asc()).all()
     return render_template(
-        "admin/coupons.html", coupons=Coupon.query.order_by(Coupon.created_at.desc()).all(),
+        "admin/coupons.html", coupons=coupons_query.all(), search_query=search_query,
         gift_templates=gift_templates,
         customer_count=Customer.query.filter(Customer.active.is_(True), Customer.deleted_at.is_(None)).count(),
     )
@@ -1920,6 +2078,41 @@ def analytics_settings():
     return redirect(url_for("admin.analytics"))
 
 
+@admin_bp.route("/team", methods=["GET", "POST"])
+@admin_required
+def manage_team():
+    import json
+    settings = ShopSettings.query.get(1)
+    if not settings:
+        settings = ShopSettings(id=1)
+        db.session.add(settings)
+        db.session.commit()
+    if request.method == "POST":
+        names = request.form.getlist("name")
+        roles = request.form.getlist("role")
+        bios = request.form.getlist("bio")
+        photos = request.form.getlist("photo")
+        members = []
+        for n, r, b, p in zip(names, roles, bios, photos):
+            n = (n or "").strip()
+            if not n:
+                continue
+            members.append({
+                "name": n[:120],
+                "role": (r or "").strip()[:80],
+                "bio": (b or "").strip()[:400],
+                "photo": (p or "").strip()[:500],
+            })
+        settings.team_members_json = json.dumps(members)
+        db.session.commit()
+        flash("Team details updated.", "success")
+        return redirect(url_for("admin.manage_team"))
+    try:
+        members = json.loads(settings.team_members_json or "[]")
+    except Exception:
+        members = []
+    return render_template("admin/team.html", team_members=members)
+
 @admin_bp.get("/analytics")
 @admin_required
 def analytics():
@@ -1943,7 +2136,32 @@ def analytics():
     daily = db.session.query(func.date(AnalyticsEvent.created_at).label("day"), func.count(AnalyticsEvent.id).label("views")).filter(AnalyticsEvent.created_at >= since, AnalyticsEvent.event_type == "page_view").group_by(func.date(AnalyticsEvent.created_at)).order_by(func.date(AnalyticsEvent.created_at)).all()
     settings = ShopSettings.query.get(1)
     tracked_paths = set((settings.analytics_paths if settings else "/").split(",")) or {"/"}
-    return render_template("admin/analytics.html", days=days, total_views=total_views, unique_visitors=unique_visitors, popular=popular, daily=daily, cart_adds=cart_adds, checkout_starts=checkout_starts, completed_orders=completed_orders, sales_total=sales_total, abandonment_rate=abandonment_rate, checkout_conversion=checkout_conversion, abandoned_carts=abandoned_carts, analytics_page_options=ANALYTICS_PAGE_OPTIONS, tracked_paths=tracked_paths, custom_tracked_paths=sorted(tracked_paths - {path for path, _label in ANALYTICS_PAGE_OPTIONS}))
+
+    # Classify traffic sources from stored referrers
+    def classify_source(ref: str) -> str:
+        if not ref:
+            return "Direct / Unknown"
+        r = ref.lower()
+        if "whatsapp" in r or "wa.me" in r or "api.whatsapp" in r:
+            return "WhatsApp"
+        if "facebook.com" in r or "fb.com" in r or "fb.me" in r or "m.facebook" in r:
+            return "Facebook"
+        if "twitter.com" in r or "t.co" in r or "x.com" in r:
+            return "X (Twitter)"
+        if "instagram.com" in r or "instagr.am" in r:
+            return "Instagram"
+        if any(s in r for s in ("google.", "bing.", "yahoo.", "duckduckgo.", "baidu.", "yandex.")):
+            return "Search"
+        return "Other"
+
+    source_counts = {}
+    page_view_events = events.filter_by(event_type="page_view").all()
+    for ev in page_view_events:
+        src = classify_source(ev.referrer or "")
+        source_counts[src] = source_counts.get(src, 0) + 1
+    source_breakdown = sorted(source_counts.items(), key=lambda x: -x[1])
+
+    return render_template("admin/analytics.html", days=days, total_views=total_views, unique_visitors=unique_visitors, popular=popular, daily=daily, cart_adds=cart_adds, checkout_starts=checkout_starts, completed_orders=completed_orders, sales_total=sales_total, abandonment_rate=abandonment_rate, checkout_conversion=checkout_conversion, abandoned_carts=abandoned_carts, analytics_page_options=ANALYTICS_PAGE_OPTIONS, tracked_paths=tracked_paths, custom_tracked_paths=sorted(tracked_paths - {path for path, _label in ANALYTICS_PAGE_OPTIONS}), source_breakdown=source_breakdown)
 
 
 @admin_bp.post("/analytics/clear")

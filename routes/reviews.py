@@ -1,9 +1,9 @@
 import hmac
 from datetime import datetime
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for, jsonify, session
 
-from models import ShopSettings, Order, Review, db
+from models import ShopSettings, Order, Review, ReviewHelpful, Customer, db
 from utils.notifications import normalize_nigerian_phone
 from utils.order_workflow import ORDER_STATUSES
 from utils.review_media import save_review_image
@@ -35,6 +35,26 @@ def _review_template():
         social_url=endpoint_url, canonical_url=endpoint_url,
     )
 
+
+
+
+@reviews_bp.post("/reviews/<int:review_id>/helpful")
+def toggle_review_helpful(review_id):
+    customer_id = session.get("customer_id")
+    customer = db.session.get(Customer, customer_id) if customer_id else None
+    if not customer or not customer.active:
+        return jsonify(ok=False, error="Sign in to mark a review helpful.", login_url=url_for("customer.login", next=request.referrer or url_for("shop.index"))), 401
+    review = Review.query.filter_by(id=review_id, status="Approved").first_or_404()
+    vote = ReviewHelpful.query.filter_by(review_id=review.id, customer_id=customer_id).first()
+    if vote:
+        db.session.delete(vote)
+        liked = False
+    else:
+        db.session.add(ReviewHelpful(review_id=review.id, customer_id=customer_id))
+        liked = True
+    db.session.commit()
+    count = ReviewHelpful.query.filter_by(review_id=review.id).count()
+    return jsonify(ok=True, liked=liked, count=count)
 
 @reviews_bp.route("/reviews", methods=["GET", "POST"])
 def submit_review():

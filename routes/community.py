@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, abort, flash, redirect, render_template, request, session, url_for, jsonify
 from sqlalchemy import or_
 
 from models import (
@@ -11,7 +11,7 @@ from models import (
 from routes.customer import current_customer
 from utils.community_media import community_image_url, save_community_image
 from utils.salesperson_permissions import salesperson_has_permission
-from utils.web_push import send_customer_community_reply_push
+from utils.web_push import send_customer_community_reply_push, send_customer_event_push
 
 community_bp = Blueprint("community", __name__, url_prefix="/community")
 CATEGORIES = ["Everything", "Order help", "Little notes", "Ideas & feedback"]
@@ -234,6 +234,7 @@ def special_post():
         return redirect(url_for("community.feed"))
     db.session.add(CommunityPost(customer_id=None, author_name="Beamers Farms", category=SPECIAL_CATEGORY, body=body, image=image))
     db.session.commit()
+    send_customer_event_push("New community post", "Beamers Farms has shared a new post with the community.", "/community", broadcast=True)
     flash("Your official Beamers Farms post is live in the community feed.", "success")
     return redirect(url_for("community.feed"))
 
@@ -270,18 +271,28 @@ def add_comment(post_id):
 
 @community_bp.post("/posts/<int:post_id>/react")
 def react(post_id):
+    wants_json = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     customer = require_customer()
     if not customer:
+        if wants_json:
+            return jsonify(ok=False, error="Sign in to like a post.", login_url=url_for("customer.login", next=url_for("community.feed"))), 401
         return write_redirect()
     if not community_write_guard():
+        if wants_json:
+            return jsonify(ok=False, error="Community reactions are currently closed."), 403
         return redirect(url_for("community.feed"))
     post = CommunityPost.query.filter_by(id=post_id, status="published").first_or_404()
     existing = CommunityReaction.query.filter_by(post_id=post.id, customer_id=customer.id).first()
     if existing:
         db.session.delete(existing)
+        liked = False
     else:
         db.session.add(CommunityReaction(post_id=post.id, customer_id=customer.id))
+        liked = True
     db.session.commit()
+    if wants_json:
+        count = CommunityReaction.query.filter_by(post_id=post.id).count()
+        return jsonify(ok=True, liked=liked, count=count)
     return redirect(url_for("community.feed"))
 
 
@@ -356,7 +367,10 @@ def report_post(post_id):
     reason = request.form.get("reason", "Something else")
     db.session.add(CommunityReport(post_id=post.id, reporter_customer_id=customer.id, reason=reason if reason in REPORT_REASONS else REPORT_REASONS[-1]))
     db.session.commit()
-    flash("Thank you. The community team will review this report.", "success")
+    message = "Thank you. The community team will review this report."
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({"ok": True, "message": message, "post_id": post.id})
+    flash(message, "success")
     return redirect(url_for("community.feed"))
 
 
@@ -440,6 +454,9 @@ def toggle_suggestion_considering(post_id):
         message = "Beamers Farms is considering your suggestion." if post.considering else "Beamers Farms updated the review status of your suggestion."
         db.session.add(CustomerNotice(customer_id=post.customer_id, title="Suggestion status updated", message=message, kind="community"))
     db.session.commit()
+    if post.customer_id:
+        customer = db.session.get(Customer, post.customer_id)
+        send_customer_event_push("Community notification", "Beamers Farms updated the status of your suggestion.", f"/community/post/{post.id}", customer=customer)
     flash("Suggestion status updated.", "success")
     return redirect(url_for("community.support"))
 

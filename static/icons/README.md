@@ -1,13 +1,11 @@
-PWA icons are resized, aspect-ratio-preserving copies of `../images/brand-mark.png`:
+Beamers Farms square brand artwork
+==================================
 
-- `icon-192.png`: standard install icon
-- `icon-512.png`: large and maskable install icon
-- `apple-touch-icon.png`: iOS home-screen icon
+The icon PNGs in this folder are resized from the square brand artwork supplied for this update.
+- icon-192.png: PWA icon / favicon fallback.
+- icon-512.png: high-resolution PWA icon.
+- apple-touch-icon.png: iOS home-screen icon.
+- notification-icon-192.png: Web Push notification icon.
+- notification-badge-96.png: Web Push badge asset.
 
-
-Beamers Farm ivory monogram assets:
-- `beamers-farm-ivory.svg`: vector favicon and manifest icon (`#FDF9ED`).
-- `notification-icon-192.png`: transparent PNG fallback for Web Push notification icons.
-- `notification-badge-96.png`: transparent compact PNG for notification badges.
-
-SVG is used directly for favicon and supported manifest contexts. Transparent PNG notification assets are intentionally retained for browser/OS compatibility because push notification icon support for SVG is inconsistent.
+The source brand mark is static/images/brand-mark.png.

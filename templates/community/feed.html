@@ -49,10 +49,10 @@
             <p class="community-post-body">{{ post.body|community_linkify }}</p>
             {% if post.image and community_image_url(post.image) %}<img class="community-post-image" src="{{ community_image_url(post.image) }}" alt="Image attached to a community post" loading="lazy">{% endif %}
             <div class="community-actions">
-              {% if customer and community_open and not community_blocked %}<form method="post" action="{{ url_for('community.react', post_id=post.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button type="submit">Like · {{ reactions[post.id] }}</button></form>{% else %}<span>{{ reactions[post.id] }} likes</span>{% endif %}
+              {% if customer and community_open and not community_blocked %}<form method="post" action="{{ url_for('community.react', post_id=post.id) }}" data-community-react data-csrf="{{ csrf_token() }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button type="submit" data-react-button>Like · <span data-react-count>{{ reactions[post.id] }}</span></button><span class="community-react-feedback" aria-live="polite"></span></form>{% else %}<span>{{ reactions[post.id] }} likes</span>{% endif %}
               <span>{{ comments[post.id]|length }} replies</span>
               {% if customer and post.customer_id and post.customer_id != customer.id %}<form method="post" action="{{ url_for('community.block_customer', customer_id=post.customer_id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button type="submit">Hide member</button></form>{% endif %}
-              {% if customer %}<form method="post" action="{{ url_for('community.report_post', post_id=post.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="reason" value="Something else"><button type="submit">Report</button></form>{% endif %}
+              {% if customer %}<form class="community-report-form" data-community-report method="post" action="{{ url_for('community.report_post', post_id=post.id) }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="reason" value="Something else"><button type="submit">Report</button></form>{% endif %}
             </div>
             <div class="community-replies">{% for comment in comments[post.id] %}<div class="community-reply {{ 'staff-reply' if comment.is_staff else '' }}"><strong>{{ comment_authors[comment.id] }}</strong>{% if comment.is_staff %}<span class="community-staff-badge">Beamers Farms team</span>{% endif %}<p>{{ comment.body|community_linkify }}</p><small>{{ comment.created_at|local_time("%d %b · %H:%M") }}</small></div>{% endfor %}
               {% if customer and community_open and not community_blocked %}<button class="reply-link" type="button" data-open-community-reply data-post-id="{{ post.id }}">Reply</button>{% elif not customer %}<p class="form-note"><a class="text-link" href="{{ url_for('customer.login', next=url_for('community.feed')) }}">Sign in to reply.</a></p>{% endif %}
@@ -100,4 +100,4 @@
   </dialog>
 {% endif %}
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='js/community.js') }}" defer></script>{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/community-report-async.js') }}" defer></script><script src="{{ url_for('static', filename='js/community-react.js') }}" defer></script><script src="{{ url_for('static', filename='js/community.js') }}" defer></script>{% endblock %}

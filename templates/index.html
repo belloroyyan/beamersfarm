@@ -2,7 +2,7 @@
 {% from "macros/update_sharing.html" import update_share_buttons %}
 {% from "macros/partner_ad_card.html" import partner_ad_card with context %}
 {% block title %}{{ page_title|default("Beamers Farms") }}{% endblock %}
-{% block structured_data %}<script type="application/ld+json">{{ {"@context":"https://schema.org", "@type":"LocalBusiness", "@id":canonical_url ~ "#business", "name":"Beamers Farms", "url":canonical_url, "logo":social_image, "image":social_image, "description":"Fresh, clean, hygienically packaged frozen chicken in Osogbo, Nigeria.", "telephone":"+2348062074302", "address":{"@type":"PostalAddress","streetAddress":"Elapop Estate, Oke Baale","addressLocality":"Osogbo","addressRegion":"Osun State","addressCountry":"NG"}, "areaServed":"Osogbo"}|tojson }}</script>{% endblock %}
+{% block structured_data %}<script type="application/ld+json">{{ {"@context":"https://schema.org", "@type":"LocalBusiness", "@id":canonical_url ~ "#business", "name":"Beamers Farms", "url":canonical_url, "logo":social_image, "image":social_image, "description":"Fresh, clean, hygienically packaged frozen chicken in Osogbo, Nigeria.", "telephone":"+2348129944488", "address":{"@type":"PostalAddress","streetAddress":"Plot 1, Elapop Estate, Ago-Koker, Along UNIOSUN Main Road, Oke Baale","addressLocality":"Osogbo","addressRegion":"Osun State","addressCountry":"NG"}, "areaServed":"Osogbo"}|tojson }}</script>{% endblock %}
 {% block content %}
 {% if not shop_is_open %}<div class="container shop-notice"><strong>Orders are currently closed.</strong><span>{{ shop_closed_message }}</span></div>{% endif %}
 {% if latest_update %}
@@ -32,6 +32,7 @@
     <div class="hero-card-overlay"><span>PACKED WITH CARE</span><strong>Clean portions. Fair prices.</strong></div>
   </div>
 </section>
+<section class="container homepage-metrics" aria-label="Beamers Farms community metrics"><div class="homepage-metrics-heading"><p class="eyebrow">Growing together</p><h2>Trusted by a growing community.</h2><p>Every order, review and customer account helps us serve Osogbo better.</p></div><div class="homepage-metric-grid"><div><strong>{{ homepage_metrics.orders }}</strong><span>Orders placed</span></div><div><strong>{{ homepage_metrics.customers }}</strong><span>Customer accounts</span></div><div><strong>{{ homepage_metrics.reviews }}</strong><span>Approved reviews</span></div></div><div class="homepage-join-actions"><a class="button button-dark" href="{{ url_for('customer.register') }}">Join Beamers Farms <span>→</span></a><button class="button button-outline pwa-install-inline" type="button" data-install-app hidden>Install Beamers</button></div></section>
 <section class="trust-strip">
   <div class="container trust-grid">
     <div><span class="trust-number">01</span><strong>Choose your portions</strong><small>Whole birds and delicious parts</small></div>
@@ -39,7 +40,7 @@
     <div><span class="trust-number">03</span><strong>Pay your way</strong><small>Opay transfer or secure online payment</small></div>
   </div>
 </section>
-{% if pinned_gallery %}<section class="container pinned-gallery-summary" aria-labelledby="pinned-gallery-heading"><div class="pinned-gallery-media">{% if pinned_gallery.media_type == "video" %}<video controls preload="metadata" src="{{ gallery_image_url(pinned_gallery.image) }}"></video>{% else %}<img src="{{ gallery_image_url(pinned_gallery.image) }}" alt="{{ pinned_gallery.title }}" loading="lazy">{% endif %}</div><a class="pinned-gallery-open" href="{{ url_for('shop.gallery') }}" aria-label="Explore the farm gallery">Explore gallery →</a></section>{% endif %}
+{% if pinned_gallery %}<section class="container pinned-gallery-summary" aria-labelledby="pinned-gallery-heading"><div class="pinned-gallery-media">{% if pinned_gallery.media_type == "video" %}<video controls preload="metadata" src="{{ gallery_image_url(pinned_gallery.image) }}"></video>{% else %}<img src="{{ gallery_image_url(pinned_gallery.image) }}" alt="{{ pinned_gallery.title }}" loading="lazy">{% endif %}</div><div class="pinned-gallery-copy"><div><p class="eyebrow">Pinned from the farm</p><h2 id="pinned-gallery-heading">{{ pinned_gallery.title }}</h2></div><a class="pinned-gallery-open" href="{{ url_for('shop.gallery') }}" aria-label="Explore the farm gallery">Explore gallery →</a></div></section>{% endif %}
 <section class="container section" id="products">
   <div class="section-heading"><div><p class="eyebrow">Beamers Farms quick menu</p><h2>Popular picks</h2></div><span class="section-note">Handpicked by the shop</span></div>
   {% if products %}
@@ -68,7 +69,7 @@
   <div class="partner-ad-grid">{% for listing in partner_ads %}{{ partner_ad_card(listing) }}{% endfor %}</div>
 </section>
 {% endif %}
-<section class="container note-panel"><div><p class="eyebrow">Made for Osogbo kitchens</p><h2>Freshness, hygiene, affordability, and portions that fit your table.</h2></div><p>From everyday family meals to restaurant prep and catering orders, Beamers Farms keeps frozen chicken simple, clean, and convenient. Need help choosing? <a class="note-link" href="https://wa.me/2348062074302" target="_blank" rel="noopener">Chat with us on WhatsApp.</a></p></section>
+<section class="container note-panel"><div><p class="eyebrow">Made for Osogbo kitchens</p><h2>Freshness, hygiene, affordability, and portions that fit your table.</h2></div><p>From everyday family meals to restaurant prep and catering orders, Beamers Farms keeps frozen chicken simple, clean, and convenient. Need help choosing? <a class="note-link" href="https://wa.me/2348129944488" target="_blank" rel="noopener">Chat with us on WhatsApp.</a></p></section>
 {% if cart_count %}<a class="cart-float" href="{{ url_for('shop.cart') }}">View cart <span class="cart-count">{{ format_quantity(cart_count) }}</span></a>{% endif %}
 {% endblock %}
-{% block scripts %}{% if latest_update %}<script src="{{ url_for('static', filename='js/update-sharing.js') }}" defer></script>{% endif %}{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/pwa-install.js') }}" defer></script>{% if latest_update %}<script src="{{ url_for('static', filename='js/update-sharing.js') }}" defer></script>{% endif %}{% endblock %}

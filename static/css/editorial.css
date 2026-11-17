@@ -476,12 +476,12 @@ input:not([type="radio"]):not([type="checkbox"]), select, textarea { border-radi
    Reports, receipts and watermark
    ========================================================================= */
 .print-receipt, .order-summary-report, .inventory-report, .sales-report {
-  background-color: #fff; background-image: url('../images/receipt-watermark-tile.svg'); background-repeat: repeat; background-size: 240px 240px;
+  background-color: #fff; background-image: url('../images/receipt-watermark.svg'); background-repeat: repeat; background-size: 240px 240px;
   border: 1px solid var(--ed-rule); border-radius: 12px; position: relative; isolation: isolate; overflow: hidden;
   -webkit-print-color-adjust: exact; print-color-adjust: exact;
 }
 .sales-report > *:not(.inventory-watermark) { position: relative; z-index: 1; }
-.inventory-watermark { position: absolute; z-index: 0; top: 40%; left: 4%; right: 4%; text-align: center; transform: rotate(-18deg); pointer-events: none; font-family: var(--ed-serif); font-size: clamp(1.4rem, 5vw, 3rem); font-weight: 700; letter-spacing: .2em; color: rgba(35, 56, 47, .06); }
+.inventory-watermark { position: absolute; z-index: 0; top: 40%; left: 4%; right: 4%; text-align: center; transform: rotate(-18deg); pointer-events: none; font-family: var(--ed-serif); font-size: clamp(1.4rem, 5vw, 3rem); font-weight: 700; letter-spacing: .2em; color: rgba(35, 56, 47, .12); }
 
 .report-cover { padding: 36px 28px 30px; margin-bottom: 26px; border-bottom: 1px solid var(--ed-ink); text-align: left; }
 .report-cover-logo { width: 64px; height: 64px; object-fit: contain; margin-bottom: 14px; }

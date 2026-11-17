@@ -8,6 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from models import (
     CustomerPushSubscription,
+    Customer,
     SalespersonAccount,
     StaffPushSubscription,
     db,
@@ -128,6 +129,42 @@ def send_customer_order_out_for_delivery_push(order, subscription_ids=None):
 def _customer_push_key(phone):
     normalized = normalize_nigerian_phone(phone) or " ".join((phone or "").split()).casefold()
     return hmac.new(str(current_app.config["SECRET_KEY"]).encode("utf-8"), normalized.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def send_customer_event_push(title, body, url="/account", *, customer=None, order=None, broadcast=False):
+    """Send opted-in customer push alerts for account-wide events or a specific customer/order."""
+    empty = {"configured": False, "total": 0, "sent": 0, "failed": 0, "expired": 0}
+    if not web_push_is_configured():
+        return empty
+    try:
+        keys = set()
+        subscriptions = []
+        if broadcast:
+            customers = Customer.query.filter_by(active=True, push_notifications_enabled=True).filter(Customer.deleted_at.is_(None)).all()
+            keys = {_customer_push_key(person.phone) for person in customers if person.phone}
+        elif customer is not None:
+            if customer.active and customer.push_notifications_enabled:
+                keys.add(_customer_push_key(customer.phone))
+        elif order is not None:
+            linked_customer = order.customer
+            if linked_customer is None:
+                # Guest orders can have a directly linked, explicitly opted-in device.
+                subscriptions.extend(list(order.customer_push_subscriptions))
+            elif linked_customer.active and linked_customer.push_notifications_enabled:
+                keys.add(_customer_push_key(linked_customer.phone))
+                subscriptions.extend(list(order.customer_push_subscriptions))
+        if keys:
+            subscriptions.extend(
+                CustomerPushSubscription.query.filter(CustomerPushSubscription.customer_key.in_(keys))
+                .order_by(CustomerPushSubscription.id.asc()).all()
+            )
+        # Deduplicate subscriptions that are linked to both the order and customer key.
+        unique = {item.id: item for item in subscriptions}
+        return _send_to_subscriptions(list(unique.values()), title, body, url, "customer")
+    except SQLAlchemyError:
+        db.session.rollback()
+        logger.exception("Could not resolve customer push subscriptions for event %s.", title)
+        return {**empty, "configured": True, "failed": 1}
 
 
 def send_customer_abandoned_cart_push(customer, cart_total=None):

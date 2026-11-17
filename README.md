@@ -45,3 +45,12 @@ Set `AUTO_CREATE_SCHEMA=false` in production and apply reviewed Alembic migratio
 - WhatsApp customer broadcasts require customer consent, the Meta Cloud API configuration, and a separately approved campaign template with a single body parameter. Email attachments are validated and are sent only through configured Resend.
 
 Account verification, online payment and messaging integrations remain unavailable until their respective server-only credentials and account approvals have been supplied by the Owner. Do not simulate successful payment or delivery in live mode.
+
+
+## Expanded feature update
+
+The current release adds PWA launcher shortcuts, a homepage install control and verified lower-bound metrics; owner-configurable delivery blackout dates and recurring weekdays; multi-image product galleries; asynchronous review helpful votes and community post likes; shop-open/shop-closed push events; coupon action dialogs; and compact admin record rows.
+
+Before deploying this release, back up the Railway MySQL database. The new Alembic migration is `f7a9c2d4e610`; leave the Flask service pre-deploy command as `python -m scripts.railway_migrate`. The migration joins the existing `u2f4a7c9e613` and `e1f2a3b4c5d6` heads and adds the product-image, helpful-vote and delivery-blackout storage. Do not reset or stamp the production database to bypass it.
+
+PWA shortcuts are shown by Android/Chrome and other launchers that implement the Web App Manifest `shortcuts` feature. iOS Home Screen does not expose the same long-press shortcut menu.

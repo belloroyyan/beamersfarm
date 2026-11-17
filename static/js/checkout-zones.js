@@ -9,6 +9,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const note = document.querySelector("[data-zone-fee-note]");
   const addressWrap = document.querySelector("[data-delivery-address-wrap]");
   const address = document.querySelector("#delivery-address");
+  const deliveryDateWrap = document.querySelector("[data-delivery-date-wrap]");
+  const deliveryDateInput = deliveryDateWrap?.querySelector("input[name=requested_delivery_date]");
+  const dateBlackoutError = deliveryDateWrap?.querySelector("[data-date-blackout-error]");
+  const blockedDates = new Set((deliveryDateInput?.dataset.blockedDates || "").split(",").filter(Boolean));
+  const blockedWeekdays = new Set((deliveryDateInput?.dataset.blockedWeekdays || "").split(",").filter(Boolean).map(Number));
+  const validateDeliveryDate = () => {
+    if (!deliveryDateInput) return true;
+    if (!deliveryDateInput.value) { deliveryDateInput.setCustomValidity(""); if (dateBlackoutError) dateBlackoutError.textContent = ""; return true; }
+    const selected = new Date(`${deliveryDateInput.value}T12:00:00`);
+    const blocked = blockedDates.has(deliveryDateInput.value) || blockedWeekdays.has((selected.getDay()+6)%7);
+    deliveryDateInput.setCustomValidity(blocked ? "Deliveries are unavailable on this date. Please choose another day." : "");
+    if (dateBlackoutError) dateBlackoutError.textContent = blocked ? "No deliveries are scheduled for this date." : "";
+    return !blocked;
+  };
+  deliveryDateInput?.addEventListener("change", validateDeliveryDate);
+  validateDeliveryDate();
   const pickupCard = document.querySelector("[data-pickup-address]");
   const disclaimer = document.querySelector("[data-zone-address-disclaimer]");
   const zoneDescription = document.querySelector("[data-zone-description]");
@@ -75,6 +91,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (mobileTotal) mobileTotal.textContent = chosen ? money(Math.max(0, subtotal + fee - discount)) : "Choose option";
     if (addressWrap) addressWrap.hidden = !chosen || pickup;
     if (address) address.required = chosen && !pickup;
+    if (deliveryDateWrap) deliveryDateWrap.hidden = !chosen || pickup;
+    if (deliveryDateInput) deliveryDateInput.required = false;
     if (pickupCard) pickupCard.hidden = !pickup;
     if (disclaimer) disclaimer.hidden = !chosen || pickup;
     if (note) {

@@ -1,20 +1,14 @@
 {
   "id": "/",
   "name": "Beamers Farms",
-  "short_name": "Beamers",
+  "short_name": "Beamers Farms",
   "description": "Fresh, clean, hygienically packaged frozen chicken in Osogbo, Nigeria.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f3f1eb",
+  "background_color": "#fdf9ed",
   "theme_color": "#23382f",
   "icons": [
-    {
-      "src": "/static/icons/beamers-farm-ivory.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
     {
       "src": "/static/icons/icon-192.png",
       "sizes": "192x192",
@@ -26,6 +20,32 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Live order stream",
+      "short_name": "Orders",
+      "description": "Open the live Beamers Farms order stream",
+      "url": "/admin/order-stream",
+      "icons": [
+        {
+          "src": "/static/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Record in-person sale",
+      "short_name": "In-person sale",
+      "description": "Record a sale at the farm",
+      "url": "/admin/in-person-orders",
+      "icons": [
+        {
+          "src": "/static/icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

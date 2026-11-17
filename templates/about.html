@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}About Beamers Farms{% endblock %}
+{% block content %}
+<div class="container detail-shell about-page">
+  <nav class="breadcrumb" aria-label="Breadcrumb"><a href="{{ url_for('shop.index') }}">Home</a><span aria-hidden="true">/</span><span>About</span></nav>
+
+  <header class="about-hero">
+    <p class="eyebrow">Our story · 2026</p>
+    <h1>About Beamers Farms</h1>
+    <p class="about-lede">Started by the Bellos, a family with experience in food and poultry, to make fresh, clean, hygienically packaged chicken easier to get in Osogbo.</p>
+  </header>
+
+  <section class="about-section">
+    <h2>Who we are</h2>
+    <p>In 2026, Beamers Farms was started by the Bellos, a family with experience in food and poultry. We wanted to make it easier for people in Osogbo to access fresh, clean, hygienically packaged chicken and reliable poultry products.</p>
+    <p>Our goal has always been to provide products that are reliable, fairly priced, and convenient. Beamers Farms is based in Oke Baale, Osogbo, and we are proud to serve customers in Osogbo.</p>
+    <p>We understand the needs of local households, families, restaurants, and businesses because we are part of the same community. That local connection influences how we package our products, communicate with customers, manage deliveries, and continue improving the business.</p>
+  </section>
+
+  <section class="about-section">
+    <h2>What makes us different</h2>
+    <p>Beamers Farms stands out among local poultry sellers in Osogbo by combining farm-to-table production with a modern e-commerce ordering experience. While many traditional poultry farms require buyers to visit in person, bargain over live birds, or handle slaughtering and cleaning themselves, Beamers Farms offers ready-to-cook frozen portions with transparent pricing and zone-based delivery.</p>
+    <div class="about-values">
+      <article><h3>Ready to cook</h3><p>Clean, hygienically packaged frozen portions — no live birds or home processing required.</p></article>
+      <article><h3>Clear pricing</h3><p>Transparent prices per unit so you know exactly what you are paying.</p></article>
+      <article><h3>Local delivery</h3><p>Zone-based delivery across Osogbo, or collect from the farm.</p></article>
+      <article><h3>Community focus</h3><p>Built for households, families, restaurants, and businesses in Osogbo.</p></article>
+    </div>
+  </section>
+
+  <section class="about-section">
+    <h2>How ordering works</h2>
+    <ol class="about-steps">
+      <li><strong>Browse</strong> the shop and choose your cuts and quantities.</li>
+      <li><strong>Checkout</strong> with delivery or farm pickup.</li>
+      <li><strong>Pay</strong> via the listed methods and we verify the payment.</li>
+      <li><strong>Receive</strong> your order at the agreed window or collect it ready.</li>
+    </ol>
+  </section>
+
+  {% if team_members %}
+  <section class="about-section">
+    <h2>The team</h2>
+    <div class="about-team">
+      {% for member in team_members %}
+      <article class="about-team-card">
+        {% if member.photo %}<img src="{{ member.photo }}" alt="{{ member.name }}" loading="lazy">{% endif %}
+        <div>
+          <strong>{{ member.name }}</strong>
+          {% if member.role %}<span>{{ member.role }}</span>{% endif %}
+          {% if member.bio %}<p>{{ member.bio }}</p>{% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="about-section about-contact">
+    <h2>Visit or contact us</h2>
+    <p><strong>Address</strong><br>Plot 1, Elapop Estate, Ago-Koker, Along UNIOSUN Main Road, Oke Baale, Osun State</p>
+    <p><strong>Opening hours</strong><br>Weekdays 7:00 AM – 7:00 PM</p>
+    <p><strong>Phone & WhatsApp</strong><br>
+      <a href="tel:+2348129944488">+234 812 994 4488</a><br>
+      <a href="tel:+2348062074302">+234 806 207 4302</a><br>
+      <a href="tel:+2349070579244">+234 907 057 9244</a><br>
+      <a href="tel:+2349034092567">+234 903 409 2567</a>
+    </p>
+    <p><a class="button button-lime" href="https://wa.me/2348129944488" target="_blank" rel="noopener">Chat on WhatsApp</a></p>
+    <p class="form-note">CAC registered · Registration No. 9967398</p>
+  </section>
+</div>
+{% endblock %}

@@ -11,7 +11,7 @@
         <p class="form-note">Your account is optional. Guest order tracking remains available when you check out without signing in.</p>
       </div>
       <div class="admin-actions">
-        <a class="button button-outline" href="{{ url_for('customer.wishlist') }}">Wishlist · {{ wishlist_count }}</a>
+        <a class="button button-outline" href="#customer-orders">My orders · {{ orders|length }}</a>
         <form method="post" action="{{ url_for('customer.logout') }}"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><button class="text-button" type="submit">Sign out</button></form>
       </div>
     </div>
@@ -75,7 +75,7 @@
           {% endif %}
         </section>
 
-        <section class="admin-panel customer-orders-panel">
+        <section class="admin-panel customer-orders-panel" id="customer-orders">
           <div class="panel-heading"><div><p class="eyebrow">Your orders</p><h2>Previous orders</h2></div><span class="section-note">{{ orders|length }} saved</span></div>
           {% if orders %}
             <div class="customer-order-list">{% for order in orders %}
@@ -95,7 +95,7 @@
       <aside class="customer-account-side">
         <section class="admin-panel customer-wishlist-summary"><p class="eyebrow">Saved for later</p><h2>Your wishlist</h2><p class="form-note">{{ wishlist_count }} product(s) saved to your list.</p><a class="button button-outline" href="{{ url_for('customer.wishlist') }}">Open wishlist <span>→</span></a></section>
         <section class="admin-panel" id="customer-notifications">
-          <p class="eyebrow">Customer notifications</p><h2>Stay updated</h2><p class="form-note">Receive new updates, gallery posts, community notices, coupons and order changes on this device.</p>
+          <p class="eyebrow">Customer notifications</p><h2>Stay updated</h2><p class="form-note">Receive order status and redelivery updates, new farm updates, gallery and community posts, coupons, and product restock alerts on this device.</p>
           <div class="account-push-panel" data-account-push data-vapid-public-key="{{ vapid_public_key }}" data-subscription-url="{{ url_for('customer.save_account_push_subscription') }}" data-csrf-token="{{ csrf_token() }}"><button class="button button-lime" type="button" data-account-push-enable>Enable notifications</button><p class="form-note" data-account-push-status role="status">Notifications are currently {{ 'enabled' if customer.push_notifications_enabled else 'off' }}.</p></div>
         </section>
         <section class="admin-panel">

@@ -1,6 +1,12 @@
-const CACHE_NAME = "beamers-farms-pwa-v26";
+const CACHE_NAME = "beamers-farms-pwa-v29";
 const OFFLINE_URL = "/static/offline.html";
 const PRECACHE_URLS = [
+  "/static/images/beamers-farms-lockup-transparent.png",
+  "/static/css/site-overrides.css",
+  "/static/js/community-report-async.js",
+  "/static/js/dispatch-batch-filters.js",
+  "/static/js/product-slideshow.js",
+  "/static/js/pwa-install.js",
   OFFLINE_URL,
   "/manifest.webmanifest",
   "/static/css/style.css",
@@ -24,10 +30,10 @@ const PRECACHE_URLS = [
   "/static/js/update-sharing.js",
   "/static/images/brand-mark.png",
   "/static/images/receipt-watermark.svg",
+  "/static/icons/beamers-farm-ivory.svg",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png",
   "/static/icons/apple-touch-icon.png",
-  "/static/icons/beamers-farm-ivory.svg",
   "/static/icons/notification-icon-192.png",
   "/static/icons/notification-badge-96.png"
 ];

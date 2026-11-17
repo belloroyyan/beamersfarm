@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Owner settings · Beamers Farms{% endblock %}
+{% block content %}
+<div class="admin-shell"><div class="container">
+  <div class="admin-topbar">
+    <div><a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to owner desk</a><p class="eyebrow">Owner-only controls</p><h1>Owner settings.</h1><p class="form-note">These controls can permanently remove selected business activity. Review each selection carefully.</p></div>
+  </div>
+    <section class="admin-panel danger-zone">
+    <div class="danger-copy"><p class="eyebrow">Danger zone</p><h2>Clear selected data</h2><p>Tick only what should be removed. Products, stock, delivery zones, staff accounts and shop settings are never included. Removing orders also removes their items, payment and refund history, linked reviews and WhatsApp logs; complaints are kept with the order link detached unless you select them too. Uploaded images are deleted with their updates, gallery items and partner listings. <strong>This cannot be undone.</strong></p></div>
+    <form method="post" action="{{ url_for('admin.clear_database') }}" class="danger-form" data-clear-form>
+      <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <div class="clear-category-picker">
+        {% for group_label, items in clear_groups %}
+        <fieldset class="clear-group">
+          <legend>{{ group_label }}</legend>
+          <button type="button" class="clear-group-toggle" data-clear-group-toggle>Select all</button>
+          <div class="clear-checkbox-list">
+            {% for key, label, hint in items %}
+            <label><input type="checkbox" name="{{ key }}" value="yes" data-clear-field><span><strong data-clear-label>{{ label }}</strong><small>{{ hint }}{% if clear_counts.get(key) is not none %} · <em>{{ clear_counts[key] }} record{{ '' if clear_counts[key] == 1 else 's' }}</em>{% endif %}</small></span></label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        {% endfor %}
+        <div class="selected-clear-wrap"><p class="field-label">You are about to clear</p><div id="selected-clear-categories" class="selected-clear-categories" aria-live="polite"><span class="field-help">No categories selected yet.</span></div></div>
+      </div>
+      <label class="consent-row clear-choice"><input type="checkbox" name="reset_pins" value="yes"><span><strong>Also unpin homepage products</strong><small>Products, prices and stock remain unchanged.</small></span></label>
+      <label><span>Type <strong>CLEAR</strong> to confirm</span><input type="text" name="confirm" autocomplete="off" required placeholder="CLEAR"></label>
+      <button class="button button-danger" type="submit" data-clear-submit disabled>Clear selected data</button>
+    </form>
+  </section>
+</div></div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/clear-categories.js') }}" defer></script>{% endblock %}

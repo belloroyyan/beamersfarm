@@ -4,7 +4,7 @@ from flask import Blueprint, abort, current_app, flash, jsonify, redirect, rende
 
 from models import DispatchBatch, Order, db
 from utils.push_subscriptions import delete_staff_push_subscription, save_staff_push_subscription
-from utils.web_push import web_push_is_configured
+from utils.web_push import send_customer_event_push, web_push_is_configured
 from utils.order_search import order_search_filter
 
 
@@ -80,6 +80,12 @@ def order_detail(order_ref):
         else:
             order.status = "Delivered"
             db.session.commit()
+            send_customer_event_push(
+                "Order delivered",
+                f"Order #{order.public_id} has been marked as delivered. Thank you for choosing Beamers Farms.",
+                f"/order/{order.public_id}/{order.public_token}/success",
+                order=order,
+            )
             flash("Delivery marked as complete. Thank you.", "success")
         return redirect(url_for("dispatch.dashboard"))
 

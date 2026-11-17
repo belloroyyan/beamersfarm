@@ -6,7 +6,7 @@ from flask import current_app, url_for
 from models import DeliveryRedeliveryRequest, DispatchBatch, Order, OrderNotification, ShopSettings, db
 from services.email import send_email
 from utils.notifications import normalize_nigerian_phone
-from utils.web_push import send_customer_order_confirmed_push
+from utils.web_push import send_customer_order_confirmed_push, send_customer_event_push
 
 TZ = ZoneInfo("Africa/Lagos")
 DONE = {"Delivered", "Picked up", "Cancelled"}
@@ -20,6 +20,20 @@ def _channels(settings):
     except (TypeError, ValueError):
         values = []
     return [v for v in values if v in {"push", "whatsapp", "email"}]
+
+def delivery_date_blocked(day, settings=None):
+    """Return True when a local calendar date or recurring weekday is blocked."""
+    settings = settings or _settings()
+    if not settings or not day:
+        return False
+    try:
+        rules = json.loads(settings.delivery_blackouts_json or "{}")
+    except (TypeError, ValueError):
+        rules = {}
+    dates = set(rules.get("dates") or [])
+    weekdays = {int(value) for value in (rules.get("weekdays") or []) if str(value).isdigit()}
+    return day.isoformat() in dates or day.weekday() in weekdays
+
 
 def delivery_windows(settings=None):
     settings = settings or _settings()
@@ -129,6 +143,11 @@ def sync_delivery_schedule():
             settings.is_open = target
             settings.updated_at = datetime.utcnow()
             db.session.commit()
+            send_customer_event_push(
+                "Beamers Farms is now open" if target else "Beamers Farms is now closed",
+                "The shop is open and accepting orders." if target else "The shop is closed for new orders. You can still browse the catalog.",
+                "/", broadcast=True,
+            )
     # Close all batches when the shop is closed; otherwise close only elapsed windows.
     if not settings.is_open:
         close_expired_batches(now, close_today=True)

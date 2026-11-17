@@ -39,6 +39,7 @@ class Product(db.Model):
     minimum_order_quantity = db.Column(db.Numeric(12, 3), nullable=False, default=Decimal("1.000"), server_default="1.000")
     processing_options = db.Column(db.Text, nullable=False, default="")
     promotional_tag = db.Column(db.String(40), nullable=False, default="", server_default="")
+    promotional_tag_color = db.Column(db.String(24), nullable=False, default="217,75,53", server_default="217,75,53")
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     order_items = db.relationship("OrderItem", back_populates="product")
@@ -52,6 +53,25 @@ class Product(db.Model):
     @property
     def is_available(self):
         return self.active and self.stock > 0
+
+class ProductImage(db.Model):
+    __tablename__ = "product_images"
+    id = db.Column(db.Integer, primary_key=True)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id", ondelete="CASCADE"), nullable=False, index=True)
+    image_path = db.Column(db.String(255), nullable=False)
+    sort_order = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    product = db.relationship("Product", backref=db.backref("gallery_images", cascade="all, delete-orphan", order_by="ProductImage.sort_order"))
+
+class ReviewHelpful(db.Model):
+    __tablename__ = "review_helpful"
+    __table_args__ = (db.UniqueConstraint("review_id", "customer_id", name="uq_review_helpful_customer"),)
+    id = db.Column(db.Integer, primary_key=True)
+    review_id = db.Column(db.Integer, db.ForeignKey("reviews.id", ondelete="CASCADE"), nullable=False, index=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    review = db.relationship("Review", backref=db.backref("helpful_votes", cascade="all, delete-orphan"))
+    customer = db.relationship("Customer")
 
 class ProductPackage(db.Model):
     __tablename__ = "product_packages"
@@ -139,9 +159,12 @@ class ShopSettings(db.Model):
     partner_forms_open = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
     delivery_open_time = db.Column(db.String(5), nullable=False, default="07:00", server_default="07:00")
     delivery_close_time = db.Column(db.String(5), nullable=False, default="19:00", server_default="19:00")
+    delivery_booking_days = db.Column(db.Integer, nullable=False, default=7, server_default="7")
     auto_shop_hours = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     delivery_windows_json = db.Column(db.Text, nullable=False, default='["9:00 AM – 11:00 AM", "3:00 PM – 5:00 PM"]', server_default='["9:00 AM – 11:00 AM", "3:00 PM – 5:00 PM"]')
+    team_members_json = db.Column(db.Text, nullable=False, default="[]", server_default="[]")
     closure_channels_json = db.Column(db.String(120), nullable=False, default='["push", "whatsapp", "email"]', server_default='["push", "whatsapp", "email"]')
+    delivery_blackouts_json = db.Column(db.Text, nullable=False, default='{"dates":[],"weekdays":[]}', server_default='{"dates":[],"weekdays":[]}')
 
 
 class DeliveryRedeliveryRequest(db.Model):
@@ -374,6 +397,7 @@ class Order(db.Model):
     address = db.Column(db.Text, nullable=False)
     email = db.Column(db.String(160), nullable=True)
     preferred_delivery_window = db.Column(db.String(120), nullable=True)
+    requested_delivery_date = db.Column(db.Date, nullable=True)
     customer_id = db.Column(db.Integer, db.ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
     whatsapp_opt_in = db.Column(db.Boolean, nullable=False, default=False)
     whatsapp_opt_in_at = db.Column(db.DateTime, nullable=True)
