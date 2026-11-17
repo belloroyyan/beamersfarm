@@ -15,14 +15,25 @@ depends_on = None
 
 
 def upgrade():
-    # Ensure team_members_json exists even if the branch migration was skipped.
     bind = op.get_bind()
     inspector = inspect(bind)
-    columns = {c["name"] for c in inspector.get_columns("shop_settings")}
+    columns = {c["name"]: c for c in inspector.get_columns("shop_settings")}
     if "team_members_json" not in columns:
         op.add_column(
             "shop_settings",
-            sa.Column("team_members_json", sa.Text(), nullable=False, server_default="[]"),
+            sa.Column("team_members_json", sa.Text(), nullable=True),
+        )
+        op.execute(
+            sa.text(
+                "UPDATE shop_settings SET team_members_json = :v WHERE team_members_json IS NULL"
+            ).bindparams(v="[]")
+        )
+        op.alter_column(
+            "shop_settings",
+            "team_members_json",
+            existing_type=sa.Text(),
+            existing_nullable=True,
+            nullable=False,
         )
 
 

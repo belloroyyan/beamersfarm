@@ -162,7 +162,7 @@ class ShopSettings(db.Model):
     delivery_booking_days = db.Column(db.Integer, nullable=False, default=7, server_default="7")
     auto_shop_hours = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     delivery_windows_json = db.Column(db.Text, nullable=False, default='["9:00 AM – 11:00 AM", "3:00 PM – 5:00 PM"]', server_default='["9:00 AM – 11:00 AM", "3:00 PM – 5:00 PM"]')
-    team_members_json = db.Column(db.Text, nullable=False, default="[]", server_default="[]")
+    team_members_json = db.Column(db.Text, nullable=False, default="[]")
     closure_channels_json = db.Column(db.String(120), nullable=False, default='["push", "whatsapp", "email"]', server_default='["push", "whatsapp", "email"]')
     delivery_blackouts_json = db.Column(db.Text, nullable=False, default='{"dates":[],"weekdays":[]}', server_default='{"dates":[],"weekdays":[]}')
 
