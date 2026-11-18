@@ -3916,3 +3916,19 @@ details.staff-profile-details[open] { box-shadow: none; }
 @media (prefers-reduced-motion: reduce) {
   .bank-account-card, .bank-account-card .copy-account-number, .nav-help-menu .nav-more-menu .nav-help-guide { animation:none !important; transition:none !important; }
 }
+
+
+/* 2026-11-18: Keep receipt and report branding almost imperceptible. */
+.print-receipt,
+.inventory-report,
+.order-summary-report {
+  background-image: url('../images/receipt-watermark.svg') !important;
+}
+.inventory-report-watermark {
+  opacity: 0.01 !important;
+}
+@media print {
+  .inventory-report-watermark {
+    opacity: 0.01 !important;
+  }
+}
