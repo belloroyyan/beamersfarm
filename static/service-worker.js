@@ -1,4 +1,4 @@
-const CACHE_NAME = "beamers-farms-pwa-v30";
+const CACHE_NAME = "beamers-farms-pwa-v31";
 const OFFLINE_URL = "/static/offline.html";
 const PRECACHE_URLS = [
   "/static/images/beamers-farms-lockup-transparent.png",
@@ -108,7 +108,7 @@ self.addEventListener("push", (event) => {
 
   event.waitUntil(self.registration.showNotification(title, {
     body,
-    icon: "/static/icons/notification-icon-192.png",
+    icon: "/static/icons/beamers-farm-ivory.svg",
     badge: "/static/icons/notification-badge-96.png",
     data: { url: targetUrl },
   }));
