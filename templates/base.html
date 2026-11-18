@@ -33,12 +33,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/refinement.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/community-release.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/polish.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/editorial.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/site-overrides.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/beamers-farms.css') }}">
   {% block head %}{% endblock %}
   {% block structured_data %}{% endblock %}
 </head>
@@ -154,7 +149,7 @@
             <a href="{{ url_for('shop.redelivery_lookup') }}">Request redelivery</a>
             </div>
       <div><h3>Community</h3><a href="{{ url_for('community.feed') }}">Community</a><a href="{{ url_for('reviews.testimonials') }}">Testimonials</a><a href="{{ url_for('reviews.submit_review') }}">Leave a review</a><a href="{{ url_for('customer.account') if current_customer else url_for('customer.login') }}">{{ 'My account' if current_customer else 'Customer account' }}</a></div>
-      <div><h3>Help & contact</h3><a href="https://wa.me/2348129944488" target="_blank" rel="noopener">WhatsApp +234 812 994 4488</a><a href="{{ url_for('shop.about') }}">About</a><a href="{{ url_for('shop.help_page') }}">Help centre</a><a href="{{ url_for('shop.privacy') }}">Privacy & security</a><a href="{{ url_for('complaints.create_complaint') }}">Customer care</a><div class="footer-social-links" aria-label="Beamers Farms social media"><a href="https://www.facebook.com/beamersfarms" target="_blank" rel="noopener noreferrer">Facebook</a><a href="https://www.instagram.com/beamersfarms/" target="_blank" rel="noopener noreferrer">Instagram</a><a href="https://www.tiktok.com/@beamersfarms" target="_blank" rel="noopener noreferrer">TikTok</a></div></div>
+      <div><h3>Help & contact</h3><a href="https://wa.me/2348129944488" target="_blank" rel="noopener">WhatsApp +234 812 994 4488</a><a href="{{ url_for('shop.about') }}">About</a><a href="{{ url_for('shop.help_page') }}">Help centre</a><a href="{{ url_for('shop.privacy') }}">Privacy & security</a><a href="{{ url_for('complaints.create_complaint') }}">Customer care</a></div>
     </div>
   </footer>
   <script src="{{ url_for('static', filename='js/admin-dialogs.js') }}" defer></script>
@@ -166,6 +161,5 @@
   <script src="{{ url_for('static', filename='js/pwa-register.js') }}" defer></script>
   <script src="{{ url_for('static', filename='js/live-sections.js') }}" defer></script>
   {% block scripts %}{% endblock %}
-  <script src="{{ url_for('static', filename='js/owner-view-switch.js') }}" defer></script>
 </body>
 </html>

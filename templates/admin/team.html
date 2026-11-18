@@ -1,39 +1,70 @@
 {% extends "base.html" %}
 {% block title %}Team · Owner desk{% endblock %}
 {% block content %}
-<div class="admin-shell"><div class="container">
+<div class="admin-shell team-admin-page"><div class="container">
   <div class="admin-topbar">
     <div>
       <a class="back-link" href="{{ url_for('admin.dashboard') }}">← Back to order desk</a>
       <p class="eyebrow">Owner settings</p>
       <h1>Team on the About page.</h1>
-      <p class="form-note">Add names, roles, short bios, and photo URLs. Leave name blank to skip a row. Changes appear on the public About page.</p>
+      <p class="form-note">Choose an existing staff account or enter a public team profile. Add as many members as you need; only saved members appear on the public About page.</p>
     </div>
+    <button class="button button-lime" type="button" data-open-team-member-dialog>Add team member <span>+</span></button>
   </div>
-  <form method="post" class="admin-panel account-form">
+
+  <form method="post" class="admin-panel team-editor-form" id="team-editor-form">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
-    <div id="team-rows">
+    <div class="team-editor-heading">
+      <div><p class="eyebrow">Public team profiles</p><h2>Current members</h2></div>
+      <span class="team-member-count" data-team-member-count>{{ team_members|length }} member{{ '' if team_members|length == 1 else 's' }}</span>
+    </div>
+    <div id="team-rows" class="team-rows">
       {% for m in team_members %}
-      <div class="team-row field-grid" style="margin-bottom:1rem;padding:1rem;background:#f8f4ea;border-radius:12px;">
-        <label>Name<input name="name" value="{{ m.name }}" maxlength="120"></label>
-        <label>Role<input name="role" value="{{ m.role }}" maxlength="80"></label>
-        <label>Photo URL<input name="photo" value="{{ m.photo }}" maxlength="500" placeholder="https://… or /static/…"></label>
-        <label>Short bio<textarea name="bio" rows="2" maxlength="400">{{ m.bio }}</textarea></label>
+      <div class="team-row" data-team-row>
+        <input type="hidden" name="staff_id" value="{{ m.staff_id|default('') }}" data-staff-id>
+        <div class="team-row-toolbar"><strong>Team member {{ loop.index }}</strong><button class="text-button team-remove-button" type="button" data-remove-team-member>Remove</button></div>
+        <div class="team-row-fields">
+          <label>Public name<input name="name" value="{{ m.name }}" maxlength="120" required></label>
+          <label>Role<input name="role" value="{{ m.role }}" maxlength="80" placeholder="e.g. Founder, Operations"></label>
+          <label class="team-row-wide">Photo URL<input name="photo" value="{{ m.photo }}" maxlength="500" placeholder="Optional image URL"></label>
+          <label class="team-row-wide">Short bio<textarea name="bio" rows="3" maxlength="400" placeholder="Optional introduction">{{ m.bio }}</textarea></label>
+        </div>
       </div>
       {% endfor %}
-      {% for _ in range(3) %}
-      <div class="team-row field-grid" style="margin-bottom:1rem;padding:1rem;background:#f8f4ea;border-radius:12px;">
-        <label>Name<input name="name" maxlength="120" placeholder="Full name"></label>
-        <label>Role<input name="role" maxlength="80" placeholder="e.g. Founder, Operations"></label>
-        <label>Photo URL<input name="photo" maxlength="500" placeholder="Optional image URL"></label>
-        <label>Short bio<textarea name="bio" rows="2" maxlength="400" placeholder="Optional"></textarea></label>
-      </div>
-      {% endfor %}
+    </div>
+    <div class="team-empty-state" data-team-empty {% if team_members %}hidden{% endif %}>
+      <strong>No team members added yet.</strong><span>Use Add team member to create the first public profile.</span>
     </div>
     <div class="form-actions">
       <a class="button button-outline" href="{{ url_for('admin.dashboard') }}">Cancel</a>
       <button class="button button-lime" type="submit">Save team</button>
     </div>
   </form>
+
+  <dialog class="admin-panel team-member-dialog" data-team-member-dialog aria-labelledby="team-member-dialog-title">
+    <button class="admin-dialog-x" type="button" data-close-team-member-dialog aria-label="Close">×</button>
+    <p class="eyebrow">About page</p>
+    <h2 id="team-member-dialog-title">Add team member</h2>
+    <p class="form-note">Select an active staff account to start with its name, or leave it unselected and enter a public profile manually.</p>
+    <div class="team-member-dialog-form">
+      <label>Existing staff member
+        <select data-new-staff-select>
+          <option value="">Enter a new public profile</option>
+          {% for account in staff_accounts %}
+          <option value="{{ account.id }}" data-name="{{ account.display_name }}">{{ account.display_name }} · @{{ account.username }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Public name<input data-new-member-name maxlength="120" placeholder="Full name" required></label>
+      <label>Role<input data-new-member-role maxlength="80" placeholder="e.g. Founder, Operations"></label>
+      <label>Photo URL<input data-new-member-photo maxlength="500" placeholder="Optional image URL"></label>
+      <label>Short bio<textarea data-new-member-bio rows="3" maxlength="400" placeholder="Optional introduction"></textarea></label>
+      <div class="form-actions">
+        <button class="button button-outline" type="button" data-close-team-member-dialog>Cancel</button>
+        <button class="button button-lime" type="button" data-add-team-member>Add member</button>
+      </div>
+    </div>
+  </dialog>
 </div></div>
 {% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/team-editor.js') }}" defer></script>{% endblock %}

@@ -1,19 +1,14 @@
-const CACHE_NAME = "beamers-farms-pwa-v29";
+const CACHE_NAME = "beamers-farms-pwa-v30";
 const OFFLINE_URL = "/static/offline.html";
 const PRECACHE_URLS = [
   "/static/images/beamers-farms-lockup-transparent.png",
-  "/static/css/site-overrides.css",
   "/static/js/community-report-async.js",
   "/static/js/dispatch-batch-filters.js",
   "/static/js/product-slideshow.js",
   "/static/js/pwa-install.js",
   OFFLINE_URL,
+  "/static/css/beamers-farms.css",
   "/manifest.webmanifest",
-  "/static/css/style.css",
-  "/static/css/refinement.css",
-  "/static/css/community-release.css",
-  "/static/css/polish.css",
-  "/static/css/editorial.css",
   "/static/js/cart.js",
   "/static/js/site-overlays.js",
   "/static/js/menu-fit.js",

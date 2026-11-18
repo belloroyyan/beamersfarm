@@ -2081,28 +2081,41 @@ def analytics_settings():
 @admin_bp.route("/team", methods=["GET", "POST"])
 @admin_required
 def manage_team():
-    import json
     settings = ShopSettings.query.get(1)
     if not settings:
         settings = ShopSettings(id=1)
         db.session.add(settings)
         db.session.commit()
     if request.method == "POST":
+        staff_ids = request.form.getlist("staff_id")
         names = request.form.getlist("name")
         roles = request.form.getlist("role")
         bios = request.form.getlist("bio")
         photos = request.form.getlist("photo")
         members = []
-        for n, r, b, p in zip(names, roles, bios, photos):
+        for staff_id_raw, n, r, b, p in zip(staff_ids, names, roles, bios, photos):
+            staff_id = None
+            try:
+                candidate_id = int(staff_id_raw or 0)
+                staff = db.session.get(SalespersonAccount, candidate_id) if candidate_id else None
+                if staff and staff.active:
+                    staff_id = staff.id
+                    if not (n or "").strip():
+                        n = staff.display_name
+            except (TypeError, ValueError):
+                staff = None
             n = (n or "").strip()
             if not n:
                 continue
-            members.append({
+            member = {
                 "name": n[:120],
                 "role": (r or "").strip()[:80],
                 "bio": (b or "").strip()[:400],
                 "photo": (p or "").strip()[:500],
-            })
+            }
+            if staff_id:
+                member["staff_id"] = staff_id
+            members.append(member)
         settings.team_members_json = json.dumps(members)
         db.session.commit()
         flash("Team details updated.", "success")
@@ -2111,7 +2124,12 @@ def manage_team():
         members = json.loads(settings.team_members_json or "[]")
     except Exception:
         members = []
-    return render_template("admin/team.html", team_members=members)
+    staff_accounts = (
+        SalespersonAccount.query.filter_by(active=True)
+        .order_by(SalespersonAccount.display_name.asc())
+        .all()
+    )
+    return render_template("admin/team.html", team_members=members, staff_accounts=staff_accounts)
 
 @admin_bp.get("/analytics")
 @admin_required
