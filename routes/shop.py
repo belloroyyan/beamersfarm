@@ -14,7 +14,7 @@ from flask import Blueprint, abort, current_app, flash, jsonify, make_response, 
 from sqlalchemy import or_
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import Review, AbandonedCart, Coupon, Customer, CustomerPushSubscription, DeliveryZone, DeliveryRedeliveryRequest, DropShare, GalleryImage, Order, OrderFinancialRecord, OrderItem, PartnerAdInvite, PartnerListing, Product, ProductPackage, ProductPackageItem, SalespersonAccount, ShopSettings, ShopUpdate, SiteOverlaySeen, WishlistItem, WholesaleOrder, WholesaleOrderItem, db
+from models import Review, AbandonedCart, Coupon, Customer, CustomerPushSubscription, DeliveryZone, DeliveryRedeliveryRequest, DropShare, GalleryImage, Order, OrderFinancialRecord, OrderItem, PartnerAdInvite, PartnerListing, Product, ProductPackage, ProductPackageItem, SalespersonAccount, ShopSettings, ShopUpdate, SiteOverlaySeen, WishlistItem, PaymentAccount, WholesaleOrder, WholesaleOrderItem, db
 from utils.helpers import build_cart, cart_processing_methods, format_quantity, parse_processing_selection, parse_quantity, product_uses_requested_kg, processing_options
 from utils.notifications import normalize_nigerian_phone
 from utils.product_images import product_image_url
@@ -302,7 +302,7 @@ def about():
             team = json.loads(settings.team_members_json or "[]")
         except Exception:
             team = []
-    return render_template("about.html", team_members=team)
+    return render_template("about.html", team_members=team, payment_accounts=PaymentAccount.query.filter_by(active=True).order_by(PaymentAccount.sort_order, PaymentAccount.id).all())
 
 @shop_bp.get("/help")
 def help_page():

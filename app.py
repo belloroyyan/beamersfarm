@@ -9,7 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config, INSTANCE_DIR
-from models import AnalyticsEvent, Coupon, Customer, CustomerNotice, DeliveryZone, Product, ShopSettings, db
+from models import AnalyticsEvent, Coupon, Customer, CustomerNotice, DeliveryZone, Product, PaymentAccount, ShopSettings, db
 from utils.delivery_operations import sync_delivery_schedule
 from routes.admin import admin_bp
 from routes.shop import shop_bp
@@ -163,9 +163,7 @@ def create_app():
             "format_quantity": format_quantity,
             "cart_count": cart_count(session.get("cart", {})),
             "csrf_token": csrf_token,
-            "payment_bank": app.config["PAYMENT_BANK"],
-            "payment_account_number": app.config["PAYMENT_ACCOUNT_NUMBER"],
-            "payment_account_name": app.config["PAYMENT_ACCOUNT_NAME"],
+            "payment_accounts": PaymentAccount.query.filter_by(active=True).order_by(PaymentAccount.sort_order, PaymentAccount.id).all(),
             "opay_checkout_enabled": opay_is_configured(),
             "vapid_public_key": app.config.get("VAPID_PUBLIC_KEY", ""),
             "shop_is_open": shop_settings.is_open if shop_settings else app.config["SHOP_OPEN_DEFAULT"],

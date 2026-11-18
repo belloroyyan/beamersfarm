@@ -15,7 +15,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from models import AbandonedCart, AnalyticsEvent, Coupon, Complaint, PrivacyRule, CommunityConductRule, Customer, CustomerNotice, CustomerNote, CustomerPushSubscription, CustomerMessageCampaign, CustomerMessageDelivery, DeliveryZone, DeliveryRedeliveryRequest, DispatchBatch, DropShare, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, PartnerListing, Product, ProductImage, ProductPackage, ProductPackageItem, Review, ReviewHelpful, SalespersonAccount, StaffActionLog, ShopSettings, ShopUpdate, StaffPushSubscription, WholesaleOrder, WholesaleOrderItem, PartnerAdInvite, SiteOverlaySeen, CommunityPost, CommunityComment, CommunityReaction, CommunityReport, CommunityBlock, CommunityNotification, db, order_customer_push_subscriptions
+from models import AbandonedCart, AnalyticsEvent, Coupon, Complaint, PrivacyRule, CommunityConductRule, Customer, CustomerNotice, CustomerNote, CustomerPushSubscription, CustomerMessageCampaign, CustomerMessageDelivery, DeliveryZone, DeliveryRedeliveryRequest, DispatchBatch, DropShare, GalleryImage, Order, OrderFinancialRecord, OrderItem, OrderNotification, PartnerListing, Product, ProductImage, ProductPackage, ProductPackageItem, Review, ReviewHelpful, SalespersonAccount, StaffActionLog, ShopSettings, ShopUpdate, StaffPushSubscription, WholesaleOrder, WholesaleOrderItem, PartnerAdInvite, PaymentAccount, SiteOverlaySeen, CommunityPost, CommunityComment, CommunityReaction, CommunityReport, CommunityBlock, CommunityNotification, db, order_customer_push_subscriptions
 from utils.notifications import build_order_confirmed_message, normalize_nigerian_phone
 from utils.product_images import save_product_image
 from utils.gallery import delete_gallery_image, save_gallery_image, save_gallery_media, gallery_media_type
@@ -437,6 +437,30 @@ def sales_report():
     )
 
 
+@admin_bp.route("/payment-accounts", methods=["GET", "POST"])
+@admin_required
+def payment_accounts():
+    if request.method == "POST":
+        action = request.form.get("action", "save")
+        if action == "delete":
+            account = db.session.get(PaymentAccount, int(request.form.get("account_id", "0") or 0))
+            if account: db.session.delete(account)
+        else:
+            account_id = int(request.form.get("account_id", "0") or 0)
+            account = db.session.get(PaymentAccount, account_id) if account_id else PaymentAccount()
+            account.bank_name = request.form.get("bank_name", "").strip()[:100]
+            account.account_number = re.sub(r"\s+", "", request.form.get("account_number", ""))[:30]
+            account.account_name = request.form.get("account_name", "").strip()[:120]
+            account.active = request.form.get("active") == "yes"
+            if not account.bank_name or not account.account_number or not account.account_name:
+                flash("Enter the bank, account number and account name.", "error")
+                return redirect(url_for("admin.payment_accounts"))
+            if not account_id: db.session.add(account)
+        db.session.commit(); flash("Bank accounts updated.", "success")
+        return redirect(url_for("admin.payment_accounts"))
+    return render_template("admin/payment_accounts.html", accounts=PaymentAccount.query.order_by(PaymentAccount.id).all())
+
+
 @admin_bp.route("/delivery-settings", methods=["GET", "POST"])
 @admin_required
 def delivery_settings():
@@ -517,6 +541,8 @@ def order_detail(order_ref):
     if request.method == "POST":
         if request.form.get("action") == "assign_dispatch_batch":
             try:
+                if order.fulfillment_type == "pickup":
+                    raise ValueError("Farm-pickup orders cannot be assigned to a dispatch batch.")
                 old_batch = order.dispatch_batch
                 batch_id = int(request.form.get("batch_id", "0") or 0)
                 if batch_id:

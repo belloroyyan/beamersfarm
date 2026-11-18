@@ -32,9 +32,9 @@
     </section>
     <aside class="admin-side">
       <section class="admin-panel payment-verification-panel">
-        <p class="eyebrow">{% if order.payment_method == 'opay_checkout' %}OPay hosted checkout{% elif order.payment_method in ['bank_transfer', 'manual_opay'] %}Manual OPay transfer{% else %}Earlier online payment record{% endif %}</p>
+        <p class="eyebrow">{% if order.payment_method == 'opay_checkout' %}OPay hosted checkout{% elif order.payment_method in ['bank_transfer', 'manual_opay'] %}Bank transfer{% else %}Earlier online payment record{% endif %}</p>
         <h2>{% if order.payment_status == 'Verified' %}Payment verified{% else %}Awaiting payment verification{% endif %}</h2>
-        <p class="form-note"><strong>Method:</strong> {% if order.payment_method == 'opay_checkout' %}OPay hosted checkout{% elif order.payment_method in ['bank_transfer', 'manual_opay'] %}Manual OPay transfer{% else %}Earlier online-payment setup{% endif %}{% if order.payment_channel %} · {{ order.payment_channel|title }}{% endif %}{% if order.payment_reference %}<br><strong>Reference:</strong> {{ order.payment_reference }}{% endif %}</p>
+        <p class="form-note"><strong>Method:</strong> {% if order.payment_method == 'opay_checkout' %}OPay hosted checkout{% elif order.payment_method in ['bank_transfer', 'manual_opay'] %}Bank transfer{% else %}Earlier online-payment setup{% endif %}{% if order.payment_channel %} · {{ order.payment_channel|title }}{% endif %}{% if order.payment_reference %}<br><strong>Reference:</strong> {{ order.payment_reference }}{% endif %}</p>
         {% if order.payment_status == 'Verified' %}<span class="status-pill status-delivered">Verified{% if order.payment_verified_at %} · {{ order.payment_verified_at|local_time("%d %b %Y · %H:%M") }}{% endif %}</span><p class="form-note"><strong>Verified by:</strong> {% if order.payment_verified_by_role == 'owner' %}Owner{% elif order.payment_verified_by_role == 'salesperson' %}Salesperson · {{ order.payment_verified_by_name or 'Name not recorded' }}{% elif order.payment_verified_by_role %}Automated payment provider (existing record){% else %}Not recorded for this earlier order{% endif %}</p>
         {% else %}<p>{% if order.payment_method not in ['bank_transfer', 'manual_opay', 'opay_checkout'] %}This order uses an earlier online-payment setup and is not processed by the current checkout. Check its payment against the business/provider records before using manual verification controls.{% elif order.payment_method == 'opay_checkout' %}OPay has not confirmed this transaction yet. Wait for the authenticated callback/status check, or use manual verification controls only after the exact amount appears in the business account.{% else %}Check that <strong>{{ format_currency(order.total) }}</strong> has actually appeared in the Beamers Farms business account. An order is not confirmed until this payment is verified.{% endif %}</p><p class="form-note">Unpaid orders remain unconfirmed. Cancel an abandoned unpaid order to return its reserved stock to the catalog.</p>{% endif %}
       {% if order.has_weight_priced_items %}<p class="weight-balance-note">The final amount is calculated after weighing. The customer settlement receipt shows the final total and any balance/refund due; the Owner financial ledger remains private.</p>{% endif %}
@@ -42,7 +42,7 @@
       {% if order.cancellation_requested_at and order.status not in ['Delivered', 'Picked up', 'Cancelled'] %}
       <section class="admin-panel insight-callout"><div><p class="eyebrow">Customer cancellation request</p><h2>Awaiting verification</h2><p>{{ order.cancellation_request_reason or 'No reason supplied.' }}</p><small>Requested {{ order.cancellation_requested_at|local_time("%d %b %Y · %H:%M") }}</small></div><form method="post"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="verify_customer_cancellation"><button class="button button-dark" type="submit">Verify cancellation & record refund</button></form></section>
       {% endif %}
-      <section class="admin-panel order-batch-editor">
+      {% if order.fulfillment_type != "pickup" %}<section class="admin-panel order-batch-editor">
         <p class="eyebrow">Dispatch assignment</p><h2>Edit Order Details</h2>
         <p class="form-note">Assign this order to an existing open batch or create a new batch now. New batches are created forcefully and may exceed the configured schedule; the weight limit is still recorded for planning.</p>
         <form method="post" class="stacked-form">
@@ -52,7 +52,7 @@
           <div class="field-grid"><label>Weight limit<input type="number" name="batch_weight_limit" min="0.001" step="0.001" value="50"></label><label>Batch label <span class="optional-label">optional</span><input name="batch_label" maxlength="120" placeholder="Manual dispatch window"></label></div>
           <button class="button button-outline" type="submit">Assign order to batch</button>
         </form>
-      </section>
+      </section>{% else %}<section class="admin-panel"><p class="eyebrow">Farm pickup</p><h2>No dispatch batch required</h2><p>This order is for farm pickup and cannot be assigned to a delivery batch.</p></section>{% endif %}
       <section class="admin-panel">
         <p class="eyebrow">Next action</p><h2>Update status</h2>
         <form method="post">

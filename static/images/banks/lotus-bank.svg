@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 300" role="img" aria-label="Lotus Bank logo">
+ <rect x="8" y="8" width="304" height="284" fill="#fff"/>
+ <rect x="16" y="16" width="288" height="188" fill="none" stroke="#00b9b8" stroke-width="12"/>
+ <g fill="#32206f" transform="translate(160 110)">
+  <path d="M0 70 C-12 30 -62 20 -80 -18 C-42 -28 -12 -5 0 25 C12 -5 42 -28 80 -18 C62 20 12 30 0 70Z"/>
+  <path d="M0 62 C-48 45 -66 2 -48 -34 C-18 -22 -4 8 0 35 C4 8 18 -22 48 -34 C66 2 48 45 0 62Z"/>
+  <path d="M-5 80 C-20 45 -14 0 0 -45 C14 0 20 45 5 80Z"/>
+  <path d="M-2 80 C-4 42 -2 10 0 -35 C2 10 4 42 2 80Z" fill="#00aaa9"/>
+ </g>
+ <text x="160" y="252" text-anchor="middle" font-family="Arial,sans-serif" font-size="42" font-weight="700" fill="#32206f">LOTUS</text>
+ <text x="160" y="282" text-anchor="middle" font-family="Arial,sans-serif" font-size="24" font-weight="700" fill="#32206f">BANK</text>
+</svg>

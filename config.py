@@ -102,9 +102,6 @@ class Config:
         "SHOP_CLOSED_MESSAGE",
         "We are currently closed for orders. You can still browse our products.",
     )
-    PAYMENT_BANK = os.environ.get("PAYMENT_BANK", "Opay")
-    PAYMENT_ACCOUNT_NUMBER = os.environ.get("PAYMENT_ACCOUNT_NUMBER", "8062074302")
-    PAYMENT_ACCOUNT_NAME = os.environ.get("PAYMENT_ACCOUNT_NAME", "Dauda Akanni Bello")
     OPAY_ENABLED = os.environ.get("OPAY_ENABLED", "false").lower() == "true"
     OPAY_ENVIRONMENT = os.environ.get("OPAY_ENVIRONMENT", "test").strip().lower()
     OPAY_MERCHANT_ID = os.environ.get("OPAY_MERCHANT_ID", "").strip()

@@ -136,6 +136,17 @@ class DeliveryZone(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
+class PaymentAccount(db.Model):
+    __tablename__ = "payment_accounts"
+    id = db.Column(db.Integer, primary_key=True)
+    bank_name = db.Column(db.String(100), nullable=False)
+    account_number = db.Column(db.String(30), nullable=False)
+    account_name = db.Column(db.String(120), nullable=False)
+    active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    sort_order = db.Column(db.Integer, nullable=False, default=0, server_default="0")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
 class ShopSettings(db.Model):
     __tablename__ = "shop_settings"
 

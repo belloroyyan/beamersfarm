@@ -64,8 +64,14 @@
   </section>
   {% endif %}
 
+
+  <section class="about-section about-bank-accounts" id="bank-details">
+    <div class="about-section-heading"><p class="eyebrow">Payment details</p><h2>Our bank account details.</h2><p>Use any of the business accounts below for bank transfer. Please confirm the total with us before payment.</p></div>
+    <div class="bank-account-grid">{% for account in payment_accounts %}<article class="bank-account-card"><div class="bank-card-brand"><span class="bank-card-monogram" aria-label="Beamers Farms">BF</span><span class="bank-card-bank-wordmark" aria-label="{{ account.bank_name }}">{{ account.bank_name.split()[0] }}</span></div><strong class="bank-card-number">{{ account.account_number }}</strong><div class="bank-card-meta"><div><small>Account name</small><strong>{{ account.account_name }}</strong></div><div><small>Bank</small><strong>{{ account.bank_name }}</strong></div></div><button type="button" class="copy-account-number" data-copy-account="{{ account.account_number }}">Copy account number</button></article>{% endfor %}</div>
+  </section>
+
   <section class="about-section about-contact">
-    <div class="about-contact-copy"><p class="eyebrow">Visit or contact us</p><h2>We would love to hear from you.</h2><p>Ask about products, delivery, pickup, or a bigger order for your restaurant or business.</p><a class="button button-lime" href="https://wa.me/2348129944488" target="_blank" rel="noopener">Chat on WhatsApp <span>→</span></a></div>
+    <div class="about-contact-copy"><p class="eyebrow">Visit or contact us</p><h2>We would love to hear from you.</h2><p>Ask about products, delivery, pickup, or a bigger order for your restaurant or business.</p><a class="button button-lime" href="https://wa.me/2348129944488" target="_blank" rel="noopener">Chat on WhatsApp <span>→</span></a><img class="about-whatsapp-qr" src="{{ url_for('static', filename='images/beamers-whatsapp-qr.jpeg') }}" alt="Scan to start a WhatsApp chat with Beamers Farms" loading="lazy"></div>
     <div class="about-contact-details"><div><strong>Address</strong><p>Plot 1, Elapop Estate, Ago-Koker, Along UNIOSUN Main Road, Oke Baale, Osun State</p></div><div><strong>Opening hours</strong><p>Weekdays<br>7:00 AM – 7:00 PM</p></div><div><strong>Phone & WhatsApp</strong><p><a href="tel:+2348129944488">+234 812 994 4488</a><br><a href="tel:+2348062074302">+234 806 207 4302</a><br><a href="tel:+2349070579244">+234 907 057 9244</a><br><a href="tel:+2349034092567">+234 903 409 2567</a></p></div></div>
     <p class="form-note about-registration">CAC registered · Registration No. 9967398</p>
   </section>

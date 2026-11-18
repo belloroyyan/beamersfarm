@@ -39,7 +39,7 @@ Set `AUTO_CREATE_SCHEMA=false` in production and apply reviewed Alembic migratio
 
 ## Integrations
 
-- OPay hosted checkout is disabled until the Owner supplies approved test/live merchant configuration; manual OPay transfer remains available. See [`OPAY_SETUP.md`](OPAY_SETUP.md) for the provider contracts and credential checklist.
+- OPay hosted checkout is disabled until the Owner supplies approved test/live merchant configuration; bank transfer remains available. See [`OPAY_SETUP.md`](OPAY_SETUP.md) for the provider contracts and credential checklist.
 - Email verification and owner email campaigns use a provider-neutral Resend transport. Resend is not used. Resend configuration is optional until the Owner activates it.
 - Customer browser push and abandoned-cart recovery require VAPID settings. Cart recovery is processed by the separate recurring command `python -m scripts.process_abandoned_carts`, not by the Gunicorn web request worker; schedule it in the chosen deployment environment after configuration.
 - WhatsApp customer broadcasts require customer consent, the Meta Cloud API configuration, and a separately approved campaign template with a single body parameter. Email attachments are validated and are sent only through configured Resend.

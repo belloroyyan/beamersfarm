@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Bank accounts{% endblock %}
+{% block content %}
+<div class="container page-shell bank-settings-page">
+  <div class="page-heading"><div><p class="eyebrow">Owner settings</p><h1>Bank accounts</h1><p>Add or update the bank accounts shown to customers at checkout and on the About page.</p></div></div>
+  <section class="admin-panel bank-account-editor">
+    <div class="bank-editor-heading"><span class="bank-editor-icon">＋</span><div><h2>Add bank account</h2><p>Choose a bank, then enter the account details customers should use.</p></div></div>
+    <form method="post" class="bank-account-form"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+      <label>Bank<select name="bank_name" required><option value="">Choose a bank</option>{% for bank in ['Access Bank','Citibank Nigeria','Ecobank','Fidelity Bank','First Bank of Nigeria','FCMB','Globus Bank','Guaranty Trust Bank','Heritage Bank','Jaiz Bank','Keystone Bank','Kuda Bank','LOTUS Bank','Moniepoint MFB','Optimus Bank','Polaris Bank','PremiumTrust Bank','Providus Bank','Stanbic IBTC','Standard Chartered','Sterling Bank','SunTrust Bank','TAJBank','Titan Trust Bank','Union Bank','United Bank for Africa','Unity Bank','Wema Bank','Zenith Bank','Other'] %}<option value="{{ bank.strip() }}">{{ bank.strip() }}</option>{% endfor %}</select></label>
+      <label>Account number<input name="account_number" required inputmode="numeric" maxlength="30" placeholder="Enter account number"></label>
+      <label>Account name<input name="account_name" required maxlength="120" placeholder="e.g. Beamers Farms"></label>
+      <label class="bank-account-active"><input type="checkbox" name="active" value="yes" checked><span>Show this account to customers</span></label>
+      <button class="button button-dark" type="submit">Add bank account</button>
+    </form>
+  </section>
+  <div class="bank-account-admin-list">{% for account in accounts %}
+    <section class="admin-panel bank-account-editor">
+      <div class="bank-editor-heading"><span class="bank-editor-icon">BF</span><div><h2>{{ account.bank_name }}</h2><p>Account #{{ account.id }} · {{ 'Visible to customers' if account.active else 'Hidden from customers' }}</p></div></div>
+      <form method="post" class="bank-account-form"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="account_id" value="{{ account.id }}">
+        <label>Bank<select name="bank_name" required>{% if account.bank_name not in ['Access Bank','Citibank Nigeria','Ecobank','Fidelity Bank','First Bank of Nigeria','FCMB','Globus Bank','Guaranty Trust Bank','Heritage Bank','Jaiz Bank','Keystone Bank','Kuda Bank','LOTUS Bank','Moniepoint MFB','Optimus Bank','Polaris Bank','PremiumTrust Bank','Providus Bank','Stanbic IBTC','Standard Chartered','Sterling Bank','SunTrust Bank','TAJBank','Titan Trust Bank','Union Bank','United Bank for Africa','Unity Bank','Wema Bank','Zenith Bank','Other'] %}<option selected value="{{ account.bank_name }}">{{ account.bank_name }}</option>{% endif %}{% for bank in ['Access Bank','Citibank Nigeria','Ecobank','Fidelity Bank','First Bank of Nigeria','FCMB','Globus Bank','Guaranty Trust Bank','Heritage Bank','Jaiz Bank','Keystone Bank','Kuda Bank','LOTUS Bank','Moniepoint MFB','Optimus Bank','Polaris Bank','PremiumTrust Bank','Providus Bank','Stanbic IBTC','Standard Chartered','Sterling Bank','SunTrust Bank','TAJBank','Titan Trust Bank','Union Bank','United Bank for Africa','Unity Bank','Wema Bank','Zenith Bank','Other'] %}<option value="{{ bank }}" {% if account.bank_name == bank %}selected{% endif %}>{{ bank }}</option>{% endfor %}</select></label>
+        <label>Account number<input name="account_number" value="{{ account.account_number }}" required inputmode="numeric" maxlength="30"></label>
+        <label>Account name<input name="account_name" value="{{ account.account_name }}" required maxlength="120"></label>
+        <label class="bank-account-active"><input type="checkbox" name="active" value="yes" {% if account.active %}checked{% endif %}><span>Show this account to customers</span></label>
+        <div class="bank-account-form-actions"><button class="button button-dark" type="submit">Save changes</button></div>
+      </form>
+      <form method="post" class="bank-account-delete" onsubmit="return confirm('Delete this bank account?')"><input type="hidden" name="_csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="action" value="delete"><input type="hidden" name="account_id" value="{{ account.id }}"><button class="button button-outline" type="submit">Delete account</button></form>
+    </section>
+  {% else %}<p class="empty-state">No bank accounts have been added yet.</p>{% endfor %}</div>
+</div>
+{% endblock %}
